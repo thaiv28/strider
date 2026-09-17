@@ -13,3 +13,4 @@ server.log
 
 # db backups (local restore point)
 backups/
+ops/seed/*.sql

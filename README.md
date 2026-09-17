@@ -3,6 +3,10 @@
 Backpacking trip planner + gear/weight tracker. Stores gear, meals, trips,
 routes, and per-trip weight/calorie rollups; the frontend is layered on later.
 
+The private hosted instance is published at `https://backpack.thaiv.dev` through
+the `main` branch deployment workflow. See `docs/adr/` for the initial hosting
+and data-protection decisions.
+
 ## Stack
 
 - **PostgreSQL** (via Docker) · **Drizzle ORM** + drizzle-kit migrations · **TypeScript** (tsx)

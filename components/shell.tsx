@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
-import { CalendarDays, Settings } from "lucide-react";
+import { CalendarDays, LogOut, Settings } from "lucide-react";
 import { cn } from "@/lib/util";
 import { useUnsaved } from "@/components/unsaved-changes";
+import { logout } from "@/app/login/actions";
 
 const NAV = [
   { href: "/", label: "Basecamp" },
@@ -76,6 +77,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
             >
               <Settings size={18} />
             </Link>
+            <form action={logout}>
+              <button type="submit" aria-label="Log out" className="text-muted transition hover:text-ink">
+                <LogOut size={18} />
+              </button>
+            </form>
           </div>
         </div>
       </header>

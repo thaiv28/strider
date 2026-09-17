@@ -1,0 +1,134 @@
+name: Deploy Backpack App
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-backpack
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      AWS_REGION: us-west-2
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+      ECR_URI: ${{ vars.ECR_URI }}
+      DEPLOY_BUCKET: ${{ vars.DEPLOY_BUCKET }}
+      BACKUP_BUCKET: ${{ vars.BACKUP_BUCKET }}
+      INSTANCE_ID: ${{ vars.INSTANCE_ID }}
+      SECRET_ARN: ${{ vars.SECRET_ARN }}
+      DISTRIBUTION_ID: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}
+      APP_PASSWORD_HASH: ${{ secrets.APP_PASSWORD_HASH }}
+      SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      ORIGIN_SECRET: ${{ secrets.ORIGIN_SECRET }}
+      BACKUP_KEY: ${{ secrets.BACKUP_KEY }}
+      FDC_API_KEY: ${{ secrets.FDC_API_KEY }}
+      GEOAPIFY_API_KEY: ${{ secrets.GEOAPIFY_API_KEY }}
+      NEXT_PUBLIC_WAQI_TOKEN: ${{ secrets.NEXT_PUBLIC_WAQI_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Check deployment configuration
+        shell: bash
+        run: |
+          required=(AWS_ROLE_ARN ECR_URI DEPLOY_BUCKET BACKUP_BUCKET INSTANCE_ID SECRET_ARN DISTRIBUTION_ID APP_PASSWORD_HASH SESSION_SECRET DB_PASSWORD ORIGIN_SECRET BACKUP_KEY)
+          for name in "${required[@]}"; do
+            if [[ -z "${!name}" ]]; then
+              echo "Missing deployment setting: $name"
+              exit 1
+            fi
+          done
+
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run build
+
+      - uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          role-session-name: backpack-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+          mask-aws-account-id: true
+
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push application image
+        shell: bash
+        run: |
+          docker buildx build \
+            --platform linux/arm64 \
+            --build-arg "NEXT_PUBLIC_WAQI_TOKEN=$NEXT_PUBLIC_WAQI_TOKEN" \
+            --tag "$ECR_URI:${GITHUB_SHA}" \
+            --push .
+
+      - name: Store runtime secrets
+        shell: bash
+        run: |
+          secret_json=$(jq -n \
+            --arg db "$DB_PASSWORD" \
+            --arg password "$APP_PASSWORD_HASH" \
+            --arg session "$SESSION_SECRET" \
+            --arg origin "$ORIGIN_SECRET" \
+            --arg backup "$BACKUP_KEY" \
+            --arg fdc "$FDC_API_KEY" \
+            --arg geo "$GEOAPIFY_API_KEY" \
+            '{DB_PASSWORD:$db,APP_PASSWORD_HASH:$password,SESSION_SECRET:$session,ORIGIN_SECRET:$origin,BACKUP_KEY:$backup,FDC_API_KEY:$fdc,GEOAPIFY_API_KEY:$geo}')
+          aws secretsmanager put-secret-value --secret-id "$SECRET_ARN" --secret-string "$secret_json" >/dev/null
+
+      - name: Upload deployment assets
+        shell: bash
+        run: |
+          aws s3 cp ops/deploy-ec2.sh "s3://$DEPLOY_BUCKET/deploy/deploy-ec2.sh"
+          aws s3 cp ops/nginx.conf.template "s3://$DEPLOY_BUCKET/deploy/nginx.conf.template"
+          aws s3 cp ops/seed/backpack.sql.enc "s3://$DEPLOY_BUCKET/seed/backpack.sql.enc"
+
+      - name: Deploy on the instance
+        shell: bash
+        run: |
+          commands=$(jq -cn \
+            --arg bucket "$DEPLOY_BUCKET" \
+            --arg backup "$BACKUP_BUCKET" \
+            --arg ecr "$ECR_URI" \
+            --arg secret "$SECRET_ARN" \
+            --arg tag "$GITHUB_SHA" \
+            '{commands:["aws s3 cp s3://"+$bucket+"/deploy/deploy-ec2.sh /tmp/deploy-ec2.sh","chmod 700 /tmp/deploy-ec2.sh","ECR_URI="+$ecr+" DEPLOY_BUCKET="+$bucket+" BACKUP_BUCKET="+$backup+" SECRET_ARN="+$secret+" IMAGE_TAG="+$tag+" /tmp/deploy-ec2.sh"]}')
+          command_id=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --parameters "$commands" \
+            --query Command.CommandId \
+            --output text)
+          if ! aws ssm wait command-executed --command-id "$command_id" --instance-id "$INSTANCE_ID"; then
+            aws ssm get-command-invocation --command-id "$command_id" --instance-id "$INSTANCE_ID"
+            exit 1
+          fi
+
+      - name: Publish and verify
+        shell: bash
+        run: |
+          invalidation_id=$(aws cloudfront create-invalidation \
+            --distribution-id "$DISTRIBUTION_ID" \
+            --paths '/*' \
+            --query Invalidation.Id \
+            --output text)
+          aws cloudfront wait invalidation-completed \
+            --distribution-id "$DISTRIBUTION_ID" \
+            --id "$invalidation_id"
+          curl --fail --retry 12 --retry-delay 10 --retry-all-errors https://backpack.thaiv.dev/api/health
