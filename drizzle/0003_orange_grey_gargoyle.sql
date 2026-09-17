@@ -1,0 +1,1 @@
+ALTER TABLE "gear_item" ADD COLUMN "quantity" integer DEFAULT 1 NOT NULL;

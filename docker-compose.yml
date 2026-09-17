@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16
+    container_name: backpack-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: backpack
+      POSTGRES_PASSWORD: backpack
+      POSTGRES_DB: backpack
+    ports:
+      - "5433:5432"
+    volumes:
+      - backpack-pgdata:/var/lib/postgresql/data
+
+volumes:
+  backpack-pgdata:
