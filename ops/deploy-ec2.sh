@@ -22,6 +22,7 @@ cat > /srv/backpack/runtime.env <<EOF
 DATABASE_URL=postgres://backpack:${db_password}@backpack-db:5432/backpack
 APP_PASSWORD_HASH=${app_password_hash}
 SESSION_SECRET=${session_secret}
+APP_ORIGIN=https://backpack.thaiv.dev
 FDC_API_KEY=${fdc_api_key}
 GEOAPIFY_API_KEY=${geoapify_api_key}
 EOF
