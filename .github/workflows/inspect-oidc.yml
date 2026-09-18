@@ -1,0 +1,21 @@
+name: Inspect OIDC Subject
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print non-secret identity claims
+        shell: bash
+        run: |
+          response=$(curl --fail --silent --show-error \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com")
+          token=$(jq -r .value <<<"$response")
+          TOKEN="$token" node -e 'const p=JSON.parse(Buffer.from(process.env.TOKEN.split(".")[1],"base64url")); console.log(JSON.stringify({sub:p.sub,aud:p.aud}))'
