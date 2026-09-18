@@ -51,12 +51,12 @@ export function HomeView({ trips, baseG, byCategory, nextReady }: Props) {
   ];
 
   return (
-    <div className="mx-auto max-w-5xl px-4 sm:px-8 py-10">
-      <div className="relative overflow-hidden rounded-[var(--radius)] border bg-panel px-6 py-7">
+    <div className="mx-auto max-w-5xl px-4 py-6 sm:px-8 sm:py-10">
+      <div className="relative overflow-hidden rounded-[var(--radius)] border bg-panel px-4 py-6 sm:px-6 sm:py-7">
         <Contours className="pointer-events-none absolute -top-24 -right-16 h-80 w-80 text-cworn/20" />
         <div className="eyebrow">◇ Season 2026</div>
         <h1 className="font-display mt-1 text-3xl font-bold tracking-tight">Basecamp</h1>
-        <div className="relative mt-5 grid grid-cols-2 gap-x-10 gap-y-4 sm:grid-cols-4">
+        <div className="relative mt-5 grid grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-4 sm:gap-x-10">
           {stats.map((st) => (
             <div key={st.label}>
               <div className="eyebrow">{st.label}</div>

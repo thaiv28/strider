@@ -139,8 +139,8 @@ export function GearFrame({
   };
 
   return (
-    <div className="mx-auto max-w-5xl px-4 sm:px-8 py-10">
-      <div className="flex items-end justify-between gap-4">
+    <div className="mx-auto max-w-5xl px-4 py-6 sm:px-8 sm:py-10">
+      <div className="flex flex-wrap items-end justify-between gap-3 sm:gap-4">
         <div>
           <div className="eyebrow">◇ Inventory</div>
           <h1 className="font-display mt-1 text-3xl font-bold tracking-tight">Gear Library</h1>

@@ -40,7 +40,7 @@ export function PantryView({ ingredients, meals }: { ingredients: IngredientRow[
   };
 
   return (
-    <div className="mx-auto max-w-3xl px-4 sm:px-8 py-10">
+    <div className="mx-auto max-w-3xl px-4 py-6 sm:px-8 sm:py-10">
       <div className="flex items-end justify-between">
         <div>
           <div className="eyebrow">◇ Pantry</div>
@@ -173,24 +173,60 @@ function PublicSearch() {
 function IngredientList({ ingredients, onEdit, onDelete }: { ingredients: IngredientRow[]; onEdit: (i: IngredientRow) => void; onDelete: (id: number) => void }) {
   if (!ingredients.length) return <p className="text-sm text-muted">No saved ingredients.</p>;
   return (
-    <Card className="overflow-hidden">
-      <div className="grid grid-cols-[minmax(0,1fr)_5rem_5rem_4rem_2rem] items-center gap-x-2 border-b bg-panel2/60 px-4 py-2">
-        {["Ingredient", "kcal/100g", "cal/oz", "g/mL", ""].map((h, i) => (
-          <span key={h || i} className={`eyebrow ${i > 0 && i < 4 ? "text-right" : ""}`}>{h}</span>
+    <>
+      <div className="space-y-2 sm:hidden">
+        {ingredients.map((i) => (
+          <Card key={i.id} className="p-4">
+            <div className="flex items-start justify-between gap-3">
+              <button onClick={() => onEdit(i)} className="min-w-0 flex-1 text-left">
+                <span className="block font-medium leading-snug break-words">{i.name}</span>
+                {i.category && <span className="mt-0.5 block text-xs text-muted">{i.category}</span>}
+              </button>
+              <button
+                onClick={() => confirm(`Delete "${i.name}"?`) && onDelete(i.id)}
+                className="grid h-11 w-11 shrink-0 place-items-center rounded text-muted hover:bg-accent/10 hover:text-accent"
+                aria-label={`Delete ${i.name}`}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="readout mt-3 grid grid-cols-3 gap-2 border-t pt-3 text-center text-sm">
+              <MobileNutrition label="kcal/100g" value={i.kcalPer100g != null ? Math.round(i.kcalPer100g) : "—"} />
+              <MobileNutrition label="cal/oz" value={kcalPerOz(i.kcalPer100g)?.toFixed(0) ?? "—"} />
+              <MobileNutrition label="g/mL" value={i.densityGMl ?? "—"} />
+            </div>
+          </Card>
         ))}
       </div>
-      {ingredients.map((i) => (
-        <div key={i.id} className="grid grid-cols-[minmax(0,1fr)_5rem_5rem_4rem_2rem] items-center gap-x-2 border-b px-4 py-2 last:border-0 hover:bg-panel2/40">
-          <button onClick={() => onEdit(i)} className="min-w-0 text-left">
-            <span className="block truncate text-sm font-medium">{i.name}</span>
-            {i.category && <span className="block truncate text-xs text-muted">{i.category}</span>}
-          </button>
-          <span className="readout text-right text-sm text-muted">{i.kcalPer100g != null ? Math.round(i.kcalPer100g) : "—"}</span>
-          <span className="readout text-right text-sm text-muted">{kcalPerOz(i.kcalPer100g)?.toFixed(0) ?? "—"}</span>
-          <span className="readout text-right text-sm text-muted">{i.densityGMl ?? "—"}</span>
-          <button onClick={() => confirm(`Delete "${i.name}"?`) && onDelete(i.id)} className="text-muted hover:text-accent" title="Delete">✕</button>
+
+      <Card className="hidden overflow-hidden sm:block">
+        <div className="grid grid-cols-[minmax(0,1fr)_5rem_5rem_4rem_2rem] items-center gap-x-2 border-b bg-panel2/60 px-4 py-2">
+          {["Ingredient", "kcal/100g", "cal/oz", "g/mL", ""].map((h, i) => (
+            <span key={h || i} className={`eyebrow ${i > 0 && i < 4 ? "text-right" : ""}`}>{h}</span>
+          ))}
         </div>
-      ))}
-    </Card>
+        {ingredients.map((i) => (
+          <div key={i.id} className="grid grid-cols-[minmax(0,1fr)_5rem_5rem_4rem_2rem] items-center gap-x-2 border-b px-4 py-2 last:border-0 hover:bg-panel2/40">
+            <button onClick={() => onEdit(i)} className="min-w-0 text-left">
+              <span className="block truncate text-sm font-medium">{i.name}</span>
+              {i.category && <span className="block truncate text-xs text-muted">{i.category}</span>}
+            </button>
+            <span className="readout text-right text-sm text-muted">{i.kcalPer100g != null ? Math.round(i.kcalPer100g) : "—"}</span>
+            <span className="readout text-right text-sm text-muted">{kcalPerOz(i.kcalPer100g)?.toFixed(0) ?? "—"}</span>
+            <span className="readout text-right text-sm text-muted">{i.densityGMl ?? "—"}</span>
+            <button onClick={() => confirm(`Delete "${i.name}"?`) && onDelete(i.id)} className="text-muted hover:text-accent" title="Delete">✕</button>
+          </div>
+        ))}
+      </Card>
+    </>
+  );
+}
+
+function MobileNutrition({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <span>
+      <span className="block font-sans text-[0.6rem] uppercase tracking-wide text-muted">{label}</span>
+      <span className="mt-0.5 block">{value}</span>
+    </span>
   );
 }

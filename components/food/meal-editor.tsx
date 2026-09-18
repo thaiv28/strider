@@ -96,7 +96,7 @@ export function MealEditor({ meal, ingredients, onBack, isNew = false }: { meal:
       <div ref={cardRef}>
       <button onClick={tryBack} className="eyebrow -my-2 py-2 hover:text-accent">← all meals</button>
 
-      <Card className="mt-2 p-5">
+      <Card className="mt-2 p-4 sm:p-5">
         <div className="flex flex-wrap items-end gap-3">
           <label className="flex-1">
             <span className="eyebrow mb-1 block">Meal name</span>
@@ -143,7 +143,7 @@ export function MealEditor({ meal, ingredients, onBack, isNew = false }: { meal:
           <Stat label="Efficiency">{calOz != null ? `${calOz.toFixed(0)} cal/oz` : "—"}</Stat>
         </div>
 
-        <div className="mt-3 flex items-center gap-2 whitespace-nowrap">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <span className="eyebrow">Show amounts for</span>
           <Input className="w-16" type="number" min="1" step="1" value={preview}
             onChange={(e) => setPreview(Math.max(1, Number(e.target.value) || 1))} />
@@ -153,15 +153,15 @@ export function MealEditor({ meal, ingredients, onBack, isNew = false }: { meal:
         <div className="mt-4 divide-y rounded-lg border">
           {items.length === 0 && <div className="px-4 py-3 text-sm text-muted">No ingredients yet.</div>}
           {items.map((it) => (
-            <div key={it.id} className="flex items-center gap-3 px-4 py-2.5">
-              <span className="min-w-0 flex-1 truncate text-sm font-medium">{it.name}</span>
+            <div key={it.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-3 sm:flex-nowrap sm:px-4 sm:py-2.5">
+              <span className="min-w-0 basis-full text-sm font-medium leading-snug break-words sm:basis-auto sm:flex-1 sm:truncate">{it.name}</span>
               <span className="readout w-20 text-right text-xs text-muted">{kcalForGrams(it.kcalPer100g, Math.round(it.amountG * scale))} kcal</span>
               <AmountControl
                 grams={Math.round(it.amountG * scale)}
                 density={it.densityGMl}
                 onChange={(displayG) => setAmounts((a) => ({ ...a, [it.id]: Math.max(0, Math.round(displayG / scale)) }))}
               />
-              <button onClick={() => run(() => removeMealIngredient(it.id))} className="text-muted hover:text-accent" title="Remove">✕</button>
+              <button onClick={() => run(() => removeMealIngredient(it.id))} className="ml-auto grid h-11 w-11 place-items-center rounded text-muted hover:bg-accent/10 hover:text-accent sm:ml-0 sm:h-auto sm:w-auto" title="Remove">✕</button>
             </div>
           ))}
         </div>
@@ -172,11 +172,11 @@ export function MealEditor({ meal, ingredients, onBack, isNew = false }: { meal:
           onAddHit={(hit) => run(() => addMealIngredientFromHit(meal.id, hit))}
         />
 
-        <div className="mt-5 flex items-center justify-between">
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
           <Button variant="danger" onClick={() => confirm(`Delete meal "${meal.name}"?`) && run(async () => { await deleteMeal(meal.id); onBack(); })}>
             Delete meal
           </Button>
-          <div className="flex items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             <Button variant="outline" disabled={!dirty} onClick={discard}>Discard changes</Button>
             <Button disabled={!dirty} onClick={save}>Save</Button>
           </div>

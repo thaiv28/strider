@@ -12,8 +12,8 @@ export default async function TripsPage() {
   const trips = await getTripsSummary(userId);
 
   return (
-    <div className="mx-auto max-w-4xl px-4 sm:px-8 py-10">
-      <div className="flex items-end justify-between">
+    <div className="mx-auto max-w-4xl px-4 py-6 sm:px-8 sm:py-10">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="eyebrow">◇ Logbook</div>
           <h1 className="font-display mt-1 text-3xl font-bold tracking-tight">Trips</h1>

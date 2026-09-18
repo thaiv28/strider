@@ -61,25 +61,25 @@ export function TripFoodPanel({
             <div className="mt-3 divide-y rounded-lg border">
               {d.entries.length === 0 && <div className="px-3 py-2 text-sm text-muted">Nothing planned.</div>}
               {d.entries.map((e) => (
-                <div key={e.id} className="flex items-center gap-3 px-3 py-2">
+                <div key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5 sm:flex-nowrap sm:py-2">
                   {e.isMeal && e.mealId ? (
                     <Link
                       href={`/food?meal=${e.mealId}&back=/trips/${tripId}`}
-                      className="min-w-0 flex-1 truncate text-sm transition hover:text-accent"
+                      className="min-w-0 basis-[calc(100%-3rem)] text-sm leading-snug break-words transition hover:text-accent sm:basis-auto sm:truncate"
                       title="Edit this meal"
                     >
                       {e.name}
                     </Link>
                   ) : (
-                    <span className="min-w-0 flex-1 truncate text-sm">{e.name}</span>
+                    <span className="min-w-0 basis-[calc(100%-3rem)] text-sm leading-snug break-words sm:basis-auto sm:flex-1 sm:truncate">{e.name}</span>
                   )}
                   <QtyInput isMeal={e.isMeal} value={e.isMeal ? e.servings : e.weightG} onCommit={(q) => run(() => setTripMealQty(e.id, tripId, q))} />
                   <span className="readout w-16 text-right text-xs text-muted">{e.kcal.toLocaleString()} kcal</span>
                   <span className="readout w-14 text-right text-xs text-muted">{gToOz(e.weightG).toFixed(1)} oz</span>
-                  <button onClick={() => run(() => copyTripMealToAll(e.id, tripId))} className="text-muted hover:text-accent" title="Copy to all days">
+                  <button onClick={() => run(() => copyTripMealToAll(e.id, tripId))} className="grid h-11 w-11 place-items-center rounded text-muted hover:bg-panel2 hover:text-accent sm:h-auto sm:w-auto" title="Copy to all days">
                     <Copy size={14} />
                   </button>
-                  <button onClick={() => run(() => removeTripMeal(e.id, tripId))} className="text-muted hover:text-accent" title="Remove">✕</button>
+                  <button onClick={() => run(() => removeTripMeal(e.id, tripId))} className="grid h-11 w-11 place-items-center rounded text-muted hover:bg-accent/10 hover:text-accent sm:h-auto sm:w-auto" title="Remove">✕</button>
                 </div>
               ))}
             </div>

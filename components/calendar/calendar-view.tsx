@@ -101,12 +101,25 @@ export function CalendarView({ initial }: { initial: CalendarData }) {
     return out;
   }, [data.cells, data.trips]);
 
+  const agenda = useMemo(() => {
+    const tripsById = new Map(data.trips.map((trip) => [trip.id, trip]));
+    return data.cells
+      .filter((cell) => cell.inMonth)
+      .map((cell) => ({
+        ...cell,
+        trips: cell.tripIds
+          .map((id) => tripsById.get(id))
+          .filter((trip): trip is NonNullable<typeof trip> => Boolean(trip && trip.startDay === cell.iso)),
+      }))
+      .filter((cell) => cell.events.length > 0 || cell.trips.length > 0);
+  }, [data.cells, data.trips]);
+
   return (
     <div className={pending ? "opacity-60 transition" : "transition"}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <button onClick={() => shift(-1)} className="rounded-md border bg-panel p-1.5 hover:bg-panel2" aria-label="Previous month"><ChevronLeft size={16} /></button>
-          <button onClick={() => shift(1)} className="rounded-md border bg-panel p-1.5 hover:bg-panel2" aria-label="Next month"><ChevronRight size={16} /></button>
+          <button onClick={() => shift(-1)} className="grid h-11 w-11 place-items-center rounded-md border bg-panel hover:bg-panel2 sm:h-auto sm:w-auto sm:p-1.5" aria-label="Previous month"><ChevronLeft size={16} /></button>
+          <button onClick={() => shift(1)} className="grid h-11 w-11 place-items-center rounded-md border bg-panel hover:bg-panel2 sm:h-auto sm:w-auto sm:p-1.5" aria-label="Next month"><ChevronRight size={16} /></button>
           <h2 className="font-display ml-1 text-xl font-bold tracking-tight">{data.label}</h2>
         </div>
         <div className="flex items-center gap-3">
@@ -122,7 +135,42 @@ export function CalendarView({ initial }: { initial: CalendarData }) {
         </p>
       )}
 
-      <Card className="mt-4 overflow-hidden">
+      <div className="mt-4 space-y-3 sm:hidden">
+        {agenda.length === 0 && (
+          <Card className="px-4 py-8 text-center text-sm text-muted">No trips or calendar events this month.</Card>
+        )}
+        {agenda.map((day) => (
+          <Card key={day.iso} className="p-4">
+            <div className="flex items-baseline justify-between gap-3 border-b pb-2">
+              <span className="font-display font-semibold">
+                {new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${day.iso}T12:00:00Z`))}
+              </span>
+              {day.iso === today && <span className="eyebrow text-accent">Today</span>}
+            </div>
+            <div className="mt-2 space-y-2">
+              {day.trips.map((trip) => (
+                <Link
+                  key={trip.id}
+                  href={`/trips/${trip.id}?from=calendar&y=${data.year}&m=${data.month}`}
+                  className="flex min-h-11 items-center gap-3 rounded-md bg-accent/10 px-3 py-2 text-sm font-medium text-accent"
+                >
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-sm bg-accent" />
+                  <span className="min-w-0 break-words">{trip.name}</span>
+                </Link>
+              ))}
+              {day.events.map((event, index) => (
+                <div key={`${event.title}-${index}`} className="flex min-h-11 items-start gap-3 rounded-md bg-panel2/50 px-3 py-2 text-sm">
+                  <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: event.color }} />
+                  <span className="min-w-0 flex-1 leading-snug break-words">{event.title}</span>
+                  {event.time && <span className="readout shrink-0 text-xs text-muted">{event.time}</span>}
+                </div>
+              ))}
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      <Card className="mt-4 hidden overflow-hidden sm:block">
         <div className="grid grid-cols-7 border-b bg-panel2/50">
           {WD.map((d) => (
             <div key={d} className="eyebrow px-1 py-1.5 text-center sm:px-2">{d}</div>

@@ -186,7 +186,7 @@ export function TripView(props: {
   }, [doUndo]);
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-8">
+    <div className="mx-auto max-w-4xl px-4 py-6 sm:px-8 sm:py-8">
       <Link href={props.backHref} className="eyebrow -my-2 inline-block py-2 hover:text-accent">
         ← {props.backLabel}
       </Link>
@@ -298,14 +298,16 @@ export function TripView(props: {
                   const dist = d.distanceMi ?? "";
                   const gain = d.elevationGainFt ?? "";
                   return (
-                    <div key={d.id} className="grid grid-cols-[3rem_minmax(0,1fr)_minmax(0,1fr)_7rem_1.5rem] items-center gap-x-3 border-b px-4 py-2 last:border-0">
-                      <span className="readout text-sm text-muted">Day {d.dayNumber}</span>
-                      <Input key={`d${d.id}-${dist}`} type="number" step="0.1" placeholder="mi" defaultValue={dist} onBlur={(e) => start(async () => await upsertTripDay(trip.id, d.dayNumber, { distanceMi: e.target.value || null }))} />
-                      <Input key={`e${d.id}-${gain}`} type="number" placeholder="ft gain" defaultValue={gain} onBlur={(e) => start(async () => await upsertTripDay(trip.id, d.dayNumber, { elevationGainFt: e.target.value === "" ? null : Number(e.target.value) }))} />
-                      <span className="readout truncate text-xs text-muted">
+                    <div key={d.id} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-b px-3 py-3 last:border-0 sm:grid-cols-[3rem_minmax(0,1fr)_minmax(0,1fr)_7rem_1.5rem] sm:gap-x-3 sm:px-4 sm:py-2">
+                      <span className="readout col-start-1 row-start-1 text-sm text-muted sm:col-auto sm:row-auto">Day {d.dayNumber}</span>
+                      <div className="col-span-3 row-start-2 grid grid-cols-2 gap-2 sm:contents">
+                        <Input key={`d${d.id}-${dist}`} aria-label={`Day ${d.dayNumber} distance in miles`} type="number" step="0.1" placeholder="mi" defaultValue={dist} onBlur={(e) => start(async () => await upsertTripDay(trip.id, d.dayNumber, { distanceMi: e.target.value || null }))} />
+                        <Input key={`e${d.id}-${gain}`} aria-label={`Day ${d.dayNumber} elevation gain in feet`} type="number" placeholder="ft gain" defaultValue={gain} onBlur={(e) => start(async () => await upsertTripDay(trip.id, d.dayNumber, { elevationGainFt: e.target.value === "" ? null : Number(e.target.value) }))} />
+                      </div>
+                      <span className="readout col-start-2 row-start-1 truncate text-right text-xs text-muted sm:col-auto sm:row-auto sm:text-left">
                         {auto?.lat != null && auto?.lon != null ? `${auto.lat.toFixed(3)}, ${auto.lon.toFixed(3)}` : ""}
                       </span>
-                      <button onClick={() => start(async () => await deleteTripDay(trip.id, d.id))} className="text-muted hover:text-accent" title="Delete day">✕</button>
+                      <button onClick={() => start(async () => await deleteTripDay(trip.id, d.id))} aria-label={`Delete day ${d.dayNumber}`} className="col-start-3 row-start-1 grid h-11 w-11 place-items-center justify-self-end rounded text-muted hover:bg-accent/10 hover:text-accent sm:col-auto sm:row-auto sm:h-auto sm:w-auto" title="Delete day">✕</button>
                     </div>
                   );
                 })}

@@ -35,9 +35,9 @@ type Props = {
   onToggleMember: (itemId: number, present: boolean, cls?: "base" | "worn") => void;
 };
 
-const GRID_BASE = "grid grid-cols-[1.25rem_1.25rem_minmax(0,1fr)_5rem_4.5rem_1.75rem] items-center gap-x-2";
+const GRID_BASE = "grid grid-cols-[1.25rem_1.25rem_minmax(0,1fr)_2.75rem] items-center gap-x-2 sm:grid-cols-[1.25rem_1.25rem_minmax(0,1fr)_5rem_4.5rem_1.75rem]";
 const GRID_LOADOUT =
-  "grid grid-cols-[1.5rem_1.25rem_1.25rem_minmax(0,1fr)_6.5rem_4.5rem_1.75rem] items-center gap-x-2";
+  "grid grid-cols-[1.5rem_1.25rem_1.25rem_minmax(0,1fr)_2.75rem] items-center gap-x-2 sm:grid-cols-[1.5rem_1.25rem_1.25rem_minmax(0,1fr)_6.5rem_4.5rem_1.75rem]";
 
 type Container = { id: number; name: string; baseG: number; consumableG: number; wornG: number; itemIds: number[] };
 
@@ -158,9 +158,9 @@ function CategoryCard({
     });
   return (
     <div className="card overflow-hidden">
-      <div className="flex items-center justify-between gap-3 border-b bg-panel2/60 px-4 py-2.5">
-        <span className="font-display font-semibold">{c.name}</span>
-        <span className="readout text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b bg-panel2/60 px-3 py-2.5 sm:px-4">
+        <span className="min-w-0 font-display font-semibold break-words">{c.name}</span>
+        <span className="readout text-xs sm:text-sm">
           <span className="text-cbase">{fmtOz(c.baseG)} base</span>
           {c.consumableG > 0 && <span className="text-ccons"> · {fmtOz(c.consumableG)} cons</span>}
           {c.wornG > 0 && <span className="text-cworn"> · {fmtOz(c.wornG)} worn</span>}
@@ -238,7 +238,7 @@ function SortableRow({
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
         loadoutMode ? GRID_LOADOUT : GRID_BASE,
-        "border-b px-4 py-2 last:border-0 hover:bg-panel2/40",
+        "border-b px-3 py-2.5 last:border-0 hover:bg-panel2/40 sm:px-4 sm:py-2",
         isDragging && "relative z-10 bg-panel opacity-90 shadow",
         canMember && !included && "opacity-45",
       )}
@@ -277,35 +277,46 @@ function SortableRow({
       )}
       <button
         onClick={() => onEdit(r)}
-        className="flex min-w-0 items-baseline gap-1.5 py-0.5 text-left transition hover:text-accent"
+        className="flex min-w-0 items-baseline gap-1.5 py-1 text-left transition hover:text-accent sm:py-0.5"
       >
-        <span className="truncate font-medium">{r.name}</span>
+        <span className="line-clamp-2 font-medium leading-snug sm:block sm:truncate">{r.name}</span>
         {r.quantity > 1 && <span className="shrink-0 text-sm text-muted">×{r.quantity}</span>}
         {r.isKit && r.componentCount > 0 && (
           <span className="shrink-0 text-xs text-muted">· {r.componentCount}</span>
         )}
       </button>
-      <span className="text-right">
+      <span className="hidden text-right sm:block">
         {canMember && included ? (
           <WornToggle value={member!} onChange={(cls) => onToggleMember(r.id, true, cls)} />
         ) : !loadoutMode && r.defaultWeightClass !== "base" ? (
           <Badge tone={r.defaultWeightClass}>{r.defaultWeightClass === "consumable" ? "cons" : r.defaultWeightClass}</Badge>
         ) : null}
       </span>
-      <span className="readout text-right text-sm text-muted">
+      <span className="readout hidden text-right text-sm text-muted sm:block">
         {fmtOz(r.weightG == null ? null : r.weightG * r.quantity)}
       </span>
-      <DeleteBtn r={r} onDelete={onDelete} />
+      <span className={cn("col-span-2 col-start-3 row-start-2 mt-1 flex min-w-0 flex-wrap items-center gap-2 pb-0.5 text-xs text-muted sm:hidden", loadoutMode && "col-start-4")}>
+        <span className="readout">{fmtOz(r.weightG == null ? null : r.weightG * r.quantity)}</span>
+        {canMember && included ? (
+          <WornToggle value={member!} onChange={(cls) => onToggleMember(r.id, true, cls)} />
+        ) : !loadoutMode && r.defaultWeightClass !== "base" ? (
+          <Badge tone={r.defaultWeightClass}>{r.defaultWeightClass === "consumable" ? "cons" : r.defaultWeightClass}</Badge>
+        ) : null}
+      </span>
+      <DeleteBtn r={r} onDelete={onDelete} loadoutMode={loadoutMode} />
     </div>
   );
 }
 
-function DeleteBtn({ r, onDelete }: { r: GearRow; onDelete: (r: GearRow) => void }) {
+function DeleteBtn({ r, onDelete, loadoutMode }: { r: GearRow; onDelete: (r: GearRow) => void; loadoutMode: boolean }) {
   return (
     <button
       onClick={() => onDelete(r)}
       aria-label={`Delete ${r.name}`}
-      className="justify-self-end rounded p-1 text-muted transition hover:bg-accent/10 hover:text-accent"
+      className={cn(
+        "col-start-4 row-start-1 grid h-11 w-11 justify-self-end place-items-center rounded text-muted transition hover:bg-accent/10 hover:text-accent sm:col-auto sm:row-auto sm:h-auto sm:w-auto sm:p-1",
+        loadoutMode && "col-start-5 sm:col-auto",
+      )}
     >
       ✕
     </button>

@@ -26,7 +26,7 @@ export function LogbookView({ trips }: { trips: TripSummary[] }) {
 
   return (
     <div>
-      <div className="mb-3 flex justify-end">
+      <div className="mb-3 hidden justify-end sm:flex">
         <div className="inline-flex overflow-hidden rounded-md border">
           {(["list", "card"] as Mode[]).map((m) => (
             <button

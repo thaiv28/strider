@@ -35,7 +35,7 @@ type Handlers = {
 type Props = { groups: { category: string; rows: TripGearRow[] }[] } & Handlers;
 
 const GRID =
-  "grid grid-cols-[1.25rem_1.25rem_minmax(0,1fr)_3.5rem_5.5rem_4.5rem_1.75rem] items-center gap-x-3";
+  "grid grid-cols-[1.25rem_1.25rem_minmax(0,1fr)_2.75rem] items-center gap-x-2 sm:grid-cols-[1.25rem_1.25rem_minmax(0,1fr)_3.5rem_5.5rem_4.5rem_1.75rem] sm:gap-x-3";
 
 type Container = { category: string; itemIds: number[] };
 
@@ -155,7 +155,7 @@ function Row({ r, onPacked, onQty, onClass, onRemove }: { r: TripGearRow } & Omi
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`${GRID} border-b px-4 py-2.5 last:border-0 hover:bg-panel2/40 ${isDragging ? "relative z-10 bg-panel opacity-90 shadow" : ""}`}
+      className={`${GRID} border-b px-3 py-2.5 last:border-0 hover:bg-panel2/40 sm:px-4 ${isDragging ? "relative z-10 bg-panel opacity-90 shadow" : ""}`}
     >
       <button {...attributes} {...listeners} aria-label="Drag" className="cursor-grab touch-none text-muted/60 hover:text-muted active:cursor-grabbing">
         ⠿
@@ -167,21 +167,36 @@ function Row({ r, onPacked, onQty, onClass, onRemove }: { r: TripGearRow } & Omi
         aria-label={`Packed: ${r.name}`}
         className="h-4 w-4 accent-[var(--accent)]"
       />
-      <span className={`truncate ${r.packed ? "text-muted line-through" : "font-medium"}`}>{r.name}</span>
+      <span className={`line-clamp-2 leading-snug sm:block sm:truncate ${r.packed ? "text-muted line-through" : "font-medium"}`}>{r.name}</span>
       <input
         type="number"
         min="1"
         defaultValue={r.quantity}
         onBlur={(e) => Number(e.target.value) !== r.quantity && onQty(r.id, Number(e.target.value))}
         aria-label={`Quantity: ${r.name}`}
-        className="w-full rounded-md border bg-panel2 py-1 text-center text-sm outline-none focus:ring-2 focus:ring-accent/25 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        className="hidden w-full rounded-md border bg-panel2 py-1 text-center text-sm outline-none focus:ring-2 focus:ring-accent/25 sm:block [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
       />
-      <WornToggle value={r.weightClass} onChange={(cls) => onClass(r.id, cls)} />
-      <span className="readout text-right text-sm text-muted">{fmtOz(r.weightG * r.quantity)}</span>
+      <span className="hidden sm:block"><WornToggle value={r.weightClass} onChange={(cls) => onClass(r.id, cls)} /></span>
+      <span className="readout hidden text-right text-sm text-muted sm:block">{fmtOz(r.weightG * r.quantity)}</span>
+      <span className="col-span-2 col-start-3 row-start-2 mt-2 flex flex-wrap items-center gap-2 sm:hidden">
+        <label className="inline-flex items-center gap-1 text-xs text-muted">
+          Qty
+          <input
+            type="number"
+            min="1"
+            defaultValue={r.quantity}
+            onBlur={(e) => Number(e.target.value) !== r.quantity && onQty(r.id, Number(e.target.value))}
+            aria-label={`Quantity: ${r.name}`}
+            className="h-11 w-14 rounded-md border bg-panel2 text-center text-base outline-none focus:ring-2 focus:ring-accent/25 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          />
+        </label>
+        <WornToggle value={r.weightClass} onChange={(cls) => onClass(r.id, cls)} />
+        <span className="readout text-xs text-muted">{fmtOz(r.weightG * r.quantity)}</span>
+      </span>
       <button
         onClick={() => onRemove(r.id)}
         aria-label={`Remove ${r.name}`}
-        className="justify-self-end rounded p-1 text-muted hover:bg-accent/10 hover:text-accent"
+        className="col-start-4 row-start-1 grid h-11 w-11 justify-self-end place-items-center rounded text-muted hover:bg-accent/10 hover:text-accent sm:col-auto sm:row-auto sm:h-auto sm:w-auto sm:p-1"
       >
         ✕
       </button>
