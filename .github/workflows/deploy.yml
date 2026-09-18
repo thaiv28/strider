@@ -134,3 +134,23 @@ jobs:
             --distribution-id "$DISTRIBUTION_ID" \
             --id "$invalidation_id"
           curl --fail --retry 12 --retry-delay 10 --retry-all-errors https://backpack.thaiv.dev/api/health
+
+      - name: Install mobile test browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify phone layouts
+        env:
+          MOBILE_TEST_BASE_URL: https://backpack.thaiv.dev
+          MOBILE_TEST_SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+        run: npm run test:mobile
+
+      - name: Upload mobile test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-layout-diagnostics
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7

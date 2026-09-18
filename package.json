@@ -17,6 +17,7 @@
     "db:backup": "bash scripts/backup-db.sh",
     "db:restore": "bash scripts/restore-db.sh",
     "import": "tsx scripts/import-sheets.ts",
+    "test:mobile": "playwright test tests/mobile.spec.ts",
     "verify": "tsx scripts/verify.ts"
   },
   "dependencies": {
@@ -41,6 +42,7 @@
     "react-leaflet": "^5.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^22.10.1",
     "@types/pg": "^8.11.10",
