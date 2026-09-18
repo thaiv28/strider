@@ -19,10 +19,10 @@
 }
 
 :root {
-  --fd: var(--ff-saira);
-  --fb: var(--ff-spectral);
-  --fm: var(--ff-mono);
-  --fl: var(--ff-inter);
+  --fd: "Arial Narrow", "Avenir Next Condensed", ui-sans-serif, system-ui, sans-serif;
+  --fb: Georgia, "Times New Roman", ui-serif, serif;
+  --fm: "SFMono-Regular", Consolas, "Liberation Mono", ui-monospace, monospace;
+  --fl: -apple-system, BlinkMacSystemFont, "Segoe UI", ui-sans-serif, system-ui, sans-serif;
   --radius: 6px;
 }
 

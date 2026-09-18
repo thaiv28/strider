@@ -75,6 +75,8 @@ jobs:
           docker buildx build \
             --platform linux/arm64 \
             --build-arg "NEXT_PUBLIC_WAQI_TOKEN=$NEXT_PUBLIC_WAQI_TOKEN" \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
             --tag "$ECR_URI:${GITHUB_SHA}" \
             --push .
 
