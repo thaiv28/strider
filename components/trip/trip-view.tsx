@@ -223,7 +223,7 @@ export function TripView(props: {
         <StrataBar weights={weights} />
       </div>
 
-      <div className="mt-5 flex gap-1 overflow-x-auto border-b">
+      <div className="mt-5 flex gap-1 overflow-x-auto overflow-y-hidden border-b">
         {([
           ["logistics", "Logistics"],
           ["planning", "Planning"],
@@ -678,7 +678,7 @@ function GearPicker({ library, onPick, onClose }: { library: LibItem[]; onPick: 
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block">
+    <label className="block min-w-0 max-w-full">
       <span className="eyebrow mb-1 block">{label}</span>
       {children}
     </label>

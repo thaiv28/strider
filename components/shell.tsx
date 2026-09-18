@@ -108,7 +108,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       <nav
         data-noprint
         aria-label="Primary navigation"
-        className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-5 border-t bg-panel/95 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(0,0,0,0.08)] backdrop-blur md:hidden"
+        className="fixed inset-x-0 bottom-0 z-[2000] grid grid-cols-5 border-t bg-panel/95 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(0,0,0,0.08)] backdrop-blur md:hidden"
       >
         {MOBILE_NAV.map((item) => {
           const Icon = item.icon;

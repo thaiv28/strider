@@ -68,5 +68,31 @@ test("a trip detail page fits the phone viewport", async ({ page }) => {
   expect(href).toBeTruthy();
   await page.goto(href!);
   await expect(page.getByText("Logistics", { exact: true }).first()).toBeVisible();
+  const tabStrip = page.getByRole("button", { name: "Logistics", exact: true }).locator("..");
+  await expect(tabStrip).toHaveCSS("position", "static");
+  await expect(tabStrip).toHaveCSS("overflow-y", "hidden");
+  const tabStripHeight = await tabStrip.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+  }));
+  expect(tabStripHeight.scrollHeight).toBeLessThanOrEqual(tabStripHeight.clientHeight + 1);
+  const dateInput = page.locator('input[type="date"]').first();
+  if (await dateInput.count()) {
+    const dateWidths = await dateInput.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      parentWidth: element.parentElement?.clientWidth ?? 0,
+    }));
+    expect(dateWidths.clientWidth).toBeLessThanOrEqual(dateWidths.parentWidth + 1);
+  }
+  await page.waitForTimeout(1_500);
   await expectNoHorizontalOverflow(page);
+});
+
+test("route maps stay below the mobile navigation", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const bottomNavigationOwnsViewportEdge = await page.evaluate(() =>
+    Boolean(document.elementFromPoint(window.innerWidth / 2, window.innerHeight - 20)?.closest('nav[aria-label="Primary navigation"]')),
+  );
+  expect(bottomNavigationOwnsViewportEdge).toBe(true);
 });

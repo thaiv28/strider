@@ -39,13 +39,13 @@ export function WeatherPanel({
   return (
     <div>
       <div className="eyebrow">Weather</div>
-      <Card className="mt-2 p-4">
+      <Card className="mt-2 min-w-0 p-3 sm:p-4">
         {rows.length === 0 ? (
           <div className="text-sm text-muted">
             {startDate ? "Add a route or coordinates to the trip to load weather." : "Set a start date to load weather."}
           </div>
         ) : (
-          <div className="divide-y rounded-lg border">
+          <div className="min-w-0 divide-y overflow-hidden rounded-lg border">
             {rows.map(({ key, ...r }) => (
               <WeatherRow key={key} {...r} elevationFt={elevationFt} />
             ))}
@@ -116,23 +116,23 @@ function WeatherRow({
   const yr = lat != null && lon != null ? `https://www.yr.no/en/forecast/daily-table/${lat.toFixed(4)},${lon.toFixed(4)}` : null;
 
   return (
-    <div className="flex items-center gap-4 px-4 py-3">
-      <div className="w-24 shrink-0">
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-3 px-3 py-3 sm:flex sm:gap-4 sm:px-4">
+      <div className="min-w-0 sm:w-24 sm:shrink-0">
         <div className="font-display font-semibold">
           {label}
           {note && <span className="ml-1 text-xs font-normal text-muted">· {note}</span>}
         </div>
         <div className="readout text-xs text-muted">{pretty(date)}</div>
-        <div className="readout text-[0.65rem] text-muted">
+        <div className="readout truncate text-[0.65rem] text-muted">
           {lat != null && lon != null ? `${lat.toFixed(3)}, ${lon.toFixed(3)}` : "—"}
         </div>
       </div>
 
       {msg ? (
-        <div className="text-sm text-muted">{msg}</div>
+        <div className="col-span-2 row-start-2 text-sm text-muted sm:col-auto sm:row-auto">{msg}</div>
       ) : climo ? (
         <>
-          <div className="flex w-40 shrink-0 items-center gap-3">
+          <div className="col-span-2 row-start-2 flex min-w-0 items-center gap-3 sm:col-auto sm:row-auto sm:w-40 sm:shrink-0">
             <span className="text-3xl leading-none">{climo.snowPct >= 20 ? "❄️" : "📅"}</span>
             <div>
               <div className="text-sm font-medium">Typical</div>
@@ -141,21 +141,21 @@ function WeatherRow({
               </div>
             </div>
           </div>
-          <div className="hidden flex-1 grid-cols-4 gap-x-6 text-sm text-muted sm:grid">
+          <div className="col-span-2 row-start-3 grid min-w-0 grid-cols-2 gap-3 border-t pt-3 text-sm text-muted sm:col-auto sm:row-auto sm:flex-1 sm:grid-cols-4 sm:gap-x-6 sm:border-0 sm:pt-0">
             <Metric label="Avg precip">{climo.precipIn.toFixed(2)}″</Metric>
             <Metric label="Wet days">{climo.precipPct}%</Metric>
             {climo.snowPct > 0 && <Metric label="Snow days">{climo.snowPct}%</Metric>}
           </div>
-          <div className="ml-auto shrink-0 text-right">
+          <div className="col-start-2 row-start-1 ml-auto shrink-0 text-right sm:col-auto sm:row-auto">
             <div className="eyebrow">typical</div>
             <div className="readout text-[0.65rem] text-muted">{climo.years}-yr avg</div>
           </div>
         </>
       ) : !d ? (
-        <div className="text-sm text-muted">Loading…</div>
+        <div className="col-span-2 row-start-2 text-sm text-muted sm:col-auto sm:row-auto">Loading…</div>
       ) : (
         <>
-          <div className="flex w-40 shrink-0 items-center gap-3">
+          <div className="col-span-2 row-start-2 flex min-w-0 items-center gap-3 sm:col-auto sm:row-auto sm:w-40 sm:shrink-0">
             <span className="text-3xl leading-none">{wx.icon}</span>
             <div>
               <div className="text-sm font-medium">{wx.text}</div>
@@ -166,7 +166,7 @@ function WeatherRow({
             </div>
           </div>
 
-          <div className="hidden flex-1 grid-cols-4 gap-x-6 text-sm text-muted sm:grid">
+          <div className="col-span-2 row-start-3 grid min-w-0 grid-cols-2 gap-3 border-t pt-3 text-sm text-muted sm:col-auto sm:row-auto sm:flex-1 sm:grid-cols-4 sm:gap-x-6 sm:border-0 sm:pt-0">
             <Metric label="Precip">
               {d.precipitation_sum[0]?.toFixed(2)}″{d.precipitation_probability_max?.[0] != null && ` · ${d.precipitation_probability_max[0]}%`}
             </Metric>
@@ -175,7 +175,7 @@ function WeatherRow({
             <Metric label="Sunset">{clock(d.sunset[0])}</Metric>
           </div>
 
-          <div className="ml-auto shrink-0 text-right">
+          <div className="col-start-2 row-start-1 ml-auto shrink-0 text-right sm:col-auto sm:row-auto">
             {kind && <div className="eyebrow">{kind}</div>}
             {yr && (
               <a href={yr} target="_blank" rel="noreferrer" className="text-sm text-accent hover:underline">
