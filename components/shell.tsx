@@ -3,17 +3,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
-import { CalendarDays, LogOut, Settings } from "lucide-react";
+import { Backpack, CalendarDays, Home, LogOut, Map, Settings, Utensils } from "lucide-react";
 import { cn } from "@/lib/util";
 import { useUnsaved } from "@/components/unsaved-changes";
 import { logout } from "@/app/login/actions";
 
 const NAV = [
-  { href: "/", label: "Basecamp" },
-  { href: "/gear", label: "Gear" },
-  { href: "/food", label: "Food" },
-  { href: "/trips", label: "Trips" },
+  { href: "/", label: "Basecamp", icon: Home },
+  { href: "/gear", label: "Gear", icon: Backpack },
+  { href: "/food", label: "Food", icon: Utensils },
+  { href: "/trips", label: "Trips", icon: Map },
 ];
+
+const MOBILE_NAV = [...NAV, { href: "/calendar", label: "Calendar", icon: CalendarDays }];
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
@@ -41,9 +43,24 @@ export function Shell({ children }: { children: React.ReactNode }) {
     requestNavigate(dest);
   };
   return (
-    <div className="min-h-screen">
-      <header data-noprint className="border-b-2 border-double bg-panel">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-8">
+    <div className="min-h-screen pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
+      <header data-noprint className="sticky top-0 z-50 border-b-2 border-double bg-panel/95 backdrop-blur md:static md:bg-panel">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 md:hidden">
+          <Link href="/" onClick={onNav("/")} className="font-display text-xl font-bold tracking-tight leading-none">
+            STRIDER
+          </Link>
+          <div className="flex items-center gap-1">
+            <Link href="/settings" onClick={onNav("/settings")} aria-label="Settings" className="grid h-11 w-11 place-items-center rounded-md text-muted hover:bg-panel2 hover:text-ink">
+              <Settings size={20} />
+            </Link>
+            <form action={logout}>
+              <button type="submit" aria-label="Log out" className="grid h-11 w-11 place-items-center rounded-md text-muted hover:bg-panel2 hover:text-ink">
+                <LogOut size={20} />
+              </button>
+            </form>
+          </div>
+        </div>
+        <div className="mx-auto hidden max-w-6xl items-center justify-between gap-3 px-8 py-3 md:flex">
           <Link href="/" onClick={onNav("/")} className="shrink-0 font-display text-lg font-bold tracking-tight leading-none sm:text-xl">
             STRIDER
           </Link>
@@ -88,6 +105,30 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <main>{children}</main>
+      <nav
+        data-noprint
+        aria-label="Primary navigation"
+        className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-5 border-t bg-panel/95 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(0,0,0,0.08)] backdrop-blur md:hidden"
+      >
+        {MOBILE_NAV.map((item) => {
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={onNav(item.href)}
+              aria-current={isActive(item.href) ? "page" : undefined}
+              className={cn(
+                "flex min-h-16 flex-col items-center justify-center gap-1 rounded-md px-1 font-sans text-[0.65rem] font-semibold",
+                isActive(item.href) ? "text-accent" : "text-muted",
+              )}
+            >
+              <Icon size={20} />
+              <span>{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 }

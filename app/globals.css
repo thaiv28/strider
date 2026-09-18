@@ -28,10 +28,19 @@
 
 html,
 body {
+  min-width: 0;
   background: var(--canvas);
   color: var(--ink);
   font-family: var(--fb), ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+@media (max-width: 639px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
 }
 
 * {

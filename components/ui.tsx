@@ -42,8 +42,8 @@ export function InfoBadge({
       <span
         role="tooltip"
         className={cn(
-          "pointer-events-none absolute left-1/2 z-[1200] w-64 -translate-x-1/2 opacity-0 transition-opacity duration-100 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100",
-          side === "bottom" ? "top-full pt-1.5" : "bottom-full pb-1.5",
+          "pointer-events-none fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-[1200] w-auto translate-x-0 opacity-0 transition-opacity duration-100 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:w-64 sm:-translate-x-1/2",
+          side === "bottom" ? "sm:top-full sm:pt-1.5" : "sm:bottom-full sm:pb-1.5",
         )}
       >
         <span className="block cursor-text select-text rounded-lg border bg-panel px-3 py-2 text-xs font-normal leading-relaxed normal-case tracking-normal text-muted shadow-lg">
@@ -83,7 +83,7 @@ export function Button({
   return (
     <button
       className={cn(
-        "inline-flex items-center justify-center gap-1.5 rounded-[calc(var(--radius)*0.6)] px-3 py-1.5 text-sm font-medium transition disabled:opacity-50",
+        "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[calc(var(--radius)*0.6)] px-3 py-1.5 text-sm font-medium transition disabled:opacity-50 sm:min-h-0",
         styles,
         className,
       )}
