@@ -193,6 +193,7 @@ export function TripView(props: {
 
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <input
+          aria-label="Trip name"
           defaultValue={trip.name}
           onBlur={(e) => e.target.value.trim() && save({ name: e.target.value.trim() })}
           className="font-display min-w-0 flex-1 bg-transparent text-3xl font-bold tracking-tight outline-none"

@@ -35,9 +35,9 @@ jobs:
       GEOAPIFY_API_KEY: ${{ secrets.GEOAPIFY_API_KEY }}
       NEXT_PUBLIC_WAQI_TOKEN: ${{ secrets.NEXT_PUBLIC_WAQI_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -66,8 +66,10 @@ jobs:
 
       - uses: aws-actions/amazon-ecr-login@v2
 
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-qemu-action@v4
+        with:
+          platforms: arm64
+      - uses: docker/setup-buildx-action@v4
 
       - name: Build and push application image
         shell: bash
@@ -144,9 +146,15 @@ jobs:
           MOBILE_TEST_SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
         run: npm run test:mobile
 
+      - name: Verify core workflows
+        env:
+          PLAYWRIGHT_BASE_URL: https://backpack.thaiv.dev
+          WORKFLOW_TEST_SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+        run: npm run test:workflow
+
       - name: Upload mobile test diagnostics
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mobile-layout-diagnostics
           path: |

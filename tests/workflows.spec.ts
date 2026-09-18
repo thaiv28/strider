@@ -1,0 +1,138 @@
+import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+
+const baseURL =
+  process.env.PLAYWRIGHT_BASE_URL ??
+  process.env.MOBILE_TEST_BASE_URL ??
+  "http://127.0.0.1:3000";
+const sessionSecret =
+  process.env.WORKFLOW_TEST_SESSION_SECRET ??
+  process.env.MOBILE_TEST_SESSION_SECRET;
+const password = process.env.WORKFLOW_TEST_PASSWORD;
+
+async function authenticate(context: BrowserContext, page: Page) {
+  if (sessionSecret) {
+    await context.addCookies([
+      {
+        name: "strider_session",
+        value: sessionSecret,
+        url: baseURL,
+        httpOnly: true,
+        secure: baseURL.startsWith("https://"),
+        sameSite: "Strict",
+      },
+    ]);
+    return;
+  }
+
+  test.skip(!password, "WORKFLOW_TEST_PASSWORD or WORKFLOW_TEST_SESSION_SECRET is required");
+  await page.goto("/login");
+  await page.getByLabel("Password").fill(password!);
+  await Promise.all([
+    page.waitForURL((url) => url.pathname === "/"),
+    page.getByRole("button", { name: "Sign in" }).click(),
+  ]);
+}
+
+async function fillAndSave(page: Page, label: string, value: string) {
+  const input = page.getByLabel(label, { exact: true });
+  await input.fill(value);
+  await Promise.all([
+    page.waitForResponse((response) => response.request().method() === "POST" && response.ok()),
+    input.press("Tab"),
+  ]);
+}
+
+test("protected pages redirect to sign in", async ({ browser }) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.goto(`${baseURL}/trips`);
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole("heading", { name: "STRIDER" })).toBeVisible();
+  await context.close();
+});
+
+test("a trip can be planned, exported, and deleted", async ({ context, page }) => {
+  test.setTimeout(90_000);
+  await authenticate(context, page);
+
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const initialName = `E2E trip ${suffix}`;
+  const updatedName = `E2E verified ${suffix}`;
+  let tripUrl: string | null = null;
+
+  const deleteCreatedTrip = async () => {
+    if (!tripUrl) return;
+    await page.goto(tripUrl);
+    const button = page.getByRole("button", { name: "Delete trip" });
+    if (!(await button.isVisible().catch(() => false))) return;
+    page.once("dialog", (dialog) => dialog.accept());
+    await Promise.all([
+      page.waitForURL((url) => url.pathname === "/trips"),
+      button.click(),
+    ]);
+    tripUrl = null;
+  };
+
+  try {
+    await page.goto("/trips");
+    page.once("dialog", (dialog) => dialog.accept(initialName));
+    await Promise.all([
+      page.waitForURL(/\/trips\/\d+$/),
+      page.getByRole("button", { name: "+ New trip" }).click(),
+    ]);
+    tripUrl = page.url();
+
+    await fillAndSave(page, "Trip name", updatedName);
+    await fillAndSave(page, "Region", "E2E Test Range");
+    await fillAndSave(page, "Area type", "Test wilderness");
+
+    await page.getByRole("button", { name: "+ Add day" }).click();
+    await expect(page.getByLabel("Day 1 distance in miles")).toBeVisible();
+    await fillAndSave(page, "Day 1 distance in miles", "4.5");
+    await fillAndSave(page, "Day 1 elevation gain in feet", "1200");
+
+    const printHref = await page
+      .getByRole("button", { name: "Print trip sheet" })
+      .locator("..")
+      .getAttribute("href");
+    expect(printHref).toMatch(/^\/trips\/\d+\/print$/);
+    await page.goto(printHref!);
+    await expect(page.getByRole("heading", { name: updatedName })).toBeVisible();
+    await page.goto(tripUrl);
+
+    const gpx = `<?xml version="1.0" encoding="UTF-8"?>
+      <gpx version="1.1"><trk><name>E2E route</name><trkseg>
+        <trkpt lat="47.0000" lon="-121.0000"><ele>1000</ele></trkpt>
+        <trkpt lat="47.0100" lon="-121.0100"><ele>1010</ele></trkpt>
+        <trkpt lat="47.0200" lon="-121.0200"><ele>1020</ele></trkpt>
+      </trkseg></trk></gpx>`;
+    await page.locator('input[name="gpx"]').setInputFiles({
+      name: "workflow.gpx",
+      mimeType: "application/gpx+xml",
+      buffer: Buffer.from(gpx),
+    });
+    await page.getByRole("button", { name: "Upload", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Use these for the trip" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Planning", exact: true }).click();
+    const permitInput = page.locator('input[type="file"][accept^="application/pdf"]');
+    await permitInput.setInputFiles({
+      name: "permit.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from("%PDF-1.4\n% Strider workflow test\n%%EOF\n"),
+    });
+    await expect(page.getByRole("link", { name: "permit.pdf" })).toBeVisible();
+
+    await page.reload();
+    await expect(page.getByLabel("Trip name")).toHaveValue(updatedName);
+    await page.getByRole("button", { name: "Logistics", exact: true }).click();
+    await expect(page.getByLabel("Region", { exact: true })).toHaveValue("E2E Test Range");
+    await expect(page.getByLabel("Day 1 distance in miles")).toHaveValue(/4\.5/);
+    await expect(page.getByRole("button", { name: "Use these for the trip" })).toBeVisible();
+
+    await deleteCreatedTrip();
+    await expect(page.getByText(updatedName, { exact: true })).toHaveCount(0);
+  } finally {
+    await deleteCreatedTrip();
+  }
+});

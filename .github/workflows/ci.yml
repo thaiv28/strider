@@ -1,0 +1,71 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: backpack
+          POSTGRES_PASSWORD: backpack
+          POSTGRES_DB: backpack
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U backpack -d backpack"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgres://backpack:backpack@127.0.0.1:5432/backpack
+      APP_ORIGIN: http://127.0.0.1:3000
+      APP_PASSWORD_HASH: 7b41ece728bdedbb5c4ba62ea70b826f14891460255e6a5a1de9f1a1c2a053bf
+      SESSION_SECRET: strider-ci-session
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+      PLAYWRIGHT_WEB_SERVER: "1"
+      WORKFLOW_TEST_PASSWORD: strider-ci-password
+      MOBILE_TEST_BASE_URL: http://127.0.0.1:3000
+      MOBILE_TEST_SESSION_SECRET: strider-ci-session
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm run db:migrate
+      - name: Seed test user
+        run: >-
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1
+          -c "insert into users (email, name) values ('workflow@example.test', 'Workflow Test');"
+      - run: npx tsc --noEmit
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:mobile
+      - run: npm run test:workflow
+
+      - name: Upload workflow test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: workflow-test-diagnostics
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7

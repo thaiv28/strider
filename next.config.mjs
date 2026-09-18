@@ -1,6 +1,5 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
+/** @type {import("next").NextConfig} */
+const nextConfig = {
   // Keep the native pg driver out of the bundle; load it at runtime.
   serverExternalPackages: ["pg"],
   experimental: {

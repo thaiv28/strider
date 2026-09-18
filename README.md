@@ -40,6 +40,19 @@ npm run verify       # print row counts + weight totals
 `npm run db:studio` opens Drizzle Studio. `npm run db:down` removes the container
 (data persists in the `backpack-pgdata` volume).
 
+## Verification
+
+```bash
+npx tsc --noEmit       # type safety
+npm run build          # production Next.js build
+npm run test:mobile    # responsive layout checks at three phone widths
+npm run test:workflow  # authenticated trip create/edit/upload/print/delete flow
+```
+
+Pull requests run these checks against an isolated Postgres service. Deployments
+repeat both browser suites against `backpack.thaiv.dev`; workflow-created records
+use unique names and are removed in test cleanup.
+
 ## Layout
 
 - `src/db/schema.ts` — the schema (source of truth)

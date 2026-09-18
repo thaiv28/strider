@@ -11,13 +11,15 @@
     "db:up": "docker run -d --name backpack-db -e POSTGRES_USER=backpack -e POSTGRES_PASSWORD=backpack -e POSTGRES_DB=backpack -p 5433:5432 -v backpack-pgdata:/var/lib/postgresql/data postgres:16",
     "db:down": "docker rm -f backpack-db",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "node scripts/migrate.mjs",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:backup": "bash scripts/backup-db.sh",
     "db:restore": "bash scripts/restore-db.sh",
     "import": "tsx scripts/import-sheets.ts",
     "test:mobile": "playwright test tests/mobile.spec.ts",
+    "test:workflow": "playwright test tests/workflows.spec.ts --project=workflow",
+    "test:e2e": "playwright test",
     "verify": "tsx scripts/verify.ts"
   },
   "dependencies": {
