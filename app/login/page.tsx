@@ -1,5 +1,3 @@
-import { login } from "./actions";
-
 export const metadata = { title: "Sign in" };
 
 export default async function LoginPage({
@@ -14,7 +12,7 @@ export default async function LoginPage({
         <p className="eyebrow">Private trail log</p>
         <h1 className="mt-2 font-display text-3xl font-bold">STRIDER</h1>
         <p className="mt-3 text-sm text-muted">Sign in to open the backpacking planner.</p>
-        <form action={login} className="mt-6 grid gap-4">
+        <form action="/api/login" method="post" className="mt-6 grid gap-4">
           <label className="grid gap-1.5 text-sm font-semibold">
             Password
             <input
