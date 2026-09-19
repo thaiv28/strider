@@ -37,8 +37,9 @@ Every push to `main` starts `.github/workflows/deploy.yml`:
 4. Write the current GitHub secret values into the project's Secrets Manager
    secret and upload the deployment script, Nginx template, and encrypted seed.
 5. Invoke `ops/deploy-ec2.sh` through Systems Manager.
-6. On the instance, pull the image, ensure PostgreSQL exists, restore the seed
-   only when the `users` table is absent, and run committed migrations.
+6. On the instance, prune unused Docker images, pull the image, ensure PostgreSQL
+   exists, restore the seed only when the `users` table is absent, and run
+   committed migrations. Running container images and data volumes are retained.
 7. Replace the application and proxy containers, then poll the internal health
    endpoint with the origin header.
 8. Invalidate CloudFront, verify the public health endpoint, and run all mobile

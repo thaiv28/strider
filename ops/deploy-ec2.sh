@@ -30,6 +30,9 @@ EOF
 registry="${ECR_URI%%/*}"
 aws ecr get-login-password | docker login --username AWS --password-stdin "$registry" >/dev/null
 image="${ECR_URI}:${IMAGE_TAG}"
+# Keep the small single-instance host from accumulating every historical image.
+# Running containers retain their image; only unreferenced layers are removed.
+docker image prune --all --force >/dev/null
 docker pull "$image"
 docker network inspect backpack-net >/dev/null 2>&1 || docker network create backpack-net >/dev/null
 
