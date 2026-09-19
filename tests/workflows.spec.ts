@@ -51,7 +51,7 @@ test("protected pages redirect to sign in", async ({ browser }) => {
   await context.close();
 });
 
-test("a trip can be planned, exported, and deleted", async ({ context, page }) => {
+test("a trip can be planned, shared, exported, and deleted", async ({ browser, context, page }) => {
   test.setTimeout(90_000);
   await authenticate(context, page);
 
@@ -129,6 +129,27 @@ test("a trip can be planned, exported, and deleted", async ({ context, page }) =
     await expect(page.getByLabel("Region", { exact: true })).toHaveValue("E2E Test Range");
     await expect(page.getByLabel("Day 1 distance in miles")).toHaveValue(/4\.5/);
     await expect(page.getByRole("button", { name: "Use these for the trip" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Share", exact: true }).click();
+    await page.getByRole("menuitem", { name: /Create view-only link/ }).click();
+    const sharedHref = await page.getByRole("menuitem", { name: "Open view-only page" }).getAttribute("href");
+    expect(sharedHref).toMatch(/^\/share\/trips\/[A-Za-z0-9_-]+$/);
+
+    const guest = await browser.newContext();
+    const sharedPage = await guest.newPage();
+    const sharedResponse = await sharedPage.goto(`${baseURL}${sharedHref}`);
+    expect(sharedResponse?.status()).toBe(200);
+    await expect(sharedPage.getByTestId("shared-trip")).toBeVisible();
+    await expect(sharedPage.getByRole("heading", { name: updatedName })).toBeVisible();
+    await expect(sharedPage.getByText("Trip report (private notes)")).toHaveCount(0);
+    await expect(sharedPage.getByRole("link", { name: "permit.pdf" })).toBeVisible();
+    await guest.close();
+
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.getByRole("menuitem", { name: "Revoke view-only link" }).click();
+    await expect(page.getByRole("menuitem", { name: /Create view-only link/ })).toBeVisible();
+    const revoked = await page.request.get(sharedHref!);
+    expect(revoked.status()).toBe(404);
 
     await deleteCreatedTrip();
     await expect(page.getByText(updatedName, { exact: true })).toHaveCount(0);

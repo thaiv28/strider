@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { Card, Button } from "@/components/ui";
 import { addDays, fetchDay, isFarFuture, type WxResult } from "@/lib/weather";
 import { getClimatology } from "@/app/weather/actions";
@@ -46,11 +46,13 @@ export function ReportPanel({
   data,
   template,
   packingList,
+  generateRequest = 0,
 }: {
   tripId: number;
   data: ReportData;
   template: string;
   packingList: string;
+  generateRequest?: number;
 }) {
   const [, start] = useTransition();
   const [pack, setPack] = useState(packingList);
@@ -66,6 +68,12 @@ export function ReportPanel({
     setOn(Object.fromEntries(blocks.map((b) => [b.token, true])));
     setConfig(true);
   };
+
+  useEffect(() => {
+    if (generateRequest > 0) openConfig();
+    // openConfig intentionally uses the latest rendered template blocks.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [generateRequest]);
 
   const generate = async () => {
     setBusy(true);
@@ -118,13 +126,6 @@ export function ReportPanel({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <div className="eyebrow">Share with the group</div>
-        </div>
-        <Button onClick={openConfig}>Generate report</Button>
-      </div>
-
       <Card className="p-4">
         <div className="flex items-center justify-between">
           <div className="eyebrow">Packing list — shared</div>

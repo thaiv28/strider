@@ -25,6 +25,9 @@ developer's local GitHub CLI session—is the durable publication path.
   estimates.
 - Trip creation/import, daily distance/elevation, gear/food snapshots,
   campsites, packing lists, GPX upload, permit upload, and printable trip sheets.
+- Consolidated trip sharing menu for printing, pre-trip report generation, and
+  persistent live view-only bearer links. Shared views expose the trip plan and
+  permit but omit private trip-report notes; owners can revoke the link.
 - Interactive route maps with topo/OSM layers and optional weather, snow, and
   air-quality overlays.
 - Calendar feeds and configurable report/energy settings.
@@ -51,6 +54,8 @@ developer's local GitHub CLI session—is the durable publication path.
 
 - The shared password is an application-wide access gate, not multi-user auth.
   Database identity still means “first users row.”
+- View-only trip URLs are non-expiring bearer links. Anyone with a current link
+  can read that trip and its permit until the owner revokes it.
 - The runtime is intentionally single-instance with no multi-AZ failover.
 - PostgreSQL and uploaded permit/GPX data are coupled to the instance's retained
   storage and database backups.

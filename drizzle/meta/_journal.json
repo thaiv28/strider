@@ -64,6 +64,13 @@
       "when": 1788287628340,
       "tag": "0008_purple_darkhawk",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789819091118,
+      "tag": "0009_add_trip_share_token",
+      "breakpoints": true
     }
   ]
 }

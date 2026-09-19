@@ -126,6 +126,7 @@ export default async function TripPage({
         waterSources: t.waterSources,
         planningNotes: t.planningNotes,
         tripReport: t.tripReport,
+        shareToken: t.shareToken,
       }}
       region={view.region}
       areaType={view.areaType}

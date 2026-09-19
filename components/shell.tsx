@@ -29,7 +29,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     if (path.startsWith("/trips")) localStorage.setItem("bp_lastTrips", path.replace(/\/print$/, ""));
   }, [path]);
 
-  if (path === "/login") return <>{children}</>;
+  if (path === "/login" || path.startsWith("/share/")) return <>{children}</>;
 
   // Route every nav click through the unsaved-changes guard. "Trips" resolves to
   // wherever you last were in the trips section.

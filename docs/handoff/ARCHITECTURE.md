@@ -32,8 +32,10 @@ truth, and keep operational behavior in version-controlled workflows/scripts.
   which call Drizzle and `revalidatePath()` the affected routes.
 - Binary responses (permit files) use a **GET route handler**
   (`app/trips/[id]/permit/route.ts`) streaming `bytea` from the DB.
-- `middleware.ts` protects every route except login, health, icons, and Next.js
-  static assets. The session cookie is HTTP-only, secure in production,
+- `middleware.ts` protects every route except login, health, icons, Next.js
+  static assets, and tokenized `/share/trips/[token]` views. Shared trip URLs are
+  persistent bearer links stored per trip; they are read-only, omit private trip
+  report notes, and can be revoked by clearing the token. The session cookie is HTTP-only, secure in production,
   same-site strict, and valid for 30 days.
 - `/api/health` verifies that the app can query PostgreSQL; it does not verify
   every third-party map, food, weather, or calendar dependency.
@@ -59,6 +61,8 @@ See `docs/handoff/OPERATIONS.md` and `docs/adr/0001-single-instance-aws-runtime.
 | `/trips` · `/trips/[id]` | trip list + full trip view (route map, days, gear, food, permit) |
 | `/trips/[id]/print` | printable trip sheet (USGS topo map, per-day distance/gain, permit) |
 | `/trips/[id]/permit` | GET handler returning the stored permit blob inline |
+| `/share/trips/[token]` | unauthenticated live, view-only trip plan (private notes omitted) |
+| `/share/trips/[token]/permit` | token-validated shared permit response |
 | `/gear` | **Gear Library** — inventory, loadouts, kits, and the Wishlist tab |
 | `/food` | meals, ingredients/pantry, nutrition |
 | `/calendar` | planning calendar over iCal feeds |

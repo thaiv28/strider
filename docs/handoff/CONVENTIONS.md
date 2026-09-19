@@ -79,7 +79,9 @@ come from `categoryColor()` in `lib/categories.ts`.
 ## Authentication and security boundary
 
 - `middleware.ts` is the route gate. Keep `/api/health` public for infrastructure
-  health checks; do not expose other data routes without a deliberate decision.
+  health checks. `/share/trips/[token]` and its permit handler are deliberately
+  public bearer-link routes: validate the token on every request, keep them
+  read-only, and never include `trip_report` private notes.
 - `APP_PASSWORD_HASH` is a SHA-256 digest, while `SESSION_SECRET` is the cookie
   value. Neither belongs in the repository or logs.
 - Authentication tests may inject the session cookie from CI secrets. This is a

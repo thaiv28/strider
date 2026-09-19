@@ -224,6 +224,9 @@ export const trip = pgTable("trip", {
   waterSources: text("water_sources"),
   planningNotes: text("planning_notes"),
   tripReport: text("trip_report"),
+  // Bearer token for the trip's persistent, unauthenticated read-only view.
+  // Null means sharing is disabled; rotating/revoking invalidates the old URL.
+  shareToken: text("share_token").unique(),
   // Shared participant packing list; null falls back to report_settings.packing_default.
   packingList: text("packing_list"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

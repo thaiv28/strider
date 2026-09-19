@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Trash2, Printer } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Card, Badge, Button, Input, Select, InfoBadge } from "@/components/ui";
 import { fmtWeight, fmtOz, fmtLbs, ozToG } from "@/lib/util";
@@ -13,6 +13,7 @@ import { TripFoodPanel, ShoppingList, type MealOpt, type IngOpt } from "./trip-f
 import { fuelPlan, GAS_PER_LITER_G, CANISTERS } from "@/lib/fuel";
 import { ReportPanel } from "./report-panel";
 import { PermitCard, type PermitMeta } from "./permit-card";
+import { ShareMenu } from "./share-menu";
 import type { TripFood, ShoppingItem } from "@/lib/trip";
 import type { ReportData } from "@/lib/report";
 import {
@@ -55,6 +56,7 @@ type Trip = {
   waterSources: string | null;
   planningNotes: string | null;
   tripReport: string | null;
+  shareToken: string | null;
 };
 type LibItem = { id: number; name: string; category: string | null; weightG: number | null; quantity: number; defaultWeightClass: "base" | "worn" | "consumable" };
 type Weights = { baseG: number; wornG: number; foodG: number; waterG: number; fuelG: number; consumableG: number; packG: number; skinOutG: number };
@@ -108,6 +110,7 @@ export function TripView(props: {
   const [picker, setPicker] = useState(false);
   type Tab = "logistics" | "planning" | "gear" | "food" | "report";
   const [tab, setTab] = useState<Tab>("logistics");
+  const [generateReportRequest, setGenerateReportRequest] = useState(0);
   const tabKey = `bp_tripTab_${trip.id}`;
   useEffect(() => {
     const saved = localStorage.getItem(tabKey);
@@ -116,6 +119,11 @@ export function TripView(props: {
   const pickTab = (k: Tab) => {
     setTab(k);
     localStorage.setItem(tabKey, k);
+  };
+  const generateReport = () => {
+    pickTab("report");
+    setGenerateReportRequest((n) => n + 1);
+    requestAnimationFrame(() => document.getElementById("report")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
   const save = (patch: Parameters<typeof updateTrip>[1]) => start(async () => await updateTrip(trip.id, patch));
   const oz = (g: number) => (g / 28.3495).toFixed(1);
@@ -206,11 +214,7 @@ export function TripView(props: {
           <option value="planned">planned</option>
           <option value="completed">completed</option>
         </Select>
-        <a href={`/trips/${trip.id}/print`} target="_blank" rel="noreferrer">
-          <Button variant="outline" aria-label="Print trip sheet" title="Printable trip sheet">
-            <Printer size={16} />
-          </Button>
-        </a>
+        <ShareMenu tripId={trip.id} initialToken={trip.shareToken} onGenerateReport={generateReport} />
         <Button variant="danger" onClick={del} aria-label="Delete trip" title="Delete trip">
           <Trash2 size={16} />
         </Button>
@@ -444,7 +448,7 @@ export function TripView(props: {
         {tab === "report" && (
           <div className="space-y-6">
             <div id="report" className="scroll-mt-24">
-              <ReportPanel tripId={trip.id} data={props.report} template={props.reportTemplate} packingList={props.tripPackingList} />
+              <ReportPanel tripId={trip.id} data={props.report} template={props.reportTemplate} packingList={props.tripPackingList} generateRequest={generateReportRequest} />
             </div>
             <div id="report-notes" className="scroll-mt-24">
               <NoteCard label="Trip report (private notes)" defaultValue={trip.tripReport} onSave={(v) => save({ tripReport: v })} rows={14} />

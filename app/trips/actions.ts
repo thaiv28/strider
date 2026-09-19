@@ -10,12 +10,40 @@ import { computeMealTotals, upsertIngredientFromHit } from "@/lib/food-server";
 import { composeTopoMap, type MapCampsite } from "@/lib/topo-map";
 import { kcalForGrams } from "@/lib/food";
 import type { FoodHit } from "@/lib/food-search";
+import { randomBytes } from "node:crypto";
 
 function bump(tripId: number) {
   revalidatePath(`/trips/${tripId}`);
   revalidatePath("/trips");
   revalidatePath("/calendar");
   revalidatePath("/");
+}
+
+export async function createTripShareLink(tripId: number): Promise<string> {
+  const userId = await getCurrentUserId();
+  const [existing] = await db
+    .select({ token: schema.trip.shareToken })
+    .from(schema.trip)
+    .where(and(eq(schema.trip.id, tripId), eq(schema.trip.userId, userId)));
+  if (!existing) throw new Error("Trip not found");
+  if (existing.token) return existing.token;
+
+  const token = randomBytes(24).toString("base64url");
+  await db
+    .update(schema.trip)
+    .set({ shareToken: token, updatedAt: new Date() })
+    .where(and(eq(schema.trip.id, tripId), eq(schema.trip.userId, userId)));
+  revalidatePath(`/trips/${tripId}`);
+  return token;
+}
+
+export async function revokeTripShareLink(tripId: number) {
+  const userId = await getCurrentUserId();
+  await db
+    .update(schema.trip)
+    .set({ shareToken: null, updatedAt: new Date() })
+    .where(and(eq(schema.trip.id, tripId), eq(schema.trip.userId, userId)));
+  revalidatePath(`/trips/${tripId}`);
 }
 
 export async function createTrip(name: string, loadoutId?: number): Promise<number> {
