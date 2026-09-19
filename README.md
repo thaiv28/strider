@@ -7,6 +7,10 @@ The private hosted instance is published at `https://backpack.thaiv.dev` through
 the `main` branch deployment workflow. See `docs/adr/` for the initial hosting
 and data-protection decisions.
 
+Agents and new contributors should start with `AGENTS.md`, then read the current
+handoff in `docs/handoff/CURRENT_STATE.md`. Architecture, conventions, and the
+production runbook are maintained beside it in `docs/handoff/`.
+
 ## Stack
 
 - **PostgreSQL** (via Docker) · **Drizzle ORM** + drizzle-kit migrations · **TypeScript** (tsx)
