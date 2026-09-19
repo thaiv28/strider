@@ -28,7 +28,7 @@ async function authenticate(context: BrowserContext, page: Page) {
   await page.goto("/login");
   await page.getByLabel("Password").fill(password!);
   await Promise.all([
-    page.waitForURL((url) => url.pathname === "/"),
+    page.waitForURL((url) => url.pathname === "/basecamp"),
     page.getByRole("button", { name: "Sign in" }).click(),
   ]);
 }
@@ -42,9 +42,34 @@ async function fillAndSave(page: Page, label: string, value: string) {
   ]);
 }
 
+// Production verification must never leave its uniquely-prefixed records
+// behind, even when the main test times out and its page fixture is closed.
+test.afterAll(async ({ browser }) => {
+  if (!sessionSecret && !password) return;
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  try {
+    await authenticate(context, page);
+    for (let i = 0; i < 25; i++) {
+      await page.goto("/trips");
+      const trip = page.locator('a[href^="/trips/"]').filter({ hasText: /^E2E (?:trip|verified) / }).first();
+      if (!(await trip.count())) break;
+      await trip.click();
+      const button = page.getByRole("button", { name: "Delete trip" });
+      page.once("dialog", (dialog) => dialog.accept());
+      await Promise.all([page.waitForURL((url) => url.pathname === "/trips"), button.click()]);
+    }
+  } finally {
+    await context.close();
+  }
+});
+
 test("protected pages redirect to sign in", async ({ browser }) => {
   const context = await browser.newContext();
   const page = await context.newPage();
+  await page.goto(`${baseURL}/`);
+  await expect(page.getByRole("heading", { name: /Plan farther/ })).toBeVisible();
+  await expect(page).toHaveURL(`${baseURL}/`);
   await page.goto(`${baseURL}/trips`);
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole("heading", { name: "STRIDER" })).toBeVisible();
@@ -52,7 +77,9 @@ test("protected pages redirect to sign in", async ({ browser }) => {
 });
 
 test("a trip can be planned, shared, exported, and deleted", async ({ browser, context, page }) => {
-  test.setTimeout(90_000);
+  // Production route-map processing and the unauthenticated share round-trip can
+  // be slow on the small ARM instance, especially immediately after deployment.
+  test.setTimeout(180_000);
   await authenticate(context, page);
 
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -91,9 +118,9 @@ test("a trip can be planned, shared, exported, and deleted", async ({ browser, c
     await fillAndSave(page, "Day 1 distance in miles", "4.5");
     await fillAndSave(page, "Day 1 elevation gain in feet", "1200");
 
+    await page.getByRole("button", { name: "Share", exact: true }).click();
     const printHref = await page
-      .getByRole("button", { name: "Print trip sheet" })
-      .locator("..")
+      .getByRole("menuitem", { name: /Print trip/ })
       .getAttribute("href");
     expect(printHref).toMatch(/^\/trips\/\d+\/print$/);
     await page.goto(printHref!);
@@ -145,8 +172,8 @@ test("a trip can be planned, shared, exported, and deleted", async ({ browser, c
     await expect(sharedPage.getByRole("link", { name: "permit.pdf" })).toBeVisible();
     await guest.close();
 
-    page.once("dialog", (dialog) => dialog.accept());
     await page.getByRole("menuitem", { name: "Revoke view-only link" }).click();
+    await page.getByRole("menuitem", { name: "Confirm revoke" }).click();
     await expect(page.getByRole("menuitem", { name: /Create view-only link/ })).toBeVisible();
     const revoked = await page.request.get(sharedHref!);
     expect(revoked.status()).toBe(404);

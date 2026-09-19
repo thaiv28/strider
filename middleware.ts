@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 const COOKIE_NAME = "strider_session";
 
 export function middleware(request: NextRequest) {
+  if (request.nextUrl.pathname === "/") return NextResponse.next();
   const sessionSecret = process.env.SESSION_SECRET;
   if (!sessionSecret) {
     return new NextResponse("Service authentication is not configured.", { status: 503 });

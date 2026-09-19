@@ -17,6 +17,8 @@ export function ShareMenu({
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState(initialToken);
   const [copied, setCopied] = useState(false);
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const root = useRef<HTMLDivElement>(null);
 
@@ -30,19 +32,35 @@ export function ShareMenu({
 
   const copyLink = () =>
     start(async () => {
-      const next = token ?? (await createTripShareLink(tripId));
-      setToken(next);
-      await navigator.clipboard.writeText(`${window.location.origin}/share/trips/${next}`);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
+      try {
+        const next = token ?? (await createTripShareLink(tripId));
+        setToken(next);
+        const url = `${window.location.origin}/share/trips/${next}`;
+        if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(url);
+        setCopied(true);
+        setMessage("View-only link copied.");
+        window.setTimeout(() => setCopied(false), 1800);
+      } catch {
+        setMessage("The link is active, but it could not be copied. Open it below and copy the address.");
+      }
     });
 
   const revoke = () => {
-    if (!confirm("Revoke this view-only link? Anyone using it will immediately lose access.")) return;
+    if (!confirmRevoke) {
+      setConfirmRevoke(true);
+      setMessage("Select revoke again to confirm.");
+      return;
+    }
     start(async () => {
-      await revokeTripShareLink(tripId);
-      setToken(null);
-      setCopied(false);
+      try {
+        await revokeTripShareLink(tripId);
+        setToken(null);
+        setCopied(false);
+        setConfirmRevoke(false);
+        setMessage("View-only link revoked.");
+      } catch {
+        setMessage("Could not revoke the link. Try again.");
+      }
     });
   };
 
@@ -71,10 +89,11 @@ export function ShareMenu({
                 <ExternalLink size={16} /> Open view-only page
               </a>
               <button type="button" role="menuitem" onClick={revoke} disabled={pending} className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-muted hover:bg-panel2 hover:text-ink disabled:opacity-50">
-                <Unlink size={16} /> Revoke view-only link
+                <Unlink size={16} /> {confirmRevoke ? "Confirm revoke" : "Revoke view-only link"}
               </button>
             </>
           )}
+          {message && <div role="status" className="border-t px-3 py-2 text-xs leading-relaxed text-muted">{message}</div>}
         </div>
       )}
     </div>

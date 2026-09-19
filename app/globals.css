@@ -110,6 +110,29 @@ summary {
   }
 }
 
+/* Public landing page motion. These remain decorative and respect the global
+   reduced-motion override above. */
+.landing-glow {
+  background:
+    radial-gradient(circle at 72% 42%, rgba(86, 190, 176, 0.17), transparent 34%),
+    radial-gradient(circle at 18% 72%, rgba(143, 177, 130, 0.10), transparent 28%);
+}
+.landing-rings {
+  background: repeating-radial-gradient(circle at 50% 110%, transparent 0 54px, rgba(145, 207, 173, 0.18) 55px 56px);
+}
+.landing-route-line {
+  stroke-dasharray: 1500;
+  stroke-dashoffset: 1500;
+  animation: landing-route 3.2s cubic-bezier(.4,0,.2,1) .35s forwards;
+}
+.landing-contours { animation: landing-drift 18s ease-in-out infinite alternate; }
+.landing-route-dot { animation: landing-pulse 2.2s ease-in-out 3.2s infinite; transform-box: fill-box; transform-origin: center; }
+.landing-float { animation: landing-float 7s ease-in-out infinite; }
+@keyframes landing-route { to { stroke-dashoffset: 0; } }
+@keyframes landing-drift { to { transform: translate3d(24px, -10px, 0); } }
+@keyframes landing-pulse { 50% { transform: scale(1.65); opacity: .55; } }
+@keyframes landing-float { 50% { transform: translateY(-10px) rotate(.25deg); } }
+
 /* ── Sandstone — warm ivory, warm-charcoal ink, crisp pine-teal ────── */
 :root {
   --canvas: #f3efe6;

@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.redirect(publicUrl("/login?error=1"), 303);
   }
 
-  const response = NextResponse.redirect(publicUrl("/"), 303);
+  const response = NextResponse.redirect(publicUrl("/basecamp"), 303);
   response.cookies.set(COOKIE_NAME, sessionSecret, {
     httpOnly: true,
     maxAge: 60 * 60 * 24 * 30,

@@ -43,7 +43,7 @@ async function expectNoHorizontalOverflow(page: Page) {
 }
 
 const pages = [
-  { path: "/", heading: "Basecamp" },
+  { path: "/basecamp", heading: "Basecamp" },
   { path: "/gear", heading: "Gear Library" },
   { path: "/food", heading: "Food" },
   { path: "/trips", heading: "Trips" },
@@ -59,6 +59,13 @@ for (const destination of pages) {
     await expectNoHorizontalOverflow(page);
   });
 }
+
+test("the public landing page fits the phone viewport", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: /Plan farther/ })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Primary navigation" })).toHaveCount(0);
+  await expectNoHorizontalOverflow(page);
+});
 
 test("a trip detail page fits the phone viewport", async ({ page }) => {
   await page.goto("/trips");
@@ -89,7 +96,7 @@ test("a trip detail page fits the phone viewport", async ({ page }) => {
 });
 
 test("route maps stay below the mobile navigation", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/basecamp");
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   const bottomNavigationOwnsViewportEdge = await page.evaluate(() =>
     Boolean(document.elementFromPoint(window.innerWidth / 2, window.innerHeight - 20)?.closest('nav[aria-label="Primary navigation"]')),

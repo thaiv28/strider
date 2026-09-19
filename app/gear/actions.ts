@@ -246,5 +246,5 @@ export async function moveGear(itemId: number, toCategoryId: number, orderedIds:
     }
   });
   revalidatePath("/gear");
-  revalidatePath("/");
+  revalidatePath("/basecamp");
 }

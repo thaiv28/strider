@@ -32,6 +32,8 @@ developer's local GitHub CLI session—is the durable publication path.
   air-quality overlays.
 - Calendar feeds and configurable report/energy settings.
 - Mobile navigation and responsive coverage at 360, 390, and 430 CSS pixels.
+- Public, responsive Strider landing page at `/`; the authenticated dashboard is
+  available at `/basecamp`.
 - PR validation with isolated PostgreSQL and production post-deploy browser
   verification.
 - Encrypted initial seed plus encrypted daily database backups to private S3.

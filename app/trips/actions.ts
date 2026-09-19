@@ -16,7 +16,7 @@ function bump(tripId: number) {
   revalidatePath(`/trips/${tripId}`);
   revalidatePath("/trips");
   revalidatePath("/calendar");
-  revalidatePath("/");
+  revalidatePath("/basecamp");
 }
 
 export async function createTripShareLink(tripId: number): Promise<string> {
@@ -61,7 +61,7 @@ export async function deleteTrip(tripId: number) {
   await db.delete(schema.trip).where(eq(schema.trip.id, tripId));
   revalidatePath("/trips");
   revalidatePath("/calendar");
-  revalidatePath("/");
+  revalidatePath("/basecamp");
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -183,7 +183,7 @@ export async function importTrip(json: string): Promise<{ tripId?: number; error
 
   revalidatePath("/trips");
   revalidatePath("/calendar");
-  revalidatePath("/");
+  revalidatePath("/basecamp");
   return { tripId };
 }
 

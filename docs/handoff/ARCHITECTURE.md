@@ -32,7 +32,7 @@ truth, and keep operational behavior in version-controlled workflows/scripts.
   which call Drizzle and `revalidatePath()` the affected routes.
 - Binary responses (permit files) use a **GET route handler**
   (`app/trips/[id]/permit/route.ts`) streaming `bytea` from the DB.
-- `middleware.ts` protects every route except login, health, icons, Next.js
+- `middleware.ts` protects every route except the public landing page, login, health, icons, Next.js
   static assets, and tokenized `/share/trips/[token]` views. Shared trip URLs are
   persistent bearer links stored per trip; they are read-only, omit private trip
   report notes, and can be revoked by clearing the token. The session cookie is HTTP-only, secure in production,
@@ -57,7 +57,8 @@ See `docs/handoff/OPERATIONS.md` and `docs/adr/0001-single-instance-aws-runtime.
 
 | Route | Purpose |
 |---|---|
-| `/` | **Basecamp** — dashboard: next objective, base-weight bar, quick stats |
+| `/` | public Strider landing page |
+| `/basecamp` | **Basecamp** — authenticated dashboard: next objective, base-weight bar, quick stats |
 | `/trips` · `/trips/[id]` | trip list + full trip view (route map, days, gear, food, permit) |
 | `/trips/[id]/print` | printable trip sheet (USGS topo map, per-day distance/gain, permit) |
 | `/trips/[id]/permit` | GET handler returning the stored permit blob inline |

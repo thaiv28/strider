@@ -9,7 +9,7 @@ import { useUnsaved } from "@/components/unsaved-changes";
 import { logout } from "@/app/login/actions";
 
 const NAV = [
-  { href: "/", label: "Basecamp", icon: Home },
+  { href: "/basecamp", label: "Basecamp", icon: Home },
   { href: "/gear", label: "Gear", icon: Backpack },
   { href: "/food", label: "Food", icon: Utensils },
   { href: "/trips", label: "Trips", icon: Map },
@@ -20,7 +20,7 @@ const MOBILE_NAV = [...NAV, { href: "/calendar", label: "Calendar", icon: Calend
 export function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const { requestNavigate } = useUnsaved();
-  const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
+  const isActive = (href: string) => path.startsWith(href);
 
   // Remember the last place visited under /trips (list or a specific trip). The
   // print view is a dead-end sub-page, so collapse it to its trip page — coming
@@ -29,7 +29,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     if (path.startsWith("/trips")) localStorage.setItem("bp_lastTrips", path.replace(/\/print$/, ""));
   }, [path]);
 
-  if (path === "/login" || path.startsWith("/share/")) return <>{children}</>;
+  if (path === "/" || path === "/login" || path.startsWith("/share/")) return <>{children}</>;
 
   // Route every nav click through the unsaved-changes guard. "Trips" resolves to
   // wherever you last were in the trips section.
@@ -46,7 +46,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
       <header data-noprint className="sticky top-0 z-50 border-b-2 border-double bg-panel/95 backdrop-blur md:static md:bg-panel">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 md:hidden">
-          <Link href="/" onClick={onNav("/")} className="font-display text-xl font-bold tracking-tight leading-none">
+          <Link href="/basecamp" onClick={onNav("/basecamp")} className="font-display text-xl font-bold tracking-tight leading-none">
             STRIDER
           </Link>
           <div className="flex items-center gap-1">
@@ -61,7 +61,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
         <div className="mx-auto hidden max-w-6xl items-center justify-between gap-3 px-8 py-3 md:flex">
-          <Link href="/" onClick={onNav("/")} className="shrink-0 font-display text-lg font-bold tracking-tight leading-none sm:text-xl">
+          <Link href="/basecamp" onClick={onNav("/basecamp")} className="shrink-0 font-display text-lg font-bold tracking-tight leading-none sm:text-xl">
             STRIDER
           </Link>
           <nav className="flex min-w-0 items-center gap-2.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-6 sm:overflow-visible">
