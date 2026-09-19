@@ -1,19 +1,24 @@
-# backpack-app — Architecture (agent steering doc)
+# backpack-app — Architecture
 
-A personal **backpacking trip planner + gear/weight tracker**. Single-user (no
-auth): every query resolves the current user via `getCurrentUserId()`, which
-returns the first `users` row. Written to be driven by an AI agent as much as a
-human, so favor small, composable server actions and keep the schema the source
-of truth.
+Strider is Thai's private backpacking trip planner and gear/weight tracker. It
+is a single-user application behind a shared password gate. Middleware compares
+the `strider_session` cookie with `SESSION_SECRET`; the login route validates a
+SHA-256 password hash. This protects the site but does not establish a database
+user identity: `getCurrentUserId()` still returns the first `users` row.
+
+The application is designed for both human and agent-driven changes. Favor
+small composable server actions, keep the schema as the data-model source of
+truth, and keep operational behavior in version-controlled workflows/scripts.
 
 ## Stack
 
 - **Next.js 15** (App Router) · **React 19** · **TypeScript 5.7** · ESM (`"type":"module"`).
-- **Postgres 16** in Docker (host port **5433** → container 5432), data in the
-  named volume `backpack-pgdata`.
+- **Postgres 16**. Local development uses Docker on host port **5433** with the
+  `backpack-pgdata` volume. Production uses a dedicated container and retained
+  host storage at `/srv/backpack/postgres`.
 - **Drizzle ORM 0.36** + **drizzle-kit 0.28**. Schema at `src/db/schema.ts` is
-  the single source of truth; iterate with `npm run db:push` (schema is pushed,
-  not migration-per-change, during active dev).
+  the source of truth. Committed migrations live in `drizzle/`; production runs
+  `npm run db:migrate` before replacing the app container.
 - **Tailwind v4** (`@tailwindcss/postcss`), custom palette tokens (see CONVENTIONS).
 - **Leaflet 1.9 / react-leaflet 5** for maps; **@dnd-kit** for drag-reorder;
   **marked** for markdown; **node-ical** for calendar feeds; **pg** driver.
@@ -27,6 +32,24 @@ of truth.
   which call Drizzle and `revalidatePath()` the affected routes.
 - Binary responses (permit files) use a **GET route handler**
   (`app/trips/[id]/permit/route.ts`) streaming `bytea` from the DB.
+- `middleware.ts` protects every route except login, health, icons, and Next.js
+  static assets. The session cookie is HTTP-only, secure in production,
+  same-site strict, and valid for 30 days.
+- `/api/health` verifies that the app can query PostgreSQL; it does not verify
+  every third-party map, food, weather, or calendar dependency.
+
+## Production topology
+
+Traffic resolves through Route 53 and CloudFront to an Nginx container on one
+Graviton EC2 instance. Nginx rejects requests without CloudFront's private
+origin-verification header and proxies accepted traffic to the Next.js
+container. PostgreSQL runs in a separate container on the private Docker
+network. Images are stored in ECR, runtime secrets in Secrets Manager, and
+deployment/backup objects in private S3 buckets. GitHub Actions assumes its AWS
+deployment role through OIDC and invokes the instance through Systems Manager;
+the instance does not require public SSH for publication.
+
+See `docs/handoff/OPERATIONS.md` and `docs/adr/0001-single-instance-aws-runtime.md`.
 
 ## Routes (`app/`)
 
@@ -85,9 +108,27 @@ for the bbox, then overlays the track + numbered campsites as SVG.
 ## External services / secrets (`.env`)
 
 - `DATABASE_URL` → `postgres://backpack:backpack@localhost:5433/backpack`
+- `APP_ORIGIN` — canonical public origin used for authentication redirects
+- `APP_PASSWORD_HASH` — SHA-256 hex digest of the shared site password
+- `SESSION_SECRET` — high-entropy value stored in the session cookie
 - `FDC_API_KEY` — USDA FoodData Central (ingredient search)
 - `GEOAPIFY_API_KEY` — geocoding / static maps fallback
 - `NEXT_PUBLIC_WAQI_TOKEN` — air-quality tiles (baked at build/boot; needs a dev
   restart to change)
 - The **GPX routing MCP** (separate project) uses `ORS_API_KEY` (OpenRouteService),
   stored in the MCP registration, not in `.env`.
+
+## Delivery and verification
+
+- `.github/workflows/ci.yml` runs on pull requests and manual dispatch with an
+  isolated PostgreSQL service. It migrates/seeds the database, type-checks,
+  builds, and runs both Playwright suites.
+- `.github/workflows/deploy.yml` runs on every push to `main`. It builds the
+  Next.js app, assumes the AWS role, publishes an ARM64 image, updates runtime
+  secrets/assets, deploys through SSM, invalidates CloudFront, and validates the
+  live site.
+- `tests/mobile.spec.ts` checks primary pages at 360, 390, and 430 CSS pixels,
+  including overflow, the trip tab strip, dates, maps, and mobile navigation.
+- `tests/workflows.spec.ts` checks authentication plus a full trip lifecycle:
+  create, edit, add a day, print, upload GPX/permit, reload, and delete. Created
+  records have unique names and are removed in `finally` cleanup.
