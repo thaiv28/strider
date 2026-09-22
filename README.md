@@ -1,9 +1,10 @@
 # backpack-app
 
 Backpacking trip planner + gear/weight tracker. Stores gear, meals, trips,
-routes, and per-trip weight/calorie rollups; the frontend is layered on later.
+routes, and per-trip weight/calorie rollups in a private workspace for each
+verified Google account.
 
-The private hosted instance is published at `https://backpack.thaiv.dev` through
+The hosted app is published at `https://backpack.thaiv.dev` through
 the `main` branch deployment workflow. See `docs/adr/` for the initial hosting
 and data-protection decisions.
 
@@ -14,7 +15,7 @@ production runbook are maintained beside it in `docs/handoff/`.
 ## Stack
 
 - **PostgreSQL** (via Docker) · **Drizzle ORM** + drizzle-kit migrations · **TypeScript** (tsx)
-- Frontend (later phases): Next.js + Tailwind + shadcn/ui.
+- **Next.js** · **Auth.js** with Google OAuth · **Tailwind CSS**
 
 Canonical weight unit is **grams**; oz/lb are derived in the UI.
 
@@ -41,6 +42,12 @@ npm run import       # load data from ~/backpack/*.html
 npm run verify       # print row counts + weight totals
 ```
 
+Copy `.env.example` to `.env.local`, configure a Google OAuth web client, and
+set `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, and `AUTH_SECRET`. For an existing
+single-user database, set `AUTH_OWNER_EMAIL` to the exact verified Google email
+that should claim the existing user row. The claim happens in place, preserving
+the user id and all trip, gear, meal, and settings relationships.
+
 `npm run db:studio` opens Drizzle Studio. `npm run db:down` removes the container
 (data persists in the `backpack-pgdata` volume).
 
@@ -53,9 +60,10 @@ npm run test:mobile    # responsive layout checks at three phone widths
 npm run test:workflow  # authenticated trip create/edit/upload/print/delete flow
 ```
 
-Pull requests run these checks against an isolated Postgres service. Deployments
-repeat both browser suites against `backpack.thaiv.dev`; workflow-created records
-use unique names and are removed in test cleanup.
+Pull requests run these checks against an isolated Postgres service, including
+cross-account isolation. Deployments repeat both browser suites against
+`backpack.thaiv.dev`; workflow-created records use isolated test identities,
+unique names, and test cleanup.
 
 ## Layout
 

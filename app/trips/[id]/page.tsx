@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/src/db/index";
 import { getCurrentUserId, getGearView, getLoadoutData } from "@/lib/gear";
 import { getTripView, getTripFood, getShoppingList } from "@/lib/trip";
@@ -11,7 +11,8 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [t] = await db.select({ name: schema.trip.name }).from(schema.trip).where(eq(schema.trip.id, Number(id)));
+  const userId = await getCurrentUserId();
+  const [t] = await db.select({ name: schema.trip.name }).from(schema.trip).where(and(eq(schema.trip.id, Number(id)), eq(schema.trip.userId, userId)));
   return { title: t?.name ?? "Trip" };
 }
 
@@ -36,15 +37,15 @@ export default async function TripPage({
   const calHref = y != null && m != null ? `/calendar?y=${y}&m=${m}` : "/calendar";
   const back = from === "calendar" ? { href: calHref, label: "Calendar" } : { href: "/trips", label: "Logbook" };
   const tripId = Number(id);
-  const view = await getTripView(tripId);
+  const userId = await getCurrentUserId();
+  const view = await getTripView(tripId, userId);
   if (!view) notFound();
 
-  const userId = await getCurrentUserId();
   const [gearView, loadoutData, tripFood, shopping, meals, ingredients, reportRows, permitRows] = await Promise.all([
     getGearView(userId),
     getLoadoutData(userId),
     getTripFood(tripId, userId),
-    getShoppingList(tripId),
+    getShoppingList(tripId, userId),
     getMeals(userId),
     getIngredients(userId),
     db.select().from(schema.reportSettings).where(eq(schema.reportSettings.userId, userId)),

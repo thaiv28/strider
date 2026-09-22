@@ -26,8 +26,11 @@ jobs:
       INSTANCE_ID: ${{ vars.INSTANCE_ID }}
       SECRET_ARN: ${{ vars.SECRET_ARN }}
       DISTRIBUTION_ID: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}
-      APP_PASSWORD_HASH: ${{ secrets.APP_PASSWORD_HASH }}
       SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+      AUTH_GOOGLE_ID: ${{ secrets.AUTH_GOOGLE_ID }}
+      AUTH_GOOGLE_SECRET: ${{ secrets.AUTH_GOOGLE_SECRET }}
+      AUTH_OWNER_EMAIL: ${{ secrets.AUTH_OWNER_EMAIL }}
+      E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
       DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
       ORIGIN_SECRET: ${{ secrets.ORIGIN_SECRET }}
       BACKUP_KEY: ${{ secrets.BACKUP_KEY }}
@@ -45,7 +48,7 @@ jobs:
       - name: Check deployment configuration
         shell: bash
         run: |
-          required=(AWS_ROLE_ARN ECR_URI DEPLOY_BUCKET BACKUP_BUCKET INSTANCE_ID SECRET_ARN DISTRIBUTION_ID APP_PASSWORD_HASH SESSION_SECRET DB_PASSWORD ORIGIN_SECRET BACKUP_KEY)
+          required=(AWS_ROLE_ARN ECR_URI DEPLOY_BUCKET BACKUP_BUCKET INSTANCE_ID SECRET_ARN DISTRIBUTION_ID SESSION_SECRET AUTH_GOOGLE_ID AUTH_GOOGLE_SECRET AUTH_OWNER_EMAIL E2E_TEST_PASSWORD DB_PASSWORD ORIGIN_SECRET BACKUP_KEY)
           for name in "${required[@]}"; do
             if [[ -z "${!name}" ]]; then
               echo "Missing deployment setting: $name"
@@ -85,15 +88,19 @@ jobs:
       - name: Store runtime secrets
         shell: bash
         run: |
+          e2e_password_hash=$(printf %s "$E2E_TEST_PASSWORD" | sha256sum | cut -d' ' -f1)
           secret_json=$(jq -n \
             --arg db "$DB_PASSWORD" \
-            --arg password "$APP_PASSWORD_HASH" \
             --arg session "$SESSION_SECRET" \
+            --arg google_id "$AUTH_GOOGLE_ID" \
+            --arg google_secret "$AUTH_GOOGLE_SECRET" \
+            --arg owner_email "$AUTH_OWNER_EMAIL" \
+            --arg e2e_hash "$e2e_password_hash" \
             --arg origin "$ORIGIN_SECRET" \
             --arg backup "$BACKUP_KEY" \
             --arg fdc "$FDC_API_KEY" \
             --arg geo "$GEOAPIFY_API_KEY" \
-            '{DB_PASSWORD:$db,APP_PASSWORD_HASH:$password,SESSION_SECRET:$session,ORIGIN_SECRET:$origin,BACKUP_KEY:$backup,FDC_API_KEY:$fdc,GEOAPIFY_API_KEY:$geo}')
+            '{DB_PASSWORD:$db,SESSION_SECRET:$session,AUTH_GOOGLE_ID:$google_id,AUTH_GOOGLE_SECRET:$google_secret,AUTH_OWNER_EMAIL:$owner_email,AUTH_E2E_PASSWORD_HASH:$e2e_hash,ORIGIN_SECRET:$origin,BACKUP_KEY:$backup,FDC_API_KEY:$fdc,GEOAPIFY_API_KEY:$geo}')
           aws secretsmanager put-secret-value --secret-id "$SECRET_ARN" --secret-string "$secret_json" >/dev/null
 
       - name: Upload deployment assets
@@ -143,13 +150,13 @@ jobs:
       - name: Verify phone layouts
         env:
           MOBILE_TEST_BASE_URL: https://backpack.thaiv.dev
-          MOBILE_TEST_SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
         run: npm run test:mobile
 
       - name: Verify core workflows
         env:
           PLAYWRIGHT_BASE_URL: https://backpack.thaiv.dev
-          WORKFLOW_TEST_SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
         run: npm run test:workflow
 
       - name: Upload mobile test diagnostics

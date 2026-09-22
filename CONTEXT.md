@@ -5,6 +5,14 @@ and completed trips.
 
 ## Language
 
+**User**:
+A person with a verified Google identity who owns a private set of Strider planning data.
+_Avoid_: Guest, shared user
+
+**Shared Trip**:
+A live, read-only projection of one Trip exposed through a revocable bearer link; private Trip Report notes are excluded.
+_Avoid_: Public trip, shared workspace
+
 **Gear Item**:
 A physical item that is current, retired, or being considered on the wishlist.
 _Avoid_: Product, asset

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/src/db/index";
 import { getCurrentUserId } from "@/lib/gear";
+import { requireOwnedCalendarFeed } from "@/lib/authorization";
 
 const s = (v: number | null) => (v == null ? null : String(v));
 
@@ -59,6 +60,7 @@ export async function addCalendarFeed(v: { label: string; color: string; url: st
 }
 
 export async function updateCalendarFeed(id: number, v: { label: string; color: string; url: string }) {
+  await requireOwnedCalendarFeed(id);
   await db
     .update(schema.calendarFeed)
     .set({ label: v.label.trim() || "Calendar", color: v.color, url: v.url.trim() })
@@ -67,6 +69,7 @@ export async function updateCalendarFeed(id: number, v: { label: string; color: 
 }
 
 export async function deleteCalendarFeed(id: number) {
+  await requireOwnedCalendarFeed(id);
   await db.delete(schema.calendarFeed).where(eq(schema.calendarFeed.id, id));
   await bumpCalendar();
 }

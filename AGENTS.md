@@ -22,8 +22,10 @@ Platform-wide AWS provisioning and domain/IAM controls belong to the private
 
 ## Non-negotiable rules
 
-- The app is single-user. The password cookie gates access, but it is not a
-  multi-user identity system; `getCurrentUserId()` still selects the first user.
+- The app is multi-user. `getCurrentUserId()` resolves the Auth.js session, and
+  every private read or mutation must enforce ownership for all supplied ids.
+- `/share/trips/[token]` is the deliberate exception: a revocable bearer token
+  grants read-only access to one Trip and never exposes private Trip Report notes.
 - Grams and integer cents are canonical storage units. Convert only at UI edges.
 - Never import server-only database modules as runtime values in client code.
 - All writes use server actions and revalidate every affected route. Use a
@@ -31,7 +33,7 @@ Platform-wide AWS provisioning and domain/IAM controls belong to the private
 - Change `src/db/schema.ts`, generate and review a migration, then apply it with
   `npm run db:migrate`. Never run `db:push` against production.
 - Never commit `.env`, plaintext backups, permits, calendar URLs, API keys,
-  password hashes, session values, origin secrets, or backup keys.
+  OAuth credentials, password hashes, session values, origin secrets, or backup keys.
 - Do not delete or recreate AWS resources, production volumes, backups, or
   production records without explicit user approval and a verified target.
 - Do not add application-specific copies of centrally managed platform resources

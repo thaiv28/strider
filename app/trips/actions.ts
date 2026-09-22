@@ -11,6 +11,14 @@ import { composeTopoMap, type MapCampsite } from "@/lib/topo-map";
 import { kcalForGrams } from "@/lib/food";
 import type { FoodHit } from "@/lib/food-search";
 import { randomBytes } from "node:crypto";
+import {
+  requireOwnedGearItem,
+  requireOwnedIngredient,
+  requireOwnedLoadout,
+  requireOwnedMeal,
+  requireOwnedTrip,
+  requireOwnedTripChild,
+} from "@/lib/authorization";
 
 function bump(tripId: number) {
   revalidatePath(`/trips/${tripId}`);
@@ -48,6 +56,7 @@ export async function revokeTripShareLink(tripId: number) {
 
 export async function createTrip(name: string, loadoutId?: number): Promise<number> {
   const userId = await getCurrentUserId();
+  if (loadoutId) await requireOwnedLoadout(loadoutId, userId);
   const [t] = await db
     .insert(schema.trip)
     .values({ userId, name: name.trim() || "New Trip", status: "planned" })
@@ -58,6 +67,7 @@ export async function createTrip(name: string, loadoutId?: number): Promise<numb
 }
 
 export async function deleteTrip(tripId: number) {
+  await requireOwnedTrip(tripId);
   await db.delete(schema.trip).where(eq(schema.trip.id, tripId));
   revalidatePath("/trips");
   revalidatePath("/calendar");
@@ -190,6 +200,8 @@ export async function importTrip(json: string): Promise<{ tripId?: number; error
 // Copy a loadout's gear into the trip as a frozen snapshot. Only seeds an empty
 // trip (copy-once semantics; afterward the trip's gear is edited directly).
 export async function seedTripFromLoadout(tripId: number, loadoutId: number) {
+  const userId = await requireOwnedTrip(tripId);
+  await requireOwnedLoadout(loadoutId, userId);
   const existing = await db
     .select({ id: schema.tripGear.id })
     .from(schema.tripGear)
@@ -230,6 +242,8 @@ export async function seedTripFromLoadout(tripId: number, loadoutId: number) {
 }
 
 export async function addTripGear(tripId: number, gearItemId: number) {
+  const userId = await requireOwnedTrip(tripId);
+  await requireOwnedGearItem(gearItemId, userId);
   const [g] = await db
     .select({
       name: schema.gearItem.name,
@@ -263,6 +277,7 @@ export async function addTripGear(tripId: number, gearItemId: number) {
 }
 
 export async function removeTripGear(id: number, tripId: number) {
+  await requireOwnedTripChild("gear", id, tripId);
   await db.delete(schema.tripGear).where(eq(schema.tripGear.id, id));
   bump(tripId);
 }
@@ -280,6 +295,8 @@ export async function restoreTripGear(
     packed: boolean;
   },
 ) {
+  const userId = await requireOwnedTrip(tripId);
+  if (item.gearItemId != null) await requireOwnedGearItem(item.gearItemId, userId);
   const [{ max }] = await db
     .select({ max: sql<number>`coalesce(max(${schema.tripGear.sortOrder}), -1)::int` })
     .from(schema.tripGear)
@@ -302,11 +319,13 @@ export async function restoreTripGear(
 }
 
 export async function setTripGearClass(id: number, tripId: number, cls: "base" | "worn") {
+  await requireOwnedTripChild("gear", id, tripId);
   await db.update(schema.tripGear).set({ weightClass: cls }).where(eq(schema.tripGear.id, id));
   bump(tripId);
 }
 
 export async function setTripGearQty(id: number, tripId: number, qty: number) {
+  await requireOwnedTripChild("gear", id, tripId);
   await db
     .update(schema.tripGear)
     .set({ quantity: Math.max(1, Math.round(qty)) })
@@ -315,11 +334,13 @@ export async function setTripGearQty(id: number, tripId: number, qty: number) {
 }
 
 export async function setTripGearPacked(id: number, tripId: number, packed: boolean) {
+  await requireOwnedTripChild("gear", id, tripId);
   await db.update(schema.tripGear).set({ packed }).where(eq(schema.tripGear.id, id));
   bump(tripId);
 }
 
 export async function clearTripGear(tripId: number) {
+  await requireOwnedTrip(tripId);
   await db.delete(schema.tripGear).where(eq(schema.tripGear.tripId, tripId));
   bump(tripId);
 }
@@ -327,6 +348,8 @@ export async function clearTripGear(tripId: number) {
 // Reorder within a category (cosmetic) or move to another (changes the item's
 // snapshot category). orderedIds = the target category's visible order.
 export async function moveTripGear(id: number, tripId: number, toCategory: string, orderedIds: number[]) {
+  await requireOwnedTripChild("gear", id, tripId);
+  for (const orderedId of [...new Set(orderedIds)]) await requireOwnedTripChild("gear", orderedId, tripId);
   await db.transaction(async (tx) => {
     await tx.update(schema.tripGear).set({ snapshotCategory: toCategory }).where(eq(schema.tripGear.id, id));
     const all = await tx
@@ -350,6 +373,7 @@ export async function upsertTripDay(
   dayNumber: number,
   patch: { distanceMi?: string | null; elevationGainFt?: number | null },
 ) {
+  await requireOwnedTrip(tripId);
   const [ex] = await db
     .select({ id: schema.tripDay.id })
     .from(schema.tripDay)
@@ -362,6 +386,7 @@ export async function upsertTripDay(
 }
 
 export async function addTripDay(tripId: number) {
+  await requireOwnedTrip(tripId);
   const rows = await db
     .select({ dayNumber: schema.tripDay.dayNumber })
     .from(schema.tripDay)
@@ -373,6 +398,7 @@ export async function addTripDay(tripId: number) {
 }
 
 export async function deleteTripDay(tripId: number, id: number) {
+  await requireOwnedTripChild("day", id, tripId);
   await db.delete(schema.tripDay).where(eq(schema.tripDay.id, id));
   await renumberDays(tripId);
   await deriveTripFromDays(tripId);
@@ -443,6 +469,7 @@ const siteVals = (tripId: number, c: Site) => ({
 });
 
 export async function addCampsite(tripId: number, c: Site): Promise<number> {
+  await requireOwnedTrip(tripId);
   const [r] = await db
     .insert(schema.tripCampsite)
     .values(siteVals(tripId, c))
@@ -453,6 +480,7 @@ export async function addCampsite(tripId: number, c: Site): Promise<number> {
 }
 
 export async function moveCampsite(id: number, tripId: number, c: Site) {
+  await requireOwnedTripChild("campsite", id, tripId);
   await db
     .update(schema.tripCampsite)
     .set({
@@ -467,12 +495,14 @@ export async function moveCampsite(id: number, tripId: number, c: Site) {
 }
 
 export async function removeCampsite(id: number, tripId: number) {
+  await requireOwnedTripChild("campsite", id, tripId);
   await db.delete(schema.tripCampsite).where(eq(schema.tripCampsite.id, id));
   await syncDaysFromCampsites(tripId);
   bump(tripId);
 }
 
 export async function clearCampsites(tripId: number) {
+  await requireOwnedTrip(tripId);
   await db.delete(schema.tripCampsite).where(eq(schema.tripCampsite.tripId, tripId));
   await syncDaysFromCampsites(tripId);
   bump(tripId);
@@ -505,6 +535,7 @@ type TripPatch = Partial<{
 }>;
 
 export async function uploadGpx(tripId: number, fd: FormData): Promise<string | null> {
+  await requireOwnedTrip(tripId);
   const f = fd.get("gpx");
   if (!(f instanceof File) || f.size === 0) return "No file selected.";
   const parsed = parseGpx(await f.text());
@@ -528,6 +559,7 @@ export async function uploadGpx(tripId: number, fd: FormData): Promise<string | 
 }
 
 export async function removeGpx(tripId: number) {
+  await requireOwnedTrip(tripId);
   await db.delete(schema.tripGpx).where(eq(schema.tripGpx.tripId, tripId));
   bump(tripId);
 }
@@ -547,6 +579,7 @@ export async function restoreGpx(
     profile: { d: number; e: number }[];
   },
 ) {
+  await requireOwnedTrip(tripId);
   await db.delete(schema.tripGpx).where(eq(schema.tripGpx.tripId, tripId));
   await db.insert(schema.tripGpx).values({
     tripId,
@@ -564,6 +597,7 @@ export async function restoreGpx(
 }
 
 export async function updateTrip(tripId: number, patch: TripPatch) {
+  await requireOwnedTrip(tripId);
   // Guard the numeric coordinate columns against non-numeric input.
   for (const k of ["lat", "lon"] as const) {
     if (patch[k] != null && !Number.isFinite(Number(patch[k]))) delete patch[k];
@@ -579,6 +613,7 @@ export async function updateTrip(tripId: number, patch: TripPatch) {
 // tiles stitched for the route bounds with the route line + campsite pins drawn
 // on top. Returns null (no map) when there's no track.
 export async function routeMapUrl(track: [number, number][], campsites: MapCampsite[]): Promise<string | null> {
+  await getCurrentUserId();
   if (!track.length) return null;
   // Tight frame + higher res so the report map reads zoomed-in and sharp.
   const png = await composeTopoMap({ track, campsites, width: 1000, height: 625, pad: 0.04 });
@@ -591,6 +626,7 @@ const PERMIT_MAX_BYTES = 15 * 1024 * 1024;
 const PERMIT_TYPES = new Set(["application/pdf", "image/png", "image/jpeg", "image/webp", "image/heic"]);
 
 export async function uploadPermit(tripId: number, form: FormData): Promise<{ ok: boolean; error?: string }> {
+  await requireOwnedTrip(tripId);
   const file = form.get("file");
   if (!(file instanceof File) || file.size === 0) return { ok: false, error: "No file." };
   if (!PERMIT_TYPES.has(file.type)) return { ok: false, error: "Use a PDF or image (PNG/JPG/WEBP)." };
@@ -607,11 +643,13 @@ export async function uploadPermit(tripId: number, form: FormData): Promise<{ ok
 }
 
 export async function deletePermit(tripId: number) {
+  await requireOwnedTrip(tripId);
   await db.delete(schema.tripPermit).where(eq(schema.tripPermit.tripId, tripId));
   bump(tripId);
 }
 
 export async function saveTripPackingList(tripId: number, packingList: string) {
+  await requireOwnedTrip(tripId);
   await db
     .update(schema.trip)
     .set({ packingList, updatedAt: new Date() })
@@ -637,10 +675,12 @@ type AddFood =
   | { kind: "hit"; hit: FoodHit; grams: number };
 
 export async function addTripMeal(tripId: number, dayNumber: number, entry: AddFood) {
+  const userId = await requireOwnedTrip(tripId);
   let name: string, kcal: number, weightG: number;
   let servings = 1, mealId: number | null = null, ingredientId: number | null = null;
 
   if (entry.kind === "meal") {
+    await requireOwnedMeal(entry.mealId, userId);
     const tot = await computeMealTotals(entry.mealId);
     const scale = entry.servings / (tot.baseServings || 1);
     name = tot.name;
@@ -649,6 +689,7 @@ export async function addTripMeal(tripId: number, dayNumber: number, entry: AddF
     servings = entry.servings;
     mealId = entry.mealId;
   } else {
+    if (entry.kind === "ingredient") await requireOwnedIngredient(entry.ingredientId, userId);
     const ing =
       entry.kind === "hit"
         ? await upsertIngredientFromHit(entry.hit)
@@ -682,6 +723,7 @@ export async function addTripMeal(tripId: number, dayNumber: number, entry: AddF
 
 // Scale a planned entry: qty is servings for a meal, grams for an ingredient.
 export async function setTripMealQty(id: number, tripId: number, qty: number) {
+  await requireOwnedTripChild("meal", id, tripId);
   const [row] = await db.select().from(schema.tripMeal).where(eq(schema.tripMeal.id, id));
   if (!row) return;
   if (row.mealId != null) {
@@ -704,6 +746,7 @@ export async function setTripMealQty(id: number, tripId: number, qty: number) {
 }
 
 export async function removeTripMeal(id: number, tripId: number) {
+  await requireOwnedTripChild("meal", id, tripId);
   await db.delete(schema.tripMeal).where(eq(schema.tripMeal.id, id));
   await syncFoodWeight(tripId);
   bump(tripId);
@@ -711,6 +754,7 @@ export async function removeTripMeal(id: number, tripId: number) {
 
 // Copy a single planned entry to every other day (appended to each day's end).
 export async function copyTripMealToAll(id: number, tripId: number) {
+  await requireOwnedTripChild("meal", id, tripId);
   const [row] = await db.select().from(schema.tripMeal).where(eq(schema.tripMeal.id, id));
   if (!row) return;
   const [t] = await db.select({ nights: schema.trip.nights }).from(schema.trip).where(eq(schema.trip.id, tripId));

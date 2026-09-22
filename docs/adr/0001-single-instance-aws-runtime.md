@@ -9,6 +9,9 @@ serverless rewrite or always-on managed database would add substantial migration
 work or baseline cost. The application remains single-user and is protected by
 an application login until its ownership checks are ready for multi-user use.
 
+The authentication and single-user portion of this decision is superseded by
+ADR 0003; the AWS runtime decision remains current.
+
 ## Consequences
 
 The instance is a deliberate availability trade-off: automated encrypted

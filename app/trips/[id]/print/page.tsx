@@ -1,16 +1,18 @@
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/src/db/index";
 import { getTripView } from "@/lib/trip";
 import { addDays, prettyDate } from "@/lib/weather";
 import { composeTopoMap } from "@/lib/topo-map";
 import { PrintButton } from "@/components/trip/print-button";
+import { getCurrentUserId } from "@/lib/gear";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [t] = await db.select({ name: schema.trip.name }).from(schema.trip).where(eq(schema.trip.id, Number(id)));
+  const userId = await getCurrentUserId();
+  const [t] = await db.select({ name: schema.trip.name }).from(schema.trip).where(and(eq(schema.trip.id, Number(id)), eq(schema.trip.userId, userId)));
   return { title: `${t?.name ?? "Trip"} (print)` };
 }
 
@@ -22,7 +24,8 @@ const coord = (lat: number | null, lon: number | null) =>
 export default async function TripPrintPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const tripId = Number(id);
-  const view = await getTripView(tripId);
+  const userId = await getCurrentUserId();
+  const view = await getTripView(tripId, userId);
   if (!view) notFound();
 
   const t = view.trip;

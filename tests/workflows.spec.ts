@@ -1,38 +1,10 @@
-import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+import { authenticate, e2ePassword } from "./auth";
 
 const baseURL =
   process.env.PLAYWRIGHT_BASE_URL ??
   process.env.MOBILE_TEST_BASE_URL ??
   "http://127.0.0.1:3000";
-const sessionSecret =
-  process.env.WORKFLOW_TEST_SESSION_SECRET ??
-  process.env.MOBILE_TEST_SESSION_SECRET;
-const password = process.env.WORKFLOW_TEST_PASSWORD;
-
-async function authenticate(context: BrowserContext, page: Page) {
-  if (sessionSecret) {
-    await context.addCookies([
-      {
-        name: "strider_session",
-        value: sessionSecret,
-        url: baseURL,
-        httpOnly: true,
-        secure: baseURL.startsWith("https://"),
-        sameSite: "Strict",
-      },
-    ]);
-    return;
-  }
-
-  test.skip(!password, "WORKFLOW_TEST_PASSWORD or WORKFLOW_TEST_SESSION_SECRET is required");
-  await page.goto("/login");
-  await page.getByLabel("Password").fill(password!);
-  await Promise.all([
-    page.waitForURL((url) => url.pathname === "/basecamp"),
-    page.getByRole("button", { name: "Sign in" }).click(),
-  ]);
-}
-
 async function fillAndSave(page: Page, label: string, value: string) {
   const input = page.getByLabel(label, { exact: true });
   await input.fill(value);
@@ -45,11 +17,11 @@ async function fillAndSave(page: Page, label: string, value: string) {
 // Production verification must never leave its uniquely-prefixed records
 // behind, even when the main test times out and its page fixture is closed.
 test.afterAll(async ({ browser }) => {
-  if (!sessionSecret && !password) return;
+  if (!e2ePassword) return;
   const context = await browser.newContext();
   const page = await context.newPage();
   try {
-    await authenticate(context, page);
+    await authenticate(page);
     for (let i = 0; i < 25; i++) {
       await page.goto("/trips");
       const trip = page.locator('a[href^="/trips/"]').filter({ hasText: /^E2E (?:trip|verified) / }).first();
@@ -70,17 +42,55 @@ test("protected pages redirect to sign in", async ({ browser }) => {
   await page.goto(`${baseURL}/`);
   await expect(page.getByRole("heading", { name: /Plan farther/ })).toBeVisible();
   await expect(page).toHaveURL(`${baseURL}/`);
+  await page.goto(`${baseURL}/privacy`);
+  await expect(page.getByRole("heading", { name: "Privacy Policy", exact: true })).toBeVisible();
   await page.goto(`${baseURL}/trips`);
-  await expect(page).toHaveURL(/\/login$/);
+  await expect.poll(() => new URL(page.url()).pathname).toBe("/login");
   await expect(page.getByRole("heading", { name: "STRIDER" })).toBeVisible();
   await context.close();
+});
+
+test("private trips are isolated between accounts", async ({ browser }) => {
+  const owner = await browser.newContext();
+  const ownerPage = await owner.newPage();
+  const outsider = await browser.newContext();
+  const outsiderPage = await outsider.newPage();
+  const name = `E2E trip isolation ${Date.now()}`;
+  let tripUrl: string | null = null;
+
+  try {
+    await authenticate(ownerPage);
+    await ownerPage.goto("/trips");
+    ownerPage.once("dialog", (dialog) => dialog.accept(name));
+    await Promise.all([
+      ownerPage.waitForURL(/\/trips\/\d+$/),
+      ownerPage.getByRole("button", { name: "+ New trip" }).click(),
+    ]);
+    tripUrl = ownerPage.url();
+
+    await authenticate(outsiderPage, "e2e-outsider@strider.invalid");
+    const response = await outsiderPage.goto(tripUrl);
+    expect(response?.status()).toBe(404);
+    await expect(outsiderPage.getByText(name, { exact: true })).toHaveCount(0);
+  } finally {
+    if (tripUrl) {
+      await ownerPage.goto(tripUrl);
+      const button = ownerPage.getByRole("button", { name: "Delete trip" });
+      if (await button.isVisible().catch(() => false)) {
+        ownerPage.once("dialog", (dialog) => dialog.accept());
+        await Promise.all([ownerPage.waitForURL((url) => url.pathname === "/trips"), button.click()]);
+      }
+    }
+    await owner.close();
+    await outsider.close();
+  }
 });
 
 test("a trip can be planned, shared, exported, and deleted", async ({ browser, context, page }) => {
   // Production route-map processing and the unauthenticated share round-trip can
   // be slow on the small ARM instance, especially immediately after deployment.
   test.setTimeout(180_000);
-  await authenticate(context, page);
+  await authenticate(page);
 
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const initialName = `E2E trip ${suffix}`;

@@ -1,6 +1,7 @@
 import { eq, asc } from "drizzle-orm";
 import { db, schema } from "@/src/db/index";
 import { OTHER_CATEGORY_ID, OTHER_CATEGORY_NAME } from "@/lib/categories";
+import { auth } from "@/auth";
 
 export type WClass = "base" | "worn" | "consumable";
 
@@ -49,8 +50,24 @@ export async function getLoadoutData(
     .from(schema.loadout)
     .where(eq(schema.loadout.userId, userId))
     .orderBy(asc(schema.loadout.id));
-  const items = await db.select().from(schema.loadoutItem);
-  const overrides = await db.select().from(schema.wishlistLoadout);
+  const items = await db
+    .select({
+      loadoutId: schema.loadoutItem.loadoutId,
+      gearItemId: schema.loadoutItem.gearItemId,
+      weightClass: schema.loadoutItem.weightClass,
+    })
+    .from(schema.loadoutItem)
+    .innerJoin(schema.loadout, eq(schema.loadoutItem.loadoutId, schema.loadout.id))
+    .where(eq(schema.loadout.userId, userId));
+  const overrides = await db
+    .select({
+      wishlistItemId: schema.wishlistLoadout.wishlistItemId,
+      loadoutId: schema.wishlistLoadout.loadoutId,
+      included: schema.wishlistLoadout.included,
+    })
+    .from(schema.wishlistLoadout)
+    .innerJoin(schema.loadout, eq(schema.wishlistLoadout.loadoutId, schema.loadout.id))
+    .where(eq(schema.loadout.userId, userId));
   const membership: Membership = {};
   for (const l of loadouts) membership[l.id] = {};
   for (const it of items) {
@@ -94,9 +111,10 @@ export async function getDefaultBaseBreakdown(
 }
 
 export async function getCurrentUserId(): Promise<number> {
-  const [u] = await db.select({ id: schema.users.id }).from(schema.users).limit(1);
-  if (!u) throw new Error("No user seeded — run `npm run import`.");
-  return u.id;
+  const session = await auth();
+  const userId = Number(session?.user?.id);
+  if (!Number.isInteger(userId) || userId <= 0) throw new Error("Unauthorized");
+  return userId;
 }
 
 export async function getGearView(userId: number) {
@@ -110,8 +128,27 @@ export async function getGearView(userId: number) {
     .from(schema.gearItem)
     .where(eq(schema.gearItem.userId, userId))
     .orderBy(asc(schema.gearItem.sortOrder), asc(schema.gearItem.name));
-  const comps = await db.select().from(schema.gearComponent).orderBy(asc(schema.gearComponent.id));
-  const repls = await db.select().from(schema.wishlistReplacement);
+  const comps = await db
+    .select({
+      id: schema.gearComponent.id,
+      gearItemId: schema.gearComponent.gearItemId,
+      name: schema.gearComponent.name,
+      weightG: schema.gearComponent.weightG,
+      quantity: schema.gearComponent.quantity,
+      notes: schema.gearComponent.notes,
+    })
+    .from(schema.gearComponent)
+    .innerJoin(schema.gearItem, eq(schema.gearComponent.gearItemId, schema.gearItem.id))
+    .where(eq(schema.gearItem.userId, userId))
+    .orderBy(asc(schema.gearComponent.id));
+  const repls = await db
+    .select({
+      wishlistItemId: schema.wishlistReplacement.wishlistItemId,
+      replacesItemId: schema.wishlistReplacement.replacesItemId,
+    })
+    .from(schema.wishlistReplacement)
+    .innerJoin(schema.gearItem, eq(schema.wishlistReplacement.wishlistItemId, schema.gearItem.id))
+    .where(eq(schema.gearItem.userId, userId));
 
   const compsByItem = new Map<number, GearComponent[]>();
   for (const c of comps) {

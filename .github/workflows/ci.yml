@@ -32,15 +32,25 @@ jobs:
     env:
       DATABASE_URL: postgres://backpack:backpack@127.0.0.1:5432/backpack
       APP_ORIGIN: http://127.0.0.1:3000
-      APP_PASSWORD_HASH: 7b41ece728bdedbb5c4ba62ea70b826f14891460255e6a5a1de9f1a1c2a053bf
-      SESSION_SECRET: strider-ci-session
       PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
       PLAYWRIGHT_WEB_SERVER: "1"
-      WORKFLOW_TEST_PASSWORD: strider-ci-password
       MOBILE_TEST_BASE_URL: http://127.0.0.1:3000
-      MOBILE_TEST_SESSION_SECRET: strider-ci-session
     steps:
       - uses: actions/checkout@v7
+
+      - name: Prepare ephemeral test authentication
+        shell: bash
+        run: |
+          e2e_password="$(openssl rand -hex 32)"
+          auth_secret="$(openssl rand -hex 32)"
+          e2e_password_hash="$(printf %s "$e2e_password" | sha256sum | cut -d' ' -f1)"
+          echo "::add-mask::$e2e_password"
+          echo "::add-mask::$auth_secret"
+          {
+            echo "E2E_TEST_PASSWORD=$e2e_password"
+            echo "AUTH_E2E_PASSWORD_HASH=$e2e_password_hash"
+            echo "AUTH_SECRET=$auth_secret"
+          } >> "$GITHUB_ENV"
 
       - uses: actions/setup-node@v7
         with:
@@ -49,10 +59,6 @@ jobs:
 
       - run: npm ci
       - run: npm run db:migrate
-      - name: Seed test user
-        run: >-
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1
-          -c "insert into users (email, name) values ('workflow@example.test', 'Workflow Test');"
       - run: npx tsc --noEmit
       - run: npm run build
       - run: npx playwright install --with-deps chromium

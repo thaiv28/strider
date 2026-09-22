@@ -39,9 +39,9 @@ changes correct.
 - Blobs use a `customType<{data: Buffer}>` mapping to `bytea` (see `trip_permit`).
 
 ## Domain rules
-- **Single data user**: `getCurrentUserId()` returns the first `users` row and
-  user-scoped queries filter on it. The shared password/session middleware is
-  an access gate, not per-user authentication or authorization.
+- **Private workspace**: `getCurrentUserId()` returns the database user id from
+  the Auth.js session. Directly user-owned rows and nested child ids must be
+  validated through `lib/authorization.ts` before reads or mutations.
 - Uncategorized gear (`category_id IS NULL`) is surfaced as a synthetic **"Other"**
   group with id `-1`; `moveGear` maps `-1` back to a `null` category.
 - `trip_gear`/`trip_meal` snapshot name+weight at plan time so a completed trip's
@@ -82,10 +82,11 @@ come from `categoryColor()` in `lib/categories.ts`.
   health checks. `/share/trips/[token]` and its permit handler are deliberately
   public bearer-link routes: validate the token on every request, keep them
   read-only, and never include `trip_report` private notes.
-- `APP_PASSWORD_HASH` is a SHA-256 digest, while `SESSION_SECRET` is the cookie
-  value. Neither belongs in the repository or logs.
-- Authentication tests may inject the session cookie from CI secrets. This is a
-  test mechanism, not a second application authentication path.
+- Google sign-in requests identity scopes only. Future Google API permissions
+  must use a separate incremental-consent flow.
+- Authentication tests use the hidden Auth.js `e2e` provider and dedicated
+  `@strider.invalid` users. The provider is password protected, absent from the
+  normal login UI, and must never be used as an application sign-in method.
 - The origin-verification header protects direct EC2 access. Preserve it in
   CloudFront and `ops/nginx.conf.template` together.
 

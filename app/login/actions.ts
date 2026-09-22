@@ -1,12 +1,19 @@
 "use server";
 
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { signIn, signOut } from "@/auth";
 
-const COOKIE_NAME = "strider_session";
+export async function loginWithGoogle() {
+  await signIn("google", { redirectTo: "/basecamp" });
+}
+
+export async function loginForE2e(formData: FormData) {
+  await signIn("e2e", {
+    email: String(formData.get("email") ?? "e2e@strider.invalid"),
+    password: String(formData.get("password") ?? ""),
+    redirectTo: "/basecamp",
+  });
+}
 
 export async function logout() {
-  const jar = await cookies();
-  jar.delete(COOKIE_NAME);
-  redirect("/login");
+  await signOut({ redirectTo: "/login" });
 }

@@ -10,8 +10,11 @@ set -euo pipefail
 install -d -m 700 /srv/backpack
 secret_json="$(aws secretsmanager get-secret-value --secret-id "$SECRET_ARN" --query SecretString --output text)"
 db_password="$(jq -r .DB_PASSWORD <<<"$secret_json")"
-app_password_hash="$(jq -r .APP_PASSWORD_HASH <<<"$secret_json")"
 session_secret="$(jq -r .SESSION_SECRET <<<"$secret_json")"
+auth_google_id="$(jq -r .AUTH_GOOGLE_ID <<<"$secret_json")"
+auth_google_secret="$(jq -r .AUTH_GOOGLE_SECRET <<<"$secret_json")"
+auth_owner_email="$(jq -r .AUTH_OWNER_EMAIL <<<"$secret_json")"
+auth_e2e_password_hash="$(jq -r .AUTH_E2E_PASSWORD_HASH <<<"$secret_json")"
 origin_secret="$(jq -r .ORIGIN_SECRET <<<"$secret_json")"
 backup_key="$(jq -r .BACKUP_KEY <<<"$secret_json")"
 fdc_api_key="$(jq -r .FDC_API_KEY <<<"$secret_json")"
@@ -20,8 +23,11 @@ geoapify_api_key="$(jq -r .GEOAPIFY_API_KEY <<<"$secret_json")"
 umask 077
 cat > /srv/backpack/runtime.env <<EOF
 DATABASE_URL=postgres://backpack:${db_password}@backpack-db:5432/backpack
-APP_PASSWORD_HASH=${app_password_hash}
 SESSION_SECRET=${session_secret}
+AUTH_GOOGLE_ID=${auth_google_id}
+AUTH_GOOGLE_SECRET=${auth_google_secret}
+AUTH_OWNER_EMAIL=${auth_owner_email}
+AUTH_E2E_PASSWORD_HASH=${auth_e2e_password_hash}
 APP_ORIGIN=https://backpack.thaiv.dev
 FDC_API_KEY=${fdc_api_key}
 GEOAPIFY_API_KEY=${geoapify_api_key}
@@ -62,6 +68,15 @@ if ! docker exec backpack-db psql -U backpack -d backpack -Atqc "select 1 from p
     | openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:${backup_key}" \
     | docker exec -i backpack-db psql -v ON_ERROR_STOP=1 -U backpack -d backpack
 fi
+
+# Every deployment gets an encrypted restore point immediately before migrations.
+# This is especially important for identity migrations: linking an owner happens
+# in place, but the pre-migration backup makes the database state recoverable.
+pre_migration_stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+docker exec backpack-db pg_dump -U backpack -d backpack \
+  | gzip \
+  | openssl enc -aes-256-cbc -pbkdf2 -salt -pass "pass:${backup_key}" \
+  | aws s3 cp - "s3://${BACKUP_BUCKET}/pre-migration/backpack-${pre_migration_stamp}.sql.gz.enc"
 
 docker run --rm \
   --network backpack-net \

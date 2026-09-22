@@ -71,6 +71,20 @@
       "when": 1789819091118,
       "tag": "0009_add_trip_share_token",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789905491118,
+      "tag": "0010_add_google_identity",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790112700000,
+      "tag": "0011_reconcile_current_schema",
+      "breakpoints": true
     }
   ]
 }
