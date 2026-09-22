@@ -232,6 +232,31 @@ export async function setLoadoutMember(
   revalidatePath("/gear");
 }
 
+// Replace the selected loadout's membership in one transaction. Select-all
+// retains existing base/worn choices and uses each item's default for additions.
+export async function setAllLoadoutMembers(loadoutId: number, present: boolean) {
+  const userId = await requireOwnedLoadout(loadoutId);
+  await db.transaction(async (tx) => {
+    if (!present) {
+      await tx.delete(schema.loadoutItem).where(eq(schema.loadoutItem.loadoutId, loadoutId));
+      return;
+    }
+    const items = await tx
+      .select({ id: schema.gearItem.id, defaultWeightClass: schema.gearItem.defaultWeightClass })
+      .from(schema.gearItem)
+      .where(and(eq(schema.gearItem.userId, userId), eq(schema.gearItem.status, "current")));
+    if (items.length) {
+      await tx.insert(schema.loadoutItem).values(items.map((item) => ({
+        loadoutId,
+        gearItemId: item.id,
+        weightClass: item.defaultWeightClass === "worn" ? "worn" as const : "base" as const,
+      }))).onConflictDoNothing();
+    }
+  });
+  revalidatePath("/gear");
+  revalidatePath("/basecamp");
+}
+
 // Reorder within a category (cosmetic) or move to another (changes category).
 // `orderedIds` is the desired order of the target category's visible items;
 // any other items in that category keep their relative order after them.

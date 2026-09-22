@@ -36,6 +36,8 @@ export function RoutePanel({
   const [drag, setDrag] = useState<{ id: number; prev: Campsite } | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const suppressClick = useRef(false);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const touchClick = useRef<{ x: number; y: number; at: number } | null>(null);
 
   const sig = campsites.map((c) => `${c.id}:${c.distanceMi}`).join("|");
   useEffect(() => setLocal(campsites), [sig]);
@@ -50,7 +52,7 @@ export function RoutePanel({
   const leftPct = (d: number) => (d / maxD) * 100;
   const topPct = (e: number) => ((H - 1 - ((e - minE) / span) * (H - 2)) / H) * 100;
   const nearest = (d: number) => points.reduce((a, b) => (Math.abs(b.d - d) < Math.abs(a.d - d) ? b : a), points[0]);
-  const fracFromEvent = (e: React.PointerEvent) => {
+  const fracFromEvent = (e: { clientX: number }) => {
     const r = boxRef.current!.getBoundingClientRect();
     return Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
   };
@@ -63,28 +65,44 @@ export function RoutePanel({
     setHover(p);
     if (drag) setLocal((cs) => cs.map((c) => (c.id === drag.id ? { ...c, distanceMi: p.d, lat: p.lat, lon: p.lon, eleFt: p.e } : c)));
   };
-  const onUp = () => {
-    if (!drag || !hover) return;
-    const p = nearest(hover.d);
+  const addAt = (p: RoutePoint) => {
+    start(async () => {
+      const id = await addCampsite(tripId, { distanceMi: p.d, lat: p.lat, lon: p.lon, eleFt: p.e });
+      pushUndo("Added campsite", () => removeCampsite(id, tripId));
+    });
+  };
+  const onUp = (e: React.PointerEvent) => {
+    if (!drag) {
+      // Touch devices do not reliably fire a pointermove before the synthetic
+      // click. Place the site using the actual tap, and ignore that click.
+      if (e.pointerType === "touch" && touchStart.current &&
+          Math.hypot(e.clientX - touchStart.current.x, e.clientY - touchStart.current.y) < 10) {
+        addAt(nearest(fracFromEvent(e) * maxD));
+        touchClick.current = { x: e.clientX, y: e.clientY, at: Date.now() };
+      }
+      touchStart.current = null;
+      return;
+    }
+    const p = nearest(fracFromEvent(e) * maxD);
     const { id, prev } = drag;
     suppressClick.current = true;
     setDrag(null);
+    touchStart.current = null;
     start(async () => await moveCampsite(id, tripId, { distanceMi: p.d, lat: p.lat, lon: p.lon, eleFt: p.e }));
     pushUndo("Moved campsite", () =>
       moveCampsite(id, tripId, { distanceMi: prev.distanceMi, lat: prev.lat, lon: prev.lon, eleFt: prev.eleFt }),
     );
   };
-  const onClick = () => {
+  const onClick = (e: React.MouseEvent) => {
     if (suppressClick.current) {
       suppressClick.current = false;
       return;
     }
-    if (!hover) return;
-    const p = hover;
-    start(async () => {
-      const id = await addCampsite(tripId, { distanceMi: p.d, lat: p.lat, lon: p.lon, eleFt: p.e });
-      pushUndo("Added campsite", () => removeCampsite(id, tripId));
-    });
+    const tapped = touchClick.current;
+    touchClick.current = null;
+    if (tapped && Date.now() - tapped.at < 750 &&
+        Math.hypot(e.clientX - tapped.x, e.clientY - tapped.y) < 10) return;
+    addAt(nearest(fracFromEvent(e) * maxD));
   };
 
   const area = `0,${H} ${points.map((p) => `${leftPct(p.d).toFixed(2)},${((H - 1 - ((p.e - minE) / span) * (H - 2))).toFixed(2)}`).join(" ")} 100,${H}`;
@@ -96,7 +114,7 @@ export function RoutePanel({
 
       <div className="space-y-3 px-4 pt-3 pb-4">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-muted">Click the profile to drop a campsite · drag to move · right-click to remove</span>
+        <span className="text-xs text-muted">Tap or click the profile to drop a campsite · drag to move · right-click to remove</span>
         {shown.length > 0 && (
           <button
             onClick={() => confirm("Clear all campsites?") && start(async () => await clearCampsites(tripId))}
@@ -115,10 +133,15 @@ export function RoutePanel({
         <div className="min-w-0 flex-1">
           <div
             ref={boxRef}
+            data-testid="elevation-profile"
             className="relative h-40 w-full cursor-crosshair touch-none select-none"
+            onPointerDown={(e) => {
+              if (e.pointerType === "touch") touchStart.current = { x: e.clientX, y: e.clientY };
+            }}
             onPointerMove={onMove}
             onPointerLeave={() => !drag && setHover(null)}
             onPointerUp={onUp}
+            onPointerCancel={() => { touchStart.current = null; setDrag(null); }}
             onClick={onClick}
           >
             <svg viewBox={`0 0 100 ${H}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full">

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Card, Button, Input, Select } from "@/components/ui";
-import { gToOz, ozToG } from "@/lib/util";
+import { displayOz, ozToG } from "@/lib/util";
 import type { GearRow, CategoryOption } from "@/lib/gear";
 
 type CompDraft = { name: string; oz: string; quantity: number; notes: string };
@@ -10,7 +10,7 @@ type CompDraft = { name: string; oz: string; quantity: number; notes: string };
 const toDraft = (r: GearRow | null): CompDraft[] =>
   (r?.components ?? []).map((c) => ({
     name: c.name,
-    oz: c.weightG ? gToOz(c.weightG).toFixed(2) : "",
+    oz: c.weightG ? displayOz(c.weightG).toFixed(2) : "",
     quantity: c.quantity,
     notes: c.notes ?? "",
   }));
@@ -68,14 +68,14 @@ export function GearDialog({
             <Field label={isKit ? "Total (oz)" : "Unit (oz)"}>
               {isKit ? (
                 <div className="readout rounded-[calc(var(--radius)*0.6)] border bg-panel2/40 px-3 py-1.5 text-sm text-muted">
-                  {gToOz(kitTotalG).toFixed(2)}
+                  {displayOz(kitTotalG).toFixed(2)}
                 </div>
               ) : (
                 <Input
                   name="weightOz"
                   type="number"
                   step="0.01"
-                  defaultValue={editing?.weightG != null ? (editing.weightG / 28.3495).toFixed(2) : ""}
+                  defaultValue={editing?.weightG != null ? displayOz(editing.weightG).toFixed(2) : ""}
                 />
               )}
             </Field>

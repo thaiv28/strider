@@ -167,6 +167,22 @@ test("a trip can be planned, shared, exported, and deleted", async ({ browser, c
     await expect(page.getByLabel("Day 1 distance in miles")).toHaveValue(/4\.5/);
     await expect(page.getByRole("button", { name: "Use these for the trip" })).toBeVisible();
 
+    // Use a real touch context: a tap may not deliver a pointermove before click.
+    const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    try {
+      const phonePage = await phone.newPage();
+      await authenticate(phonePage);
+      await phonePage.goto(tripUrl);
+      await phonePage.getByRole("button", { name: "Logistics", exact: true }).click();
+      const profile = phonePage.getByTestId("elevation-profile");
+      await expect(profile).toBeVisible();
+      await profile.tap({ position: { x: 90, y: 100 } });
+      await expect(profile.getByRole("button", { name: "1" })).toHaveCount(1);
+      await expect(profile.getByRole("button", { name: "2" })).toHaveCount(0);
+    } finally {
+      await phone.close();
+    }
+
     await page.getByRole("button", { name: "Share", exact: true }).click();
     await page.getByRole("menuitem", { name: /Create view-only link/ }).click();
     const sharedHref = await page.getByRole("menuitem", { name: "Open view-only page" }).getAttribute("href");
@@ -178,6 +194,15 @@ test("a trip can be planned, shared, exported, and deleted", async ({ browser, c
     expect(sharedResponse?.status()).toBe(200);
     await expect(sharedPage.getByTestId("shared-trip")).toBeVisible();
     await expect(sharedPage.getByRole("heading", { name: updatedName })).toBeVisible();
+    await expect(sharedPage.locator('meta[property="og:title"]')).toHaveAttribute("content", `${updatedName} · Strider`);
+    const previewImage = await sharedPage.locator('meta[property="og:image"]').getAttribute("content");
+    expect(previewImage).toContain(`${sharedHref}/opengraph-image`);
+    // The metadata uses the production canonical origin; fetch this CI trip on
+    // the isolated test server instead of asking production for its token.
+    const imageUrl = new URL(previewImage!);
+    const imageResponse = await sharedPage.request.get(`${baseURL}${imageUrl.pathname}${imageUrl.search}`);
+    expect(imageResponse.status()).toBe(200);
+    expect(imageResponse.headers()["content-type"]).toContain("image/png");
     await expect(sharedPage.getByText("Trip report (private notes)")).toHaveCount(0);
     await expect(sharedPage.getByRole("link", { name: "permit.pdf" })).toBeVisible();
     await guest.close();

@@ -1,6 +1,6 @@
 # Strider current state
 
-Last reviewed: 2026-09-20.
+Last reviewed: 2026-09-22.
 
 ## Deployed baseline
 
@@ -19,8 +19,8 @@ developer's local GitHub CLI session—is the durable publication path.
 
 ## Working capabilities
 
-- Gear inventory, category ordering, kits, loadouts, wishlist replacements, and
-  projected loadout weight.
+- Gear inventory, category ordering, kits, loadouts with bulk selection, wishlist
+  replacements, and projected loadout weight.
 - Meal/ingredient management, nutrition lookup, trip food planning, and calorie
   estimates.
 - Trip creation/import, daily distance/elevation, gear/food snapshots,
@@ -28,6 +28,8 @@ developer's local GitHub CLI session—is the durable publication path.
 - Consolidated trip sharing menu for printing, pre-trip report generation, and
   persistent live view-only bearer links. Shared views expose the trip plan and
   permit but omit private trip-report notes; owners can revoke the link.
+- Public link previews use Strider artwork, and live shared-trip links include
+  the Trip name and summary in their preview metadata.
 - Interactive route maps with topo/OSM layers and optional weather, snow, and
   air-quality overlays.
 - Calendar feeds and configurable report/energy settings.
