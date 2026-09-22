@@ -197,7 +197,10 @@ test("a trip can be planned, shared, exported, and deleted", async ({ browser, c
     await expect(sharedPage.locator('meta[property="og:title"]')).toHaveAttribute("content", `${updatedName} · Strider`);
     const previewImage = await sharedPage.locator('meta[property="og:image"]').getAttribute("content");
     expect(previewImage).toContain(`${sharedHref}/opengraph-image`);
-    const imageResponse = await sharedPage.request.get(previewImage!);
+    // The metadata uses the production canonical origin; fetch this CI trip on
+    // the isolated test server instead of asking production for its token.
+    const imageUrl = new URL(previewImage!);
+    const imageResponse = await sharedPage.request.get(`${baseURL}${imageUrl.pathname}${imageUrl.search}`);
     expect(imageResponse.status()).toBe(200);
     expect(imageResponse.headers()["content-type"]).toContain("image/png");
     await expect(sharedPage.getByText("Trip report (private notes)")).toHaveCount(0);

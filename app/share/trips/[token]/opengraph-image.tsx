@@ -8,8 +8,8 @@ export const contentType = socialImageContentType;
 export const alt = "Shared Strider trip plan";
 export const dynamic = "force-dynamic";
 
-export default async function OpenGraphImage({ params }: { params: { token: string } }) {
-  const { token } = params;
+export default async function OpenGraphImage({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params;
   const [trip] = await db
     .select({ name: schema.trip.name })
     .from(schema.trip)
