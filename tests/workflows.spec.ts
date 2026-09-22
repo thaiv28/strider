@@ -36,6 +36,20 @@ test.afterAll(async ({ browser }) => {
   }
 });
 
+test("authentication endpoints use the configured public origin", async ({ request }) => {
+  const response = await request.get(`${baseURL}/api/auth/providers`);
+  expect(response.ok()).toBeTruthy();
+
+  const providers = (await response.json()) as {
+    google: { signinUrl: string; callbackUrl: string };
+  };
+  const expectedOrigin = new URL(baseURL).origin;
+
+  expect(new URL(providers.google.signinUrl).origin).toBe(expectedOrigin);
+  expect(new URL(providers.google.callbackUrl).origin).toBe(expectedOrigin);
+  expect(new URL(providers.google.callbackUrl).pathname).toBe("/api/auth/callback/google");
+});
+
 test("protected pages redirect to sign in", async ({ browser }) => {
   const context = await browser.newContext();
   const page = await context.newPage();
