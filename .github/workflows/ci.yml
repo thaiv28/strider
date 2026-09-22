@@ -31,10 +31,10 @@ jobs:
           --health-retries 12
     env:
       DATABASE_URL: postgres://backpack:backpack@127.0.0.1:5432/backpack
-      AUTH_URL: http://127.0.0.1:3000
-      PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+      AUTH_URL: http://localhost:3000
+      PLAYWRIGHT_BASE_URL: http://localhost:3000
       PLAYWRIGHT_WEB_SERVER: "1"
-      MOBILE_TEST_BASE_URL: http://127.0.0.1:3000
+      MOBILE_TEST_BASE_URL: http://localhost:3000
     steps:
       - uses: actions/checkout@v7
 

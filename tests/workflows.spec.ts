@@ -43,7 +43,7 @@ test("authentication endpoints use the configured public origin", async ({ reque
   const providers = (await response.json()) as {
     google: { signinUrl: string; callbackUrl: string };
   };
-  const expectedOrigin = new URL(baseURL).origin;
+  const expectedOrigin = new URL(process.env.AUTH_URL ?? baseURL).origin;
 
   expect(new URL(providers.google.signinUrl).origin).toBe(expectedOrigin);
   expect(new URL(providers.google.callbackUrl).origin).toBe(expectedOrigin);
