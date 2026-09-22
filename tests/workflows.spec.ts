@@ -151,22 +151,6 @@ test("a trip can be planned, shared, exported, and deleted", async ({ browser, c
     await page.getByRole("button", { name: "Upload", exact: true }).click();
     await expect(page.getByRole("button", { name: "Use these for the trip" })).toBeVisible();
 
-    // Use a real touch context: a tap may not deliver a pointermove before click.
-    const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
-    try {
-      const phonePage = await phone.newPage();
-      await authenticate(phonePage);
-      await phonePage.goto(tripUrl);
-      await phonePage.getByRole("button", { name: "Logistics", exact: true }).click();
-      const profile = phonePage.getByTestId("elevation-profile");
-      await expect(profile).toBeVisible();
-      await profile.tap({ position: { x: 90, y: 100 } });
-      await expect(profile.getByRole("button", { name: "1" })).toHaveCount(1);
-      await expect(profile.getByRole("button", { name: "2" })).toHaveCount(0);
-    } finally {
-      await phone.close();
-    }
-
     await page.getByRole("button", { name: "Planning", exact: true }).click();
     const permitInput = page.locator('input[type="file"][accept^="application/pdf"]');
     await permitInput.setInputFiles({
@@ -182,6 +166,22 @@ test("a trip can be planned, shared, exported, and deleted", async ({ browser, c
     await expect(page.getByLabel("Region", { exact: true })).toHaveValue("E2E Test Range");
     await expect(page.getByLabel("Day 1 distance in miles")).toHaveValue(/4\.5/);
     await expect(page.getByRole("button", { name: "Use these for the trip" })).toBeVisible();
+
+    // Use a real touch context: a tap may not deliver a pointermove before click.
+    const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    try {
+      const phonePage = await phone.newPage();
+      await authenticate(phonePage);
+      await phonePage.goto(tripUrl);
+      await phonePage.getByRole("button", { name: "Logistics", exact: true }).click();
+      const profile = phonePage.getByTestId("elevation-profile");
+      await expect(profile).toBeVisible();
+      await profile.tap({ position: { x: 90, y: 100 } });
+      await expect(profile.getByRole("button", { name: "1" })).toHaveCount(1);
+      await expect(profile.getByRole("button", { name: "2" })).toHaveCount(0);
+    } finally {
+      await phone.close();
+    }
 
     await page.getByRole("button", { name: "Share", exact: true }).click();
     await page.getByRole("menuitem", { name: /Create view-only link/ }).click();
