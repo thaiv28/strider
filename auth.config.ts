@@ -1,7 +1,7 @@
 import type { NextAuthConfig } from "next-auth";
 import Google from "next-auth/providers/google";
 
-const PUBLIC_PATHS = new Set(["/", "/login", "/api/health"]);
+const PUBLIC_PATHS = new Set(["/", "/login", "/privacy", "/api/health"]);
 
 export default {
   secret: process.env.AUTH_SECRET ?? process.env.SESSION_SECRET,

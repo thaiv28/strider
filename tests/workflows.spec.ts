@@ -42,6 +42,8 @@ test("protected pages redirect to sign in", async ({ browser }) => {
   await page.goto(`${baseURL}/`);
   await expect(page.getByRole("heading", { name: /Plan farther/ })).toBeVisible();
   await expect(page).toHaveURL(`${baseURL}/`);
+  await page.goto(`${baseURL}/privacy`);
+  await expect(page.getByRole("heading", { name: "Privacy Policy", exact: true })).toBeVisible();
   await page.goto(`${baseURL}/trips`);
   await expect.poll(() => new URL(page.url()).pathname).toBe("/login");
   await expect(page.getByRole("heading", { name: "STRIDER" })).toBeVisible();

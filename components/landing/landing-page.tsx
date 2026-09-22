@@ -80,7 +80,7 @@ export function LandingPage() {
         <div className="landing-rings absolute inset-0 opacity-30" />
         <div className="relative z-10 mx-auto max-w-3xl"><div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#91cfad]">The trail starts here</div><h2 className="font-display mt-5 text-5xl font-bold leading-none tracking-tight sm:text-7xl">Make the next trip<br />the best-planned one.</h2><Link href="/login" className="group mt-9 inline-flex items-center gap-2 rounded-full bg-[#d7f2df] px-6 py-3 font-semibold text-[#122219] transition hover:bg-white">Enter Strider <ArrowRight size={17} className="transition group-hover:translate-x-1" /></Link></div>
       </section>
-      <footer className="flex flex-col gap-2 border-t border-white/10 bg-[#101713] px-5 py-8 text-sm text-white/45 sm:flex-row sm:items-center sm:justify-between sm:px-8"><span className="font-display font-bold tracking-[0.14em] text-white/75">STRIDER</span><span>Built for the miles before the miles.</span></footer>
+      <footer className="flex flex-col gap-3 border-t border-white/10 bg-[#101713] px-5 py-8 text-sm text-white/45 sm:flex-row sm:items-center sm:justify-between sm:px-8"><span className="font-display font-bold tracking-[0.14em] text-white/75">STRIDER</span><div className="flex flex-wrap items-center gap-x-5 gap-y-2"><span>Built for the miles before the miles.</span><Link href="/privacy" className="text-white/65 underline-offset-4 transition hover:text-white hover:underline">Privacy</Link></div></footer>
     </div>
   );
 }
