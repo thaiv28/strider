@@ -7,6 +7,7 @@ import { UnsavedChangesProvider } from "@/components/unsaved-changes";
 const DESCRIPTION = "Backpacking trip planner and gear tracker";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://backpack.thaiv.dev"),
   title: { default: "Strider", template: "%s · Strider" },
   description: DESCRIPTION,
   applicationName: "Strider",
@@ -15,9 +16,10 @@ export const metadata: Metadata = {
     description: DESCRIPTION,
     siteName: "Strider",
     type: "website",
+    url: "/",
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "Strider",
     description: DESCRIPTION,
   },

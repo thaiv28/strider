@@ -4,6 +4,7 @@ import { db, schema } from "@/src/db/index";
 import { getTripFood, getShoppingList, getTripView } from "@/lib/trip";
 import { DEFAULT_PACKING } from "@/lib/report";
 import { SharedTripView } from "@/components/trip/shared-trip-view";
+import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
 
@@ -12,11 +13,29 @@ async function sharedTrip(token: string) {
   return row ?? null;
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ token: string }> }) {
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
   const { token } = await params;
-  const [row] = await db.select({ name: schema.trip.name }).from(schema.trip).where(eq(schema.trip.shareToken, token));
+  const [row] = await db
+    .select({ name: schema.trip.name, region: schema.trip.region, startDate: schema.trip.startDate })
+    .from(schema.trip)
+    .where(eq(schema.trip.shareToken, token));
+  if (!row) notFound();
+  const title = `${row.name} · Strider`;
+  const details = [row.region, row.startDate].filter(Boolean).join(" · ");
+  const description = details
+    ? `Explore the trip plan for ${row.name} (${details}) on Strider.`
+    : `Explore the trip plan for ${row.name} on Strider.`;
   return {
-    title: row ? `${row.name} · View-only` : "Shared trip",
+    title: { absolute: title },
+    description,
+    openGraph: {
+      title,
+      description,
+      siteName: "Strider",
+      type: "website",
+      url: `/share/trips/${encodeURIComponent(token)}`,
+    },
+    twitter: { card: "summary_large_image", title, description },
     robots: { index: false, follow: false, noarchive: true },
   };
 }

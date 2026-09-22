@@ -16,6 +16,7 @@ import {
   deleteLoadout,
   setDefaultLoadout,
   setLoadoutMember,
+  setAllLoadoutMembers,
   setWishlistReplacements,
   setWishlistLoadout,
 } from "@/app/gear/actions";
@@ -126,6 +127,20 @@ export function GearFrame({
     });
   };
 
+  const setAllMembers = (present: boolean) => {
+    if (!isLoadout) return;
+    const lid = selected as number;
+    setMember((m) => {
+      const next: Record<number, "base" | "worn"> = present ? { ...(m[lid] ?? {}) } : {};
+      if (present) for (const g of groups) for (const r of g.rows) {
+        if (r.status === "current" && next[r.id] === undefined)
+          next[r.id] = r.defaultWeightClass === "worn" ? "worn" : "base";
+      }
+      return { ...m, [lid]: next };
+    });
+    start(async () => await setAllLoadoutMembers(lid, present));
+  };
+
   const setWishInLoadout = (itemId: number, loadoutId: number, included: boolean | null) => {
     setOverrides((o) => {
       const next = { ...o, [itemId]: { ...(o[itemId] ?? {}) } };
@@ -190,6 +205,12 @@ export function GearFrame({
               <option value="retired">Retired</option>
               <option value="all">All</option>
             </Select>
+            {isLoadout && (
+              <span className="flex gap-2">
+                <Button variant="outline" disabled={pending} onClick={() => setAllMembers(true)}>Select all</Button>
+                <Button variant="outline" disabled={pending} onClick={() => setAllMembers(false)}>Deselect all</Button>
+              </span>
+            )}
             {pending && <span className="eyebrow">saving…</span>}
           </div>
 
@@ -267,15 +288,15 @@ function LoadoutBar({
   return (
     <div className="mt-6 flex flex-wrap items-center gap-2">
       <span className="eyebrow mr-1">Loadout</span>
-      {loadouts.map((l) => (
+      <button onClick={() => onSelect("all")} className={chip(selected === "all")}>
+        All gear
+      </button>
+      {[...loadouts].reverse().map((l) => (
         <button key={l.id} onClick={() => onSelect(l.id)} className={chip(selected === l.id)}>
           {l.isDefault && "★ "}
           {l.name}
         </button>
       ))}
-      <button onClick={() => onSelect("all")} className={chip(selected === "all")}>
-        All gear
-      </button>
       <button
         onClick={() => {
           const n = prompt("New loadout name:");

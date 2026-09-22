@@ -102,19 +102,6 @@ export default function RouteMap({
         )}
       </LayersControl>
       <Polyline positions={track} pathOptions={{ color: MAP_COLORS.route, weight: 4 }} />
-      {pois.map((p, i) => (
-        <CircleMarker
-          key={`poi${i}`}
-          center={[p.lat, p.lon]}
-          radius={5}
-          pathOptions={{ color: "#5b4a20", weight: 1.5, fillColor: "#a08a4e", fillOpacity: 0.9 }}
-        >
-          <Tooltip direction="top" offset={[0, -6]}>
-            {p.name ?? "Campsite"}
-            {p.kind === "wilderness_hut" ? " (hut)" : ""}
-          </Tooltip>
-        </CircleMarker>
-      ))}
       {groupByLocation(campsites.filter((c) => c.lat != null && c.lon != null)).map((grp) => {
         const label = grp.map((c) => c.night).join("/");
         return (
@@ -130,6 +117,20 @@ export default function RouteMap({
           </CircleMarker>
         );
       })}
+      {/* Draw the smaller API campsite marker after the custom marker so both remain visible at the same coordinates. */}
+      {pois.map((p, i) => (
+        <CircleMarker
+          key={`poi${i}`}
+          center={[p.lat, p.lon]}
+          radius={5}
+          pathOptions={{ color: "#5b4a20", weight: 1.5, fillColor: "#a08a4e", fillOpacity: 0.9 }}
+        >
+          <Tooltip direction="top" offset={[0, -6]}>
+            {p.name ?? "Campsite"}
+            {p.kind === "wilderness_hut" ? " (hut)" : ""}
+          </Tooltip>
+        </CircleMarker>
+      ))}
       {isLoop ? (
         <CircleMarker center={first} radius={8} pathOptions={{ color: MAP_COLORS.end, weight: 3, fillColor: MAP_COLORS.start, fillOpacity: 1 }}>
           <Tooltip permanent direction="top" offset={[0, -6]}>
