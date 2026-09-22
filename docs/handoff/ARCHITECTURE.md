@@ -1,10 +1,9 @@
 # backpack-app — Architecture
 
-Strider is Thai's private backpacking trip planner and gear/weight tracker. It
-is a single-user application behind a shared password gate. Middleware compares
-the `strider_session` cookie with `SESSION_SECRET`; the login route validates a
-SHA-256 password hash. This protects the site but does not establish a database
-user identity: `getCurrentUserId()` still returns the first `users` row.
+Strider is a multi-user backpacking trip planner and gear/weight tracker. Auth.js
+uses verified Google identity for public, self-service sign-in and JWT sessions
+carry the owning database user id. Private reads and mutations validate that id
+against every user-owned parent resource before accessing nested records.
 
 The application is designed for both human and agent-driven changes. Favor
 small composable server actions, keep the schema as the data-model source of
@@ -12,7 +11,7 @@ truth, and keep operational behavior in version-controlled workflows/scripts.
 
 ## Stack
 
-- **Next.js 15** (App Router) · **React 19** · **TypeScript 5.7** · ESM (`"type":"module"`).
+- **Next.js 15** (App Router) · **React 19** · **TypeScript 5.7** · Auth.js 5 · ESM (`"type":"module"`).
 - **Postgres 16**. Local development uses Docker on host port **5433** with the
   `backpack-pgdata` volume. Production uses a dedicated container and retained
   host storage at `/srv/backpack/postgres`.
@@ -32,11 +31,11 @@ truth, and keep operational behavior in version-controlled workflows/scripts.
   which call Drizzle and `revalidatePath()` the affected routes.
 - Binary responses (permit files) use a **GET route handler**
   (`app/trips/[id]/permit/route.ts`) streaming `bytea` from the DB.
-- `middleware.ts` protects every route except the public landing page, login, health, icons, Next.js
+- Auth.js middleware protects every route except the public landing page, login, health, icons, Next.js
   static assets, and tokenized `/share/trips/[token]` views. Shared trip URLs are
   persistent bearer links stored per trip; they are read-only, omit private trip
-  report notes, and can be revoked by clearing the token. The session cookie is HTTP-only, secure in production,
-  same-site strict, and valid for 30 days.
+  report notes, and can be revoked by clearing the token. A shared link does not
+  create a user session or grant access to any other Trip.
 - `/api/health` verifies that the app can query PostgreSQL; it does not verify
   every third-party map, food, weather, or calendar dependency.
 
@@ -114,8 +113,10 @@ for the bbox, then overlays the track + numbered campsites as SVG.
 
 - `DATABASE_URL` → `postgres://backpack:backpack@localhost:5433/backpack`
 - `APP_ORIGIN` — canonical public origin used for authentication redirects
-- `APP_PASSWORD_HASH` — SHA-256 hex digest of the shared site password
-- `SESSION_SECRET` — high-entropy value stored in the session cookie
+- `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` — Google web OAuth client
+- `AUTH_OWNER_EMAIL` — verified Google email allowed to claim the legacy data user
+- `AUTH_SECRET` or `SESSION_SECRET` — high-entropy Auth.js signing/encryption secret
+- `AUTH_E2E_PASSWORD_HASH` — test-only credential for the isolated workflow identity
 - `FDC_API_KEY` — USDA FoodData Central (ingredient search)
 - `GEOAPIFY_API_KEY` — geocoding / static maps fallback
 - `NEXT_PUBLIC_WAQI_TOKEN` — air-quality tiles (baked at build/boot; needs a dev
@@ -134,6 +135,6 @@ for the bbox, then overlays the track + numbered campsites as SVG.
   live site.
 - `tests/mobile.spec.ts` checks primary pages at 360, 390, and 430 CSS pixels,
   including overflow, the trip tab strip, dates, maps, and mobile navigation.
-- `tests/workflows.spec.ts` checks authentication plus a full trip lifecycle:
+- `tests/workflows.spec.ts` checks authentication, cross-user isolation, and a full trip lifecycle:
   create, edit, add a day, print, upload GPX/permit, reload, and delete. Created
   records have unique names and are removed in `finally` cleanup.

@@ -8,7 +8,7 @@ import { SharedTripView } from "@/components/trip/shared-trip-view";
 export const dynamic = "force-dynamic";
 
 async function sharedTrip(token: string) {
-  const [row] = await db.select({ id: schema.trip.id }).from(schema.trip).where(eq(schema.trip.shareToken, token));
+  const [row] = await db.select({ id: schema.trip.id, userId: schema.trip.userId }).from(schema.trip).where(eq(schema.trip.shareToken, token));
   return row ?? null;
 }
 
@@ -26,11 +26,11 @@ export default async function SharedTripPage({ params }: { params: Promise<{ tok
   const shared = await sharedTrip(token);
   if (!shared) notFound();
 
-  const view = await getTripView(shared.id);
+  const view = await getTripView(shared.id, shared.userId);
   if (!view || view.trip.shareToken !== token) notFound();
   const [food, shopping, settingsRows, permitRows] = await Promise.all([
     getTripFood(shared.id, view.trip.userId),
-    getShoppingList(shared.id),
+    getShoppingList(shared.id, shared.userId),
     db.select({ packingDefault: schema.reportSettings.packingDefault }).from(schema.reportSettings).where(eq(schema.reportSettings.userId, view.trip.userId)),
     db.select({ filename: schema.tripPermit.filename, mimeType: schema.tripPermit.mimeType }).from(schema.tripPermit).where(eq(schema.tripPermit.tripId, shared.id)),
   ]);

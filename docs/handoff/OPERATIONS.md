@@ -12,7 +12,7 @@ GitHub/AWS configuration.
 | Route 53 | Resolves `backpack.thaiv.dev` to CloudFront. |
 | CloudFront | Terminates public HTTPS, supplies the private origin header, and caches safe edge responses. |
 | Nginx on EC2 | Rejects requests without the origin header and proxies accepted traffic to `backpack-app:3000`. |
-| Next.js container | Serves Strider, enforces the password cookie, and runs server actions. |
+| Next.js container | Serves Strider, validates Auth.js sessions, enforces ownership, and runs server actions. |
 | PostgreSQL container | Stores all application data, including GPX and permit blobs. |
 | ECR | Stores revision-addressed application images tagged with the Git revision. |
 | Secrets Manager | Supplies database, login, session, origin, backup, and server API secrets. |
@@ -38,8 +38,9 @@ Every push to `main` starts `.github/workflows/deploy.yml`:
    secret and upload the deployment script, Nginx template, and encrypted seed.
 5. Invoke `ops/deploy-ec2.sh` through Systems Manager.
 6. On the instance, prune unused Docker images, pull the image, ensure PostgreSQL
-   exists, restore the seed only when the `users` table is absent, and run
-   committed migrations. Running container images and data volumes are retained.
+   exists, restore the seed only when the `users` table is absent, create an
+   encrypted pre-migration backup, and run committed migrations. Running
+   container images and data volumes are retained.
 7. Replace the application and proxy containers, then poll the internal health
    endpoint with the origin header.
 8. Invalidate CloudFront, verify the public health endpoint, and run all mobile
@@ -63,8 +64,11 @@ GitHub Actions expects these repository variables:
 It expects these GitHub secrets:
 
 - `AWS_ROLE_ARN`
-- `APP_PASSWORD_HASH`
 - `SESSION_SECRET`
+- `AUTH_GOOGLE_ID`
+- `AUTH_GOOGLE_SECRET`
+- `AUTH_OWNER_EMAIL`
+- `E2E_TEST_PASSWORD`
 - `DB_PASSWORD`
 - `ORIGIN_SECRET`
 - `BACKUP_KEY`
@@ -104,9 +108,9 @@ gh run view RUN_ID --repo thaiv28/backpack-app --log-failed
 ```
 
 The mobile suite runs 24 checks across three phone widths. The workflow suite
-runs two checks: unauthenticated redirect behavior and a complete authenticated
-trip lifecycle. Its test record is deleted even when the main assertion path
-fails, provided the browser can still reach the site.
+checks unauthenticated redirects, cross-user Trip isolation, and a complete
+authenticated trip lifecycle. Test Trips are deleted in `finally` cleanup,
+provided the browser can still reach the site.
 
 ## Backups and initial restore
 
@@ -117,6 +121,11 @@ The instance installs `/usr/local/bin/backpack-backup` and runs it daily at
 2. Compresses the SQL stream with gzip.
 3. Encrypts it with AES-256-CBC/PBKDF2 and a salted payload.
 4. Uploads it under `daily/` in the private backup bucket.
+
+The deployment script also uploads an encrypted dump under `pre-migration/`
+immediately before applying migrations. The Google identity migration links the
+configured owner to the existing `users.id` in place; it does not copy or delete
+Trips or other owned rows.
 
 The repository contains only an encrypted initial seed at
 `ops/seed/backpack.sql.enc`; its design is recorded in
@@ -168,9 +177,10 @@ choose a forward fix or approved restore deliberately.
 
 - CloudFront-to-origin traffic is authorized by `X-Origin-Verify`; direct
   requests to Nginx without the value receive 403.
-- The application password is checked using a timing-safe comparison of SHA-256
-  bytes. The resulting session cookie is a bearer secret and lasts 30 days.
-- The password gate protects one owner's application. It is not sufficient for
-  multiple independent users or row-level authorization.
+- Auth.js accepts verified Google identity and stores the database user id in an
+  encrypted JWT session. `AUTH_OWNER_EMAIL` is the only Google identity allowed
+  to claim the one legacy, unlinked data user.
+- The hidden E2E credentials provider is protected by a separate SHA-256 password
+  and can create only `@strider.invalid` test identities.
 - GitHub OIDC drives deployment. Local GitHub CLI authorization is unrelated and
   may expire without affecting an already configured Actions deployment.

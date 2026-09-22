@@ -61,8 +61,19 @@ export async function getMeals(userId: number): Promise<MealRow[]> {
     .where(eq(schema.meal.userId, userId))
     .orderBy(asc(schema.meal.name));
   const items = await db
-    .select()
+    .select({
+      id: schema.mealIngredient.id,
+      mealId: schema.mealIngredient.mealId,
+      ingredientId: schema.mealIngredient.ingredientId,
+      snapshotName: schema.mealIngredient.snapshotName,
+      snapshotKcalPer100g: schema.mealIngredient.snapshotKcalPer100g,
+      snapshotDensityGMl: schema.mealIngredient.snapshotDensityGMl,
+      amountG: schema.mealIngredient.amountG,
+      sortOrder: schema.mealIngredient.sortOrder,
+    })
     .from(schema.mealIngredient)
+    .innerJoin(schema.meal, eq(schema.mealIngredient.mealId, schema.meal.id))
+    .where(eq(schema.meal.userId, userId))
     .orderBy(asc(schema.mealIngredient.sortOrder), asc(schema.mealIngredient.id));
 
   const byMeal = new Map<number, MealIngredientRow[]>();

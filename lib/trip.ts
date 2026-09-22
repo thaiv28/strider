@@ -1,4 +1,4 @@
-import { eq, asc, inArray } from "drizzle-orm";
+import { and, eq, asc, inArray } from "drizzle-orm";
 import { db, schema } from "@/src/db/index";
 import { DEFAULT_COOK_WATER_ML } from "@/lib/fuel";
 
@@ -54,7 +54,11 @@ export async function getTripFood(tripId: number, userId: number): Promise<TripF
   const [ep] = await db.select().from(schema.energyParams).where(eq(schema.energyParams.userId, userId));
   const params = { bmr: ep?.bmr ?? 1735, calPerMile: ep?.calPerEnergyMile ?? 200, ftPerMile: ep?.ftPerEnergyMile ?? 625 };
 
-  const [t] = await db.select({ nights: schema.trip.nights }).from(schema.trip).where(eq(schema.trip.id, tripId));
+  const [t] = await db
+    .select({ nights: schema.trip.nights })
+    .from(schema.trip)
+    .where(and(eq(schema.trip.id, tripId), eq(schema.trip.userId, userId)));
+  if (!t) throw new Error("Trip not found");
   const dayRows = await db.select().from(schema.tripDay).where(eq(schema.tripDay.tripId, tripId));
   const dayMap = new Map(dayRows.map((d) => [d.dayNumber, d]));
 
@@ -102,7 +106,12 @@ export type ShoppingItem = { key: string; name: string; grams: number };
 // Consolidated grocery list: every planned meal's ingredients (scaled to the
 // planned servings) plus standalone ingredient entries, summed per ingredient.
 // Grams are for a single serving-plan; callers scale by the party/people count.
-export async function getShoppingList(tripId: number): Promise<ShoppingItem[]> {
+export async function getShoppingList(tripId: number, userId: number): Promise<ShoppingItem[]> {
+  const [owned] = await db
+    .select({ id: schema.trip.id })
+    .from(schema.trip)
+    .where(and(eq(schema.trip.id, tripId), eq(schema.trip.userId, userId)));
+  if (!owned) throw new Error("Trip not found");
   const entries = await db
     .select({
       mealId: schema.tripMeal.mealId,
@@ -230,7 +239,9 @@ export async function getTripsSummary(userId: number): Promise<TripSummary[]> {
       weightG: schema.tripGear.snapshotWeightG,
       quantity: schema.tripGear.quantity,
     })
-    .from(schema.tripGear);
+    .from(schema.tripGear)
+    .innerJoin(schema.trip, eq(schema.tripGear.tripId, schema.trip.id))
+    .where(eq(schema.trip.userId, userId));
 
   const agg = new Map<number, { base: number; worn: number }>();
   for (const g of gear) {
@@ -261,12 +272,12 @@ export async function getTripsSummary(userId: number): Promise<TripSummary[]> {
   });
 }
 
-export async function getTripView(tripId: number) {
+export async function getTripView(tripId: number, userId: number) {
   const [row] = await db
     .select()
     .from(schema.trip)
     .leftJoin(schema.trail, eq(schema.trip.trailId, schema.trail.id))
-    .where(eq(schema.trip.id, tripId));
+    .where(and(eq(schema.trip.id, tripId), eq(schema.trip.userId, userId)));
   if (!row) return null;
   const t = row.trip;
   const trail = row.trail;

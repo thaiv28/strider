@@ -3,6 +3,7 @@ import { db, schema } from "@/src/db/index";
 import { getCurrentUserId } from "@/lib/gear";
 import { fetchFdcDensity, type FoodHit } from "@/lib/food-search";
 import { kcalForGrams } from "@/lib/food";
+import { requireOwnedMeal } from "@/lib/authorization";
 
 const sRound = (v: number | null | undefined) => (v == null ? null : String(Math.round(v)));
 const s = (v: number | null | undefined) => (v == null ? null : String(v));
@@ -36,6 +37,7 @@ export async function upsertIngredientFromHit(hit: FoodHit) {
 
 // Total kcal/weight of a meal at its base servings, plus name & base servings.
 export async function computeMealTotals(mealId: number): Promise<{ name: string; kcal: number; g: number; baseServings: number }> {
+  await requireOwnedMeal(mealId);
   const [m] = await db.select().from(schema.meal).where(eq(schema.meal.id, mealId));
   const items = await db.select().from(schema.mealIngredient).where(eq(schema.mealIngredient.mealId, mealId));
   const kcal = items.reduce((sum, it) => sum + kcalForGrams(it.snapshotKcalPer100g != null ? Number(it.snapshotKcalPer100g) : null, it.amountG), 0);

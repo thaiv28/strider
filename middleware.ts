@@ -1,19 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import NextAuth from "next-auth";
+import authConfig from "@/auth.config";
 
-const COOKIE_NAME = "strider_session";
-
-export function middleware(request: NextRequest) {
-  if (request.nextUrl.pathname === "/") return NextResponse.next();
-  const sessionSecret = process.env.SESSION_SECRET;
-  if (!sessionSecret) {
-    return new NextResponse("Service authentication is not configured.", { status: 503 });
-  }
-  if (request.cookies.get(COOKIE_NAME)?.value === sessionSecret) return NextResponse.next();
-
-  const loginUrl = new URL("/login", request.url);
-  return NextResponse.redirect(loginUrl);
-}
+export const { auth: middleware } = NextAuth(authConfig);
 
 export const config = {
-  matcher: ["/((?!login|share|api/login|api/health|_next/static|_next/image|icon.svg|apple-icon).*)"],
+  matcher: ["/((?!_next/static|_next/image|icon.svg|apple-icon).*)"],
 };

@@ -6,6 +6,11 @@ import { db, schema } from "@/src/db/index";
 import { getCurrentUserId } from "@/lib/gear";
 import { searchFoods, fetchFdcDensity, type FoodHit } from "@/lib/food-search";
 import { upsertIngredientFromHit } from "@/lib/food-server";
+import {
+  requireOwnedIngredient,
+  requireOwnedMeal,
+  requireOwnedMealIngredient,
+} from "@/lib/authorization";
 
 const s = (v: number | null | undefined) => (v == null ? null : String(v));
 const sRound = (v: number | null | undefined) => (v == null ? null : String(Math.round(v)));
@@ -16,6 +21,7 @@ function bump() {
 
 // ---- search (called from the client to populate the add-ingredient dialog) ----
 export async function searchNutrition(query: string): Promise<FoodHit[]> {
+  await getCurrentUserId();
   return searchFoods(query);
 }
 
@@ -52,6 +58,7 @@ export async function createIngredient(v: IngredientInput) {
 }
 
 export async function updateIngredient(id: number, v: IngredientInput) {
+  await requireOwnedIngredient(id);
   await db
     .update(schema.ingredient)
     .set({
@@ -67,6 +74,7 @@ export async function updateIngredient(id: number, v: IngredientInput) {
 }
 
 export async function deleteIngredient(id: number) {
+  await requireOwnedIngredient(id);
   await db.delete(schema.ingredient).where(eq(schema.ingredient.id, id));
   bump();
 }
@@ -86,6 +94,7 @@ export async function updateMeal(
   id: number,
   patch: { name?: string; baseServings?: number; mealType?: string | null; isHot?: boolean; waterMl?: number | null; notes?: string | null },
 ) {
+  await requireOwnedMeal(id);
   const set: Record<string, unknown> = {};
   if (patch.name != null) set.name = patch.name.trim() || "Untitled";
   if (patch.baseServings != null) set.baseServings = Math.max(1, Math.round(patch.baseServings));
@@ -98,6 +107,7 @@ export async function updateMeal(
 }
 
 export async function deleteMeal(id: number) {
+  await requireOwnedMeal(id);
   await db.delete(schema.meal).where(eq(schema.meal.id, id));
   bump();
 }
@@ -128,6 +138,8 @@ async function insertMealLine(
 
 // Add a pantry ingredient (already saved) to a meal.
 export async function addMealIngredient(mealId: number, ingredientId: number, amountG: number) {
+  const userId = await requireOwnedMeal(mealId);
+  await requireOwnedIngredient(ingredientId, userId);
   const [ing] = await db.select().from(schema.ingredient).where(eq(schema.ingredient.id, ingredientId));
   if (!ing) throw new Error("Ingredient not found");
   await insertMealLine(mealId, { ingredientId, name: ing.name, kcalPer100g: Number(ing.kcalPer100g) || null, densityGMl: ing.densityGMl != null ? Number(ing.densityGMl) : null, amountG });
@@ -136,6 +148,7 @@ export async function addMealIngredient(mealId: number, ingredientId: number, am
 
 // Add a public hit to a meal — saves it to the pantry first, then links it.
 export async function addMealIngredientFromHit(mealId: number, hit: FoodHit, amountG?: number) {
+  await requireOwnedMeal(mealId);
   const ing = await upsertIngredientFromHit(hit);
   await insertMealLine(mealId, {
     ingredientId: ing.id,
@@ -148,6 +161,7 @@ export async function addMealIngredientFromHit(mealId: number, hit: FoodHit, amo
 }
 
 export async function updateMealIngredientAmount(id: number, amountG: number) {
+  await requireOwnedMealIngredient(id);
   await db
     .update(schema.mealIngredient)
     .set({ amountG: Math.max(0, Math.round(amountG)) })
@@ -156,6 +170,7 @@ export async function updateMealIngredientAmount(id: number, amountG: number) {
 }
 
 export async function removeMealIngredient(id: number) {
+  await requireOwnedMealIngredient(id);
   await db.delete(schema.mealIngredient).where(eq(schema.mealIngredient.id, id));
   bump();
 }

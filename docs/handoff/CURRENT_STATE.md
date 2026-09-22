@@ -1,6 +1,6 @@
 # Strider current state
 
-Last reviewed: 2026-09-19.
+Last reviewed: 2026-09-20.
 
 ## Deployed baseline
 
@@ -10,11 +10,11 @@ Last reviewed: 2026-09-19.
 - Release branch: `main`
 - Publication: automatic GitHub Actions deployment on every push to `main`
 - Runtime: ARM64 Next.js and PostgreSQL containers on one Graviton EC2 instance
-- Access: shared password gate with a 30-day HTTP-only session cookie
-- Data identity: one seeded user selected by `getCurrentUserId()`
+- Access: public self-service Google sign-in through Auth.js
+- Data identity: private per-user workspaces resolved from the authenticated session
 
 The last reviewed deployment completed the public health check, 24 responsive
-layout checks, and two authenticated workflow checks. GitHub Actions—not a
+layout checks, and three authenticated workflow checks. GitHub Actions—not a
 developer's local GitHub CLI session—is the durable publication path.
 
 ## Working capabilities
@@ -34,6 +34,10 @@ developer's local GitHub CLI session—is the durable publication path.
 - Mobile navigation and responsive coverage at 360, 390, and 430 CSS pixels.
 - Public, responsive Strider landing page at `/`; the authenticated dashboard is
   available at `/basecamp`.
+- Verified Google accounts can create isolated Strider workspaces. The configured
+  owner email claims the legacy user row in place, preserving every existing id.
+- Ownership guards cover private trip, gear, food, loadout, calendar, permit,
+  print, and nested-resource access. Bearer-link sharing remains read-only.
 - PR validation with isolated PostgreSQL and production post-deploy browser
   verification.
 - Encrypted initial seed plus encrypted daily database backups to private S3.
@@ -54,8 +58,6 @@ developer's local GitHub CLI session—is the durable publication path.
 
 ## Known limitations and risks
 
-- The shared password is an application-wide access gate, not multi-user auth.
-  Database identity still means “first users row.”
 - View-only trip URLs are non-expiring bearer links. Anyone with a current link
   can read that trip and its permit until the owner revokes it.
 - The runtime is intentionally single-instance with no multi-AZ failover.
@@ -64,6 +66,10 @@ developer's local GitHub CLI session—is the durable publication path.
 - `/api/health` checks only application-to-database connectivity.
 - Production tests cover layout and the core trip lifecycle, not every gear,
   food, calendar, external API, or recovery path.
+- Google Calendar write access is not implemented; sign-in requests identity
+  scopes only.
+- Public signup increases the importance of rate limits and storage quotas for
+  external searches, AI imports, GPX files, and permit uploads.
 - Workflow tests mutate production briefly. Unique naming and `finally` cleanup
   reduce residue risk but cannot guarantee cleanup during a total outage.
 - Database migrations are forward-applied before the app container is replaced.
@@ -83,10 +89,9 @@ developer's local GitHub CLI session—is the durable publication path.
 3. Expand workflow coverage to representative gear, food, and calendar writes.
 4. Add observability beyond the database health check (structured logs, disk and
    backup freshness alarms, and external dependency visibility).
-5. If sharing with other people becomes a goal, replace the shared gate with
-   real identity and add ownership checks to every mutation before onboarding
-   anyone. Treat `docs/going-multiuser.md` as an input to re-evaluate, not an
-   implementation-ready plan.
+5. Add optional incremental Google Calendar authorization and one-way Trip event
+   synchronization after the Google OAuth consent screen is verified.
+6. Add rate limits, upload quotas, and account deletion before broader promotion.
 
 ## Handoff rule
 

@@ -37,6 +37,8 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   email: text("email").notNull().unique(),
   name: text("name"),
+  googleSubject: text("google_subject").unique(),
+  imageUrl: text("image_url"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

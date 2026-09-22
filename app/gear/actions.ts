@@ -5,6 +5,12 @@ import { eq, and, isNull } from "drizzle-orm";
 import { db, schema } from "@/src/db/index";
 import { getCurrentUserId, OTHER_CATEGORY_ID } from "@/lib/gear";
 import { ozToG } from "@/lib/util";
+import {
+  requireOwnedCategory,
+  requireOwnedGearItem,
+  requireOwnedGearItems,
+  requireOwnedLoadout,
+} from "@/lib/authorization";
 
 type WClass = "base" | "worn" | "consumable";
 type Status = "current" | "retired" | "wishlist";
@@ -67,6 +73,7 @@ export async function createGear(fd: FormData) {
   const userId = await getCurrentUserId();
   const v = parseForm(fd);
   if (!v.name) throw new Error("Name is required");
+  await requireOwnedCategory(v.categoryId, userId);
   await db.transaction(async (tx) => {
     const [row] = await tx
       .insert(schema.gearItem)
@@ -90,8 +97,10 @@ export async function createGear(fd: FormData) {
 }
 
 export async function updateGear(id: number, fd: FormData) {
+  const userId = await requireOwnedGearItem(id);
   const v = parseForm(fd);
   if (!v.name) throw new Error("Name is required");
+  await requireOwnedCategory(v.categoryId, userId);
   await db.transaction(async (tx) => {
     await tx
       .update(schema.gearItem)
@@ -115,6 +124,7 @@ export async function updateGear(id: number, fd: FormData) {
 }
 
 export async function deleteGear(id: number) {
+  await requireOwnedGearItem(id);
   await db.delete(schema.gearItem).where(eq(schema.gearItem.id, id));
   revalidatePath("/gear");
 }
@@ -122,6 +132,8 @@ export async function deleteGear(id: number) {
 // Replace the full set of current items a wishlist item would retire.
 export async function setWishlistReplacements(wishlistItemId: number, replacesIds: number[]) {
   const ids = [...new Set(replacesIds)].filter((n) => Number.isFinite(n) && n !== wishlistItemId);
+  const userId = await requireOwnedGearItem(wishlistItemId);
+  await requireOwnedGearItems(ids, userId);
   await db.transaction(async (tx) => {
     await tx
       .delete(schema.wishlistReplacement)
@@ -141,6 +153,8 @@ export async function setWishlistLoadout(
   loadoutId: number,
   included: boolean | null,
 ) {
+  const userId = await requireOwnedGearItem(wishlistItemId);
+  await requireOwnedLoadout(loadoutId, userId);
   if (included === null) {
     await db
       .delete(schema.wishlistLoadout)
@@ -173,17 +187,19 @@ export async function createLoadout(name: string): Promise<number> {
 }
 
 export async function renameLoadout(id: number, name: string) {
+  await requireOwnedLoadout(id);
   await db.update(schema.loadout).set({ name: name.trim() || "Loadout" }).where(eq(schema.loadout.id, id));
   revalidatePath("/gear");
 }
 
 export async function deleteLoadout(id: number) {
+  await requireOwnedLoadout(id);
   await db.delete(schema.loadout).where(eq(schema.loadout.id, id));
   revalidatePath("/gear");
 }
 
 export async function setDefaultLoadout(id: number) {
-  const userId = await getCurrentUserId();
+  const userId = await requireOwnedLoadout(id);
   await db.transaction(async (tx) => {
     await tx.update(schema.loadout).set({ isDefault: false }).where(eq(schema.loadout.userId, userId));
     await tx.update(schema.loadout).set({ isDefault: true }).where(eq(schema.loadout.id, id));
@@ -198,6 +214,8 @@ export async function setLoadoutMember(
   present: boolean,
   cls: "base" | "worn" = "base",
 ) {
+  const userId = await requireOwnedLoadout(loadoutId);
+  await requireOwnedGearItem(gearItemId, userId);
   if (present) {
     await db
       .insert(schema.loadoutItem)
@@ -218,8 +236,10 @@ export async function setLoadoutMember(
 // `orderedIds` is the desired order of the target category's visible items;
 // any other items in that category keep their relative order after them.
 export async function moveGear(itemId: number, toCategoryId: number, orderedIds: number[]) {
-  const userId = await getCurrentUserId();
+  const userId = await requireOwnedGearItem(itemId);
   const targetCat = toCategoryId === OTHER_CATEGORY_ID ? null : toCategoryId;
+  await requireOwnedCategory(targetCat, userId);
+  await requireOwnedGearItems(orderedIds, userId);
   await db.transaction(async (tx) => {
     await tx
       .update(schema.gearItem)

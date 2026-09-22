@@ -1,20 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
+import { authenticate } from "./auth";
 
-const sessionSecret = process.env.MOBILE_TEST_SESSION_SECRET;
-const baseURL = process.env.MOBILE_TEST_BASE_URL ?? "http://127.0.0.1:3000";
-
-test.beforeEach(async ({ context }) => {
-  test.skip(!sessionSecret, "MOBILE_TEST_SESSION_SECRET is required");
-  await context.addCookies([
-    {
-      name: "strider_session",
-      value: sessionSecret!,
-      url: baseURL,
-      httpOnly: true,
-      secure: baseURL.startsWith("https://"),
-      sameSite: "Strict",
-    },
-  ]);
+test.beforeEach(async ({ page }) => {
+  await authenticate(page);
 });
 
 async function expectNoHorizontalOverflow(page: Page) {
