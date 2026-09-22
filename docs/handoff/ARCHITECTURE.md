@@ -112,7 +112,7 @@ for the bbox, then overlays the track + numbered campsites as SVG.
 ## External services / secrets (`.env`)
 
 - `DATABASE_URL` → `postgres://backpack:backpack@localhost:5433/backpack`
-- `APP_ORIGIN` — canonical public origin used for authentication redirects
+- `AUTH_URL` — canonical public origin used by Auth.js for authentication redirects
 - `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` — Google web OAuth client
 - `AUTH_OWNER_EMAIL` — verified Google email allowed to claim the legacy data user
 - `AUTH_SECRET` or `SESSION_SECRET` — high-entropy Auth.js signing/encryption secret
