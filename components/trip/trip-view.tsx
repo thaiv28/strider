@@ -57,6 +57,7 @@ type Trip = {
   planningNotes: string | null;
   tripReport: string | null;
   shareToken: string | null;
+  editToken: string | null;
 };
 type LibItem = { id: number; name: string; category: string | null; weightG: number | null; quantity: number; defaultWeightClass: "base" | "worn" | "consumable" };
 type Weights = { baseG: number; wornG: number; foodG: number; waterG: number; fuelG: number; consumableG: number; packG: number; skinOutG: number };
@@ -64,6 +65,7 @@ type Weights = { baseG: number; wornG: number; foodG: number; waterG: number; fu
 const tone = (s: string) => (s === "completed" ? "current" : s === "planned" ? "wishlist" : "neutral");
 
 export function TripView(props: {
+  isOwner: boolean;
   trip: Trip;
   region: string | null;
   areaType: string | null;
@@ -214,10 +216,10 @@ export function TripView(props: {
           <option value="planned">planned</option>
           <option value="completed">completed</option>
         </Select>
-        <ShareMenu tripId={trip.id} initialToken={trip.shareToken} onGenerateReport={generateReport} />
-        <Button variant="danger" onClick={del} aria-label="Delete trip" title="Delete trip">
+        {props.isOwner && <ShareMenu tripId={trip.id} initialToken={trip.shareToken} initialEditToken={trip.editToken} onGenerateReport={generateReport} />}
+        {props.isOwner && <Button variant="danger" onClick={del} aria-label="Delete trip" title="Delete trip">
           <Trash2 size={16} />
-        </Button>
+        </Button>}
       </div>
       <div className="readout mt-1 text-sm text-muted">
         {[props.region, props.areaType, trip.startDate ?? "date TBD"].filter(Boolean).join(" · ")}
@@ -451,7 +453,7 @@ export function TripView(props: {
               <ReportPanel tripId={trip.id} data={props.report} template={props.reportTemplate} packingList={props.tripPackingList} generateRequest={generateReportRequest} />
             </div>
             <div id="report-notes" className="scroll-mt-24">
-              <NoteCard label="Trip report (private notes)" defaultValue={trip.tripReport} onSave={(v) => save({ tripReport: v })} rows={14} />
+              {props.isOwner && <NoteCard label="Trip report (private notes)" defaultValue={trip.tripReport} onSave={(v) => save({ tripReport: v })} rows={14} />}
             </div>
           </div>
         )}

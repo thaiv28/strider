@@ -3,6 +3,7 @@ import "./globals.css";
 import { fontVars } from "./fonts";
 import { Shell } from "@/components/shell";
 import { UnsavedChangesProvider } from "@/components/unsaved-changes";
+import { auth } from "@/auth";
 
 const DESCRIPTION = "Backpacking trip planner and gear tracker";
 
@@ -27,12 +28,13 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const signedIn = Boolean((await auth())?.user?.id);
   return (
     <html lang="en" className={fontVars}>
       <body>
         <UnsavedChangesProvider>
-          <Shell>{children}</Shell>
+          <Shell signedIn={signedIn}>{children}</Shell>
         </UnsavedChangesProvider>
       </body>
     </html>

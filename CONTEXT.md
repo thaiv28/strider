@@ -10,8 +10,15 @@ A person with a verified Google identity who owns a private set of Strider plann
 _Avoid_: Guest, shared user
 
 **Shared Trip**:
-A live, read-only projection of one Trip exposed through a revocable bearer link; private Trip Report notes are excluded.
+A Trip another User can view or edit through a revocable link. Private Trip Report notes remain visible only to its owner.
 _Avoid_: Public trip, shared workspace
+
+**Trip Owner**:
+The User whose workspace contains the Trip and who controls its links and deletion.
+
+**Trip Collaborator**:
+A signed-in User who has opened a Trip's edit link and can change its plan while that link remains active.
+_Avoid_: Co-owner
 
 **Gear Item**:
 A physical item that is current, retired, or being considered on the wishlist.

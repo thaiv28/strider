@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/src/db/index";
 import { getCurrentUserId } from "@/lib/gear";
+import { tripAccess } from "@/lib/authorization";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +9,8 @@ export const dynamic = "force-dynamic";
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const userId = await getCurrentUserId();
+  const access = await tripAccess(Number(id), userId);
+  if (!access) return new Response("Not found", { status: 404 });
   const [row] = await db
     .select({
       filename: schema.tripPermit.filename,
@@ -16,7 +19,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     })
     .from(schema.tripPermit)
     .innerJoin(schema.trip, eq(schema.tripPermit.tripId, schema.trip.id))
-    .where(and(eq(schema.tripPermit.tripId, Number(id)), eq(schema.trip.userId, userId)));
+    .where(and(eq(schema.tripPermit.tripId, Number(id)), eq(schema.trip.userId, access.ownerId)));
   if (!row) return new Response("Not found", { status: 404 });
 
   return new Response(new Uint8Array(row.data), {

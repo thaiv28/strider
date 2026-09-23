@@ -6,13 +6,15 @@ import { getTripView, getTripFood, getShoppingList } from "@/lib/trip";
 import { getMeals, getIngredients } from "@/lib/pantry";
 import { DEFAULT_TEMPLATE, DEFAULT_PACKING, type ReportData } from "@/lib/report";
 import { TripView } from "@/components/trip/trip-view";
+import { tripAccess } from "@/lib/authorization";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const userId = await getCurrentUserId();
-  const [t] = await db.select({ name: schema.trip.name }).from(schema.trip).where(and(eq(schema.trip.id, Number(id)), eq(schema.trip.userId, userId)));
+  const access = await tripAccess(Number(id), userId);
+  const [t] = access ? await db.select({ name: schema.trip.name }).from(schema.trip).where(and(eq(schema.trip.id, Number(id)), eq(schema.trip.userId, access.ownerId))) : [];
   return { title: t?.name ?? "Trip" };
 }
 
@@ -38,17 +40,19 @@ export default async function TripPage({
   const back = from === "calendar" ? { href: calHref, label: "Calendar" } : { href: "/trips", label: "Logbook" };
   const tripId = Number(id);
   const userId = await getCurrentUserId();
-  const view = await getTripView(tripId, userId);
+  const access = await tripAccess(tripId, userId);
+  if (!access) notFound();
+  const view = await getTripView(tripId, access.ownerId);
   if (!view) notFound();
 
   const [gearView, loadoutData, tripFood, shopping, meals, ingredients, reportRows, permitRows] = await Promise.all([
     getGearView(userId),
     getLoadoutData(userId),
-    getTripFood(tripId, userId),
-    getShoppingList(tripId, userId),
+    getTripFood(tripId, access.ownerId),
+    getShoppingList(tripId, access.ownerId),
     getMeals(userId),
     getIngredients(userId),
-    db.select().from(schema.reportSettings).where(eq(schema.reportSettings.userId, userId)),
+    db.select().from(schema.reportSettings).where(eq(schema.reportSettings.userId, access.ownerId)),
     db
       .select({ filename: schema.tripPermit.filename, mimeType: schema.tripPermit.mimeType, sizeBytes: schema.tripPermit.sizeBytes })
       .from(schema.tripPermit)
@@ -106,6 +110,7 @@ export default async function TripPage({
 
   return (
     <TripView
+      isOwner={access.isOwner}
       trip={{
         id: t.id,
         name: t.name,
@@ -126,8 +131,9 @@ export default async function TripPage({
         drivingNotes: t.drivingNotes,
         waterSources: t.waterSources,
         planningNotes: t.planningNotes,
-        tripReport: t.tripReport,
-        shareToken: t.shareToken,
+        tripReport: access.isOwner ? t.tripReport : null,
+        shareToken: access.isOwner ? t.shareToken : null,
+        editToken: access.isOwner ? t.editToken : null,
       }}
       region={view.region}
       areaType={view.areaType}

@@ -1,5 +1,6 @@
-import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { notFound, redirect } from "next/navigation";
+import { eq, or } from "drizzle-orm";
+import { auth } from "@/auth";
 import { db, schema } from "@/src/db/index";
 import { getTripFood, getShoppingList, getTripView } from "@/lib/trip";
 import { DEFAULT_PACKING } from "@/lib/report";
@@ -9,7 +10,8 @@ import type { Metadata } from "next";
 export const dynamic = "force-dynamic";
 
 async function sharedTrip(token: string) {
-  const [row] = await db.select({ id: schema.trip.id, userId: schema.trip.userId }).from(schema.trip).where(eq(schema.trip.shareToken, token));
+  const [row] = await db.select({ id: schema.trip.id, userId: schema.trip.userId, shareToken: schema.trip.shareToken, editToken: schema.trip.editToken })
+    .from(schema.trip).where(or(eq(schema.trip.shareToken, token), eq(schema.trip.editToken, token)));
   return row ?? null;
 }
 
@@ -18,7 +20,7 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
   const [row] = await db
     .select({ name: schema.trip.name, region: schema.trip.region, startDate: schema.trip.startDate })
     .from(schema.trip)
-    .where(eq(schema.trip.shareToken, token));
+    .where(or(eq(schema.trip.shareToken, token), eq(schema.trip.editToken, token)));
   if (!row) notFound();
   const title = `${row.name} · Strider`;
   const details = [row.region, row.startDate].filter(Boolean).join(" · ");
@@ -44,6 +46,21 @@ export default async function SharedTripPage({ params }: { params: Promise<{ tok
   const { token } = await params;
   const shared = await sharedTrip(token);
   if (!shared) notFound();
+
+  const session = await auth();
+  const visitorId = Number(session?.user?.id);
+  if (shared.editToken === token) {
+    if (!visitorId) redirect(`/login?callbackUrl=${encodeURIComponent(`/share/trips/${token}`)}`);
+    if (visitorId !== shared.userId) {
+      await db.insert(schema.tripShareVisit).values({ tripId: shared.id, userId: visitorId, permission: "edit" })
+        .onConflictDoNothing();
+    }
+    redirect(`/trips/${shared.id}`);
+  }
+  if (visitorId && visitorId !== shared.userId) {
+    await db.insert(schema.tripShareVisit).values({ tripId: shared.id, userId: visitorId, permission: "view" })
+      .onConflictDoNothing();
+  }
 
   const view = await getTripView(shared.id, shared.userId);
   if (!view || view.trip.shareToken !== token) notFound();

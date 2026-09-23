@@ -17,10 +17,12 @@ const NAV = [
 
 const MOBILE_NAV = [...NAV, { href: "/calendar", label: "Calendar", icon: CalendarDays }];
 
-export function Shell({ children }: { children: React.ReactNode }) {
+export function Shell({ children, signedIn }: { children: React.ReactNode; signedIn: boolean }) {
   const path = usePathname();
   const { requestNavigate } = useUnsaved();
-  const isActive = (href: string) => path.startsWith(href);
+  const sharedTrip = path.startsWith("/share/trips/");
+  const tripsHref = sharedTrip ? "/trips?section=shared" : "/trips";
+  const isActive = (href: string) => path.startsWith(href) || (href === "/trips" && sharedTrip);
 
   // Remember the last place visited under /trips (list or a specific trip). The
   // print view is a dead-end sub-page, so collapse it to its trip page — coming
@@ -29,7 +31,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     if (path.startsWith("/trips")) localStorage.setItem("bp_lastTrips", path.replace(/\/print$/, ""));
   }, [path]);
 
-  if (path === "/" || path === "/login" || path === "/privacy" || path.startsWith("/share/")) return <>{children}</>;
+  if (path === "/" || path === "/login" || path === "/privacy" || (path.startsWith("/share/") && !signedIn)) return <>{children}</>;
 
   // Route every nav click through the unsaved-changes guard. "Trips" resolves to
   // wherever you last were in the trips section.
@@ -37,8 +39,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
     e.preventDefault();
     let dest = href;
     if (href === "/trips") {
-      const last = typeof window !== "undefined" ? localStorage.getItem("bp_lastTrips") : null;
-      if (last && last !== "/trips") dest = last;
+      if (sharedTrip) dest = tripsHref;
+      else {
+        const last = typeof window !== "undefined" ? localStorage.getItem("bp_lastTrips") : null;
+        if (last && last !== "/trips") dest = last;
+      }
     }
     requestNavigate(dest);
   };
@@ -68,7 +73,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             {NAV.map((l) => (
               <Link
                 key={l.href}
-                href={l.href}
+                href={l.href === "/trips" ? tripsHref : l.href}
                 onClick={onNav(l.href)}
                 className={cn(
                   "shrink-0 font-display text-xs font-semibold tracking-wide uppercase transition sm:text-sm",
@@ -104,7 +109,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </header>
-      <main>{children}</main>
+      {sharedTrip ? children : <main>{children}</main>}
       <nav
         data-noprint
         aria-label="Primary navigation"
@@ -115,7 +120,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={item.href === "/trips" ? tripsHref : item.href}
               onClick={onNav(item.href)}
               aria-current={isActive(item.href) ? "page" : undefined}
               className={cn(

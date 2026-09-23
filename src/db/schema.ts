@@ -230,11 +230,26 @@ export const trip = pgTable("trip", {
   // Bearer token for the trip's persistent, unauthenticated read-only view.
   // Null means sharing is disabled; rotating/revoking invalidates the old URL.
   shareToken: text("share_token").unique(),
+  // Signed-in collaborators receive edit access after opening this bearer link.
+  editToken: text("edit_token").unique(),
   // Shared participant packing list; null falls back to report_settings.packing_default.
   packingList: text("packing_list"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+// A visit remembers a link in the visitor's trip list. Revoking a link removes
+// its visits, including edit grants, without affecting the other permission.
+export const tripShareVisit = pgTable(
+  "trip_share_visit",
+  {
+    tripId: integer("trip_id").notNull().references(() => trip.id, { onDelete: "cascade" }),
+    userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    permission: text("permission").$type<"view" | "edit">().notNull(),
+    visitedAt: timestamp("visited_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({ tripShareVisitUniq: uniqueIndex("trip_share_visit_uniq").on(t.tripId, t.userId, t.permission) }),
+);
 
 // Per-user, singleton: the pre-trip report template and the master packing list
 // each trip's list is seeded from. Null columns fall back to code defaults (lib/report).

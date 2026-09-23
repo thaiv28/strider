@@ -17,6 +17,8 @@ import {
   requireOwnedLoadout,
   requireOwnedMeal,
   requireOwnedTrip,
+  requireTripEditor,
+  tripAccess,
   requireOwnedTripChild,
 } from "@/lib/authorization";
 
@@ -47,11 +49,35 @@ export async function createTripShareLink(tripId: number): Promise<string> {
 
 export async function revokeTripShareLink(tripId: number) {
   const userId = await getCurrentUserId();
-  await db
-    .update(schema.trip)
-    .set({ shareToken: null, updatedAt: new Date() })
-    .where(and(eq(schema.trip.id, tripId), eq(schema.trip.userId, userId)));
+  await requireOwnedTrip(tripId, userId);
+  await db.transaction(async (tx) => {
+    await tx.update(schema.trip).set({ shareToken: null, updatedAt: new Date() }).where(eq(schema.trip.id, tripId));
+    await tx.delete(schema.tripShareVisit).where(and(eq(schema.tripShareVisit.tripId, tripId), eq(schema.tripShareVisit.permission, "view")));
+  });
   revalidatePath(`/trips/${tripId}`);
+  revalidatePath("/trips");
+}
+
+export async function createTripEditLink(tripId: number): Promise<string> {
+  const userId = await getCurrentUserId();
+  await requireOwnedTrip(tripId, userId);
+  const [row] = await db.select({ token: schema.trip.editToken }).from(schema.trip).where(eq(schema.trip.id, tripId));
+  if (row.token) return row.token;
+  const token = randomBytes(24).toString("base64url");
+  await db.update(schema.trip).set({ editToken: token, updatedAt: new Date() }).where(eq(schema.trip.id, tripId));
+  revalidatePath(`/trips/${tripId}`);
+  return token;
+}
+
+export async function revokeTripEditLink(tripId: number) {
+  const userId = await getCurrentUserId();
+  await requireOwnedTrip(tripId, userId);
+  await db.transaction(async (tx) => {
+    await tx.update(schema.trip).set({ editToken: null, updatedAt: new Date() }).where(eq(schema.trip.id, tripId));
+    await tx.delete(schema.tripShareVisit).where(and(eq(schema.tripShareVisit.tripId, tripId), eq(schema.tripShareVisit.permission, "edit")));
+  });
+  revalidatePath(`/trips/${tripId}`);
+  revalidatePath("/trips");
 }
 
 export async function createTrip(name: string, loadoutId?: number): Promise<number> {
@@ -200,7 +226,7 @@ export async function importTrip(json: string): Promise<{ tripId?: number; error
 // Copy a loadout's gear into the trip as a frozen snapshot. Only seeds an empty
 // trip (copy-once semantics; afterward the trip's gear is edited directly).
 export async function seedTripFromLoadout(tripId: number, loadoutId: number) {
-  const userId = await requireOwnedTrip(tripId);
+  const userId = await requireTripEditor(tripId);
   await requireOwnedLoadout(loadoutId, userId);
   const existing = await db
     .select({ id: schema.tripGear.id })
@@ -242,7 +268,7 @@ export async function seedTripFromLoadout(tripId: number, loadoutId: number) {
 }
 
 export async function addTripGear(tripId: number, gearItemId: number) {
-  const userId = await requireOwnedTrip(tripId);
+  const userId = await requireTripEditor(tripId);
   await requireOwnedGearItem(gearItemId, userId);
   const [g] = await db
     .select({
@@ -295,8 +321,11 @@ export async function restoreTripGear(
     packed: boolean;
   },
 ) {
-  const userId = await requireOwnedTrip(tripId);
-  if (item.gearItemId != null) await requireOwnedGearItem(item.gearItemId, userId);
+  const userId = await requireTripEditor(tripId);
+  // A collaborator can undo removal of an owner's snapshotted item without
+  // obtaining access to that owner's gear library.
+  const [ownedGear] = item.gearItemId == null ? [] : await db.select({ id: schema.gearItem.id })
+    .from(schema.gearItem).where(and(eq(schema.gearItem.id, item.gearItemId), eq(schema.gearItem.userId, userId)));
   const [{ max }] = await db
     .select({ max: sql<number>`coalesce(max(${schema.tripGear.sortOrder}), -1)::int` })
     .from(schema.tripGear)
@@ -305,7 +334,7 @@ export async function restoreTripGear(
     .insert(schema.tripGear)
     .values({
       tripId,
-      gearItemId: item.gearItemId,
+      gearItemId: ownedGear?.id ?? null,
       snapshotName: item.name,
       snapshotWeightG: item.weightG,
       snapshotCategory: item.category,
@@ -340,7 +369,7 @@ export async function setTripGearPacked(id: number, tripId: number, packed: bool
 }
 
 export async function clearTripGear(tripId: number) {
-  await requireOwnedTrip(tripId);
+  await requireTripEditor(tripId);
   await db.delete(schema.tripGear).where(eq(schema.tripGear.tripId, tripId));
   bump(tripId);
 }
@@ -373,7 +402,7 @@ export async function upsertTripDay(
   dayNumber: number,
   patch: { distanceMi?: string | null; elevationGainFt?: number | null },
 ) {
-  await requireOwnedTrip(tripId);
+  await requireTripEditor(tripId);
   const [ex] = await db
     .select({ id: schema.tripDay.id })
     .from(schema.tripDay)
@@ -386,7 +415,7 @@ export async function upsertTripDay(
 }
 
 export async function addTripDay(tripId: number) {
-  await requireOwnedTrip(tripId);
+  await requireTripEditor(tripId);
   const rows = await db
     .select({ dayNumber: schema.tripDay.dayNumber })
     .from(schema.tripDay)
@@ -469,7 +498,7 @@ const siteVals = (tripId: number, c: Site) => ({
 });
 
 export async function addCampsite(tripId: number, c: Site): Promise<number> {
-  await requireOwnedTrip(tripId);
+  await requireTripEditor(tripId);
   const [r] = await db
     .insert(schema.tripCampsite)
     .values(siteVals(tripId, c))
@@ -502,7 +531,7 @@ export async function removeCampsite(id: number, tripId: number) {
 }
 
 export async function clearCampsites(tripId: number) {
-  await requireOwnedTrip(tripId);
+  await requireTripEditor(tripId);
   await db.delete(schema.tripCampsite).where(eq(schema.tripCampsite.tripId, tripId));
   await syncDaysFromCampsites(tripId);
   bump(tripId);
@@ -535,7 +564,7 @@ type TripPatch = Partial<{
 }>;
 
 export async function uploadGpx(tripId: number, fd: FormData): Promise<string | null> {
-  await requireOwnedTrip(tripId);
+  await requireTripEditor(tripId);
   const f = fd.get("gpx");
   if (!(f instanceof File) || f.size === 0) return "No file selected.";
   const parsed = parseGpx(await f.text());
@@ -559,7 +588,7 @@ export async function uploadGpx(tripId: number, fd: FormData): Promise<string | 
 }
 
 export async function removeGpx(tripId: number) {
-  await requireOwnedTrip(tripId);
+  await requireTripEditor(tripId);
   await db.delete(schema.tripGpx).where(eq(schema.tripGpx.tripId, tripId));
   bump(tripId);
 }
@@ -579,7 +608,7 @@ export async function restoreGpx(
     profile: { d: number; e: number }[];
   },
 ) {
-  await requireOwnedTrip(tripId);
+  await requireTripEditor(tripId);
   await db.delete(schema.tripGpx).where(eq(schema.tripGpx.tripId, tripId));
   await db.insert(schema.tripGpx).values({
     tripId,
@@ -597,7 +626,13 @@ export async function restoreGpx(
 }
 
 export async function updateTrip(tripId: number, patch: TripPatch) {
-  await requireOwnedTrip(tripId);
+  const userId = await requireTripEditor(tripId);
+  const access = await tripAccess(tripId, userId);
+  const allowed = new Set(["name", "status", "startDate", "nights", "partySize", "groceryPeople", "groceryRemoved",
+    "region", "areaType", "lat", "lon", "distanceMi", "elevationGainFt", "foodGPerDay", "waterGPerDay",
+    "fuelGPerDay", "trailhead", "permitRequired", "permitNotes", "drivingNotes", "waterSources", "planningNotes", "tripReport"]);
+  if (Object.keys(patch).some((key) => !allowed.has(key))) throw new Error("Invalid trip field");
+  if (!access?.isOwner && Object.prototype.hasOwnProperty.call(patch, "tripReport")) throw new Error("Private notes are owner-only");
   // Guard the numeric coordinate columns against non-numeric input.
   for (const k of ["lat", "lon"] as const) {
     if (patch[k] != null && !Number.isFinite(Number(patch[k]))) delete patch[k];
@@ -626,7 +661,7 @@ const PERMIT_MAX_BYTES = 15 * 1024 * 1024;
 const PERMIT_TYPES = new Set(["application/pdf", "image/png", "image/jpeg", "image/webp", "image/heic"]);
 
 export async function uploadPermit(tripId: number, form: FormData): Promise<{ ok: boolean; error?: string }> {
-  await requireOwnedTrip(tripId);
+  await requireTripEditor(tripId);
   const file = form.get("file");
   if (!(file instanceof File) || file.size === 0) return { ok: false, error: "No file." };
   if (!PERMIT_TYPES.has(file.type)) return { ok: false, error: "Use a PDF or image (PNG/JPG/WEBP)." };
@@ -643,13 +678,13 @@ export async function uploadPermit(tripId: number, form: FormData): Promise<{ ok
 }
 
 export async function deletePermit(tripId: number) {
-  await requireOwnedTrip(tripId);
+  await requireTripEditor(tripId);
   await db.delete(schema.tripPermit).where(eq(schema.tripPermit.tripId, tripId));
   bump(tripId);
 }
 
 export async function saveTripPackingList(tripId: number, packingList: string) {
-  await requireOwnedTrip(tripId);
+  await requireTripEditor(tripId);
   await db
     .update(schema.trip)
     .set({ packingList, updatedAt: new Date() })
@@ -675,7 +710,7 @@ type AddFood =
   | { kind: "hit"; hit: FoodHit; grams: number };
 
 export async function addTripMeal(tripId: number, dayNumber: number, entry: AddFood) {
-  const userId = await requireOwnedTrip(tripId);
+  const userId = await requireTripEditor(tripId);
   let name: string, kcal: number, weightG: number;
   let servings = 1, mealId: number | null = null, ingredientId: number | null = null;
 

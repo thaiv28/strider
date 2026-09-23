@@ -100,6 +100,89 @@ test("private trips are isolated between accounts", async ({ browser }) => {
   }
 });
 
+test("view and edit links grant distinct, revocable access", async ({ browser }) => {
+  test.setTimeout(180_000);
+  const owner = await browser.newContext();
+  const visitor = await browser.newContext();
+  const guest = await browser.newContext();
+  const ownerPage = await owner.newPage();
+  const visitorPage = await visitor.newPage();
+  const guestPage = await guest.newPage();
+  const name = `E2E trip sharing ${Date.now()}`;
+  let tripUrl: string | null = null;
+
+  try {
+    await authenticate(ownerPage);
+    await ownerPage.goto("/trips");
+    ownerPage.once("dialog", (dialog) => dialog.accept(name));
+    await Promise.all([ownerPage.waitForURL(/\/trips\/\d+$/), ownerPage.getByRole("button", { name: "+ New trip" }).click()]);
+    tripUrl = ownerPage.url();
+    await ownerPage.getByRole("button", { name: "Share", exact: true }).click();
+    await ownerPage.getByRole("menuitem", { name: /Create view-only link/ }).click();
+    const viewLink = await ownerPage.getByRole("menuitem", { name: "Open view-only page" }).getAttribute("href");
+    await ownerPage.getByRole("menuitem", { name: /Create edit link/ }).click();
+    const editLink = await ownerPage.getByRole("menuitem", { name: "Open edit link" }).getAttribute("href");
+    expect(editLink).not.toBe(viewLink);
+
+    await guestPage.goto(editLink!);
+    await expect(guestPage).toHaveURL(/\/login\?callbackUrl=/);
+    await guestPage.goto(viewLink!);
+    await expect(guestPage.getByTestId("shared-trip")).toBeVisible();
+    await expect(guestPage.getByRole("link", { name: "STRIDER" })).toHaveCount(0);
+
+    await authenticate(visitorPage, "e2e-collaborator@strider.invalid");
+    await visitorPage.goto(viewLink!);
+    await expect(visitorPage.getByRole("link", { name: "STRIDER" })).toBeVisible();
+    await visitorPage.getByRole("link", { name: "Gear", exact: true }).click();
+    await expect(visitorPage).toHaveURL(/\/gear$/);
+    await visitorPage.goto(viewLink!);
+    await visitorPage.getByRole("link", { name: "Trips", exact: true }).click();
+    await expect(visitorPage).toHaveURL(/\/trips\?section=shared$/);
+    await expect(visitorPage.getByRole("tab", { name: /Shared with me/ })).toHaveAttribute("aria-selected", "true");
+    await expect(visitorPage.getByRole("link", { name: /View only/ })).toContainText(name);
+    expect((await visitorPage.getByRole("link", { name: /View only/ }).getAttribute("href"))).toBe(viewLink);
+    expect((await visitorPage.goto(tripUrl!))?.status()).toBe(404);
+
+    await visitorPage.goto(editLink!);
+    await expect(visitorPage).toHaveURL(tripUrl!);
+    await expect(visitorPage.getByRole("button", { name: "Delete trip" })).toHaveCount(0);
+    await expect(visitorPage.getByRole("button", { name: "Share", exact: true })).toHaveCount(0);
+    await visitorPage.getByRole("button", { name: "Report", exact: true }).click();
+    await expect(visitorPage.getByText("Trip report (private notes)")).toHaveCount(0);
+    await fillAndSave(visitorPage, "Trip name", `${name} edited`);
+    await ownerPage.reload();
+    await expect(ownerPage.getByLabel("Trip name")).toHaveValue(`${name} edited`);
+    await visitorPage.goto("/trips");
+    await visitorPage.getByRole("tab", { name: /Shared with me/ }).click();
+    await expect(visitorPage.getByRole("link", { name: /Can edit/ })).toContainText(`${name} edited`);
+
+    await ownerPage.getByRole("button", { name: "Share", exact: true }).click();
+    await ownerPage.getByRole("menuitem", { name: "Revoke edit link" }).click();
+    await ownerPage.getByRole("menuitem", { name: "Confirm revoke edit link" }).click();
+    expect((await visitorPage.goto(tripUrl!))?.status()).toBe(404);
+    await visitorPage.goto("/trips");
+    await visitorPage.getByRole("tab", { name: /Shared with me/ }).click();
+    await expect(visitorPage.getByRole("link", { name: /View only/ })).toBeVisible();
+    await ownerPage.getByRole("menuitem", { name: "Revoke view-only link" }).click();
+    await ownerPage.getByRole("menuitem", { name: "Confirm revoke" }).click();
+    await visitorPage.reload();
+    await visitorPage.getByRole("tab", { name: /Shared with me/ }).click();
+    await expect(visitorPage.getByText("Open a trip link while signed in")).toBeVisible();
+  } finally {
+    if (tripUrl) {
+      await ownerPage.goto(tripUrl);
+      const button = ownerPage.getByRole("button", { name: "Delete trip" });
+      if (await button.isVisible().catch(() => false)) {
+        ownerPage.once("dialog", (dialog) => dialog.accept());
+        await Promise.all([ownerPage.waitForURL((url) => url.pathname === "/trips"), button.click()]);
+      }
+    }
+    await owner.close();
+    await visitor.close();
+    await guest.close();
+  }
+});
+
 test("a trip can be planned, shared, exported, and deleted", async ({ browser, context, page }) => {
   // Production route-map processing and the unauthenticated share round-trip can
   // be slow on the small ARM instance, especially immediately after deployment.
