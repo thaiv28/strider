@@ -25,9 +25,11 @@ developer's local GitHub CLI session—is the durable publication path.
   estimates.
 - Trip creation/import, daily distance/elevation, gear/food snapshots,
   campsites, packing lists, GPX upload, permit upload, and printable trip sheets.
-- Consolidated trip sharing menu for printing, pre-trip report generation, and
-  persistent live view-only bearer links. Shared views expose the trip plan and
-  permit but omit private trip-report notes; owners can revoke the link.
+- Consolidated trip sharing menu for printing, reports, and separate persistent
+  view-only and edit links. View links work without sign-in; edit links require
+  sign-in. Opening either link while signed in adds the Trip to Shared with me.
+  The owner can revoke either link independently. Private Trip Report notes,
+  link controls, and deletion remain owner-only.
 - Public link previews use Strider artwork, and live shared-trip links include
   the Trip name and summary in their preview metadata.
 - Interactive route maps with topo/OSM layers and optional weather, snow, and
@@ -38,8 +40,9 @@ developer's local GitHub CLI session—is the durable publication path.
   available at `/basecamp`.
 - Verified Google accounts can create isolated Strider workspaces. The configured
   owner email claims the legacy user row in place, preserving every existing id.
-- Ownership guards cover private trip, gear, food, loadout, calendar, permit,
-  print, and nested-resource access. Bearer-link sharing remains read-only.
+- Ownership guards cover private gear, food, loadout, calendar, and print data;
+  trip edits additionally accept active, signed-in collaborators. Revoked edit
+  links remove collaborator grants.
 - PR validation with isolated PostgreSQL and production post-deploy browser
   verification.
 - Encrypted initial seed plus encrypted daily database backups to private S3.
@@ -61,7 +64,8 @@ developer's local GitHub CLI session—is the durable publication path.
 ## Known limitations and risks
 
 - View-only trip URLs are non-expiring bearer links. Anyone with a current link
-  can read that trip and its permit until the owner revokes it.
+  can read that trip and its permit until the owner revokes it. Anyone signed in
+  with a current edit link can change trip planning data until revocation.
 - The runtime is intentionally single-instance with no multi-AZ failover.
 - PostgreSQL and uploaded permit/GPX data are coupled to the instance's retained
   storage and database backups.

@@ -3,7 +3,9 @@
 Strider is a multi-user backpacking trip planner and gear/weight tracker. Auth.js
 uses verified Google identity for public, self-service sign-in and JWT sessions
 carry the owning database user id. Private reads and mutations validate that id
-against every user-owned parent resource before accessing nested records.
+against every user-owned parent resource before accessing nested records. Trip
+collaborators are recorded when they open an edit link; each trip write checks
+that their grant is still active.
 
 The application is designed for both human and agent-driven changes. Favor
 small composable server actions, keep the schema as the data-model source of
@@ -32,10 +34,11 @@ truth, and keep operational behavior in version-controlled workflows/scripts.
 - Binary responses (permit files) use a **GET route handler**
   (`app/trips/[id]/permit/route.ts`) streaming `bytea` from the DB.
 - Auth.js middleware protects every route except the public landing page, login, health, icons, Next.js
-  static assets, and tokenized `/share/trips/[token]` views. Shared trip URLs are
-  persistent bearer links stored per trip; they are read-only, omit private trip
-  report notes, and can be revoked by clearing the token. A shared link does not
-  create a user session or grant access to any other Trip.
+  static assets, and tokenized `/share/trips/[token]` entry points. Each trip has
+  independent view and edit links. A view link requires no session; an edit link
+  redirects to sign-in, records the visitor, then opens the trip editor.
+  Link revocation removes matching visits. Private report notes, sharing,
+  and deletion remain owner-only.
 - `/api/health` verifies that the app can query PostgreSQL; it does not verify
   every third-party map, food, weather, or calendar dependency.
 

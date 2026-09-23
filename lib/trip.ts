@@ -224,13 +224,15 @@ export type TripSummary = {
   track: [number, number][] | null;
 };
 
-export async function getTripsSummary(userId: number): Promise<TripSummary[]> {
+export async function getTripsSummary(userId: number, sharedIds?: number[]): Promise<TripSummary[]> {
+  if (sharedIds && !sharedIds.length) return [];
+  const filter = sharedIds ? inArray(schema.trip.id, sharedIds) : eq(schema.trip.userId, userId);
   const rows = await db
     .select()
     .from(schema.trip)
     .leftJoin(schema.trail, eq(schema.trip.trailId, schema.trail.id))
     .leftJoin(schema.tripGpx, eq(schema.tripGpx.tripId, schema.trip.id))
-    .where(eq(schema.trip.userId, userId))
+    .where(filter)
     .orderBy(asc(schema.trip.startDate));
   const gear = await db
     .select({
@@ -241,7 +243,7 @@ export async function getTripsSummary(userId: number): Promise<TripSummary[]> {
     })
     .from(schema.tripGear)
     .innerJoin(schema.trip, eq(schema.tripGear.tripId, schema.trip.id))
-    .where(eq(schema.trip.userId, userId));
+    .where(filter);
 
   const agg = new Map<number, { base: number; worn: number }>();
   for (const g of gear) {

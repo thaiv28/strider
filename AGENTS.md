@@ -24,8 +24,9 @@ Platform-wide AWS provisioning and domain/IAM controls belong to the private
 
 - The app is multi-user. `getCurrentUserId()` resolves the Auth.js session, and
   every private read or mutation must enforce ownership for all supplied ids.
-- `/share/trips/[token]` is the deliberate exception: a revocable bearer token
-  grants read-only access to one Trip and never exposes private Trip Report notes.
+- `/share/trips/[token]` is the deliberate public entry point: a revocable view
+  token grants read-only access without sign-in; an edit token requires sign-in
+  and records a trip-specific grant. Neither exposes private Trip Report notes.
 - Grams and integer cents are canonical storage units. Convert only at UI edges.
 - Never import server-only database modules as runtime values in client code.
 - All writes use server actions and revalidate every affected route. Use a

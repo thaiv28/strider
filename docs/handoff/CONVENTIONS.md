@@ -41,7 +41,9 @@ changes correct.
 ## Domain rules
 - **Private workspace**: `getCurrentUserId()` returns the database user id from
   the Auth.js session. Directly user-owned rows and nested child ids must be
-  validated through `lib/authorization.ts` before reads or mutations.
+  validated through `lib/authorization.ts` before reads or mutations. Trip
+  edits accept only the owner or a signed-in visitor with an active edit grant;
+  sharing, deletion, and private Trip Report notes remain owner-only.
 - Uncategorized gear (`category_id IS NULL`) is surfaced as a synthetic **"Other"**
   group with id `-1`; `moveGear` maps `-1` back to a `null` category.
 - `trip_gear`/`trip_meal` snapshot name+weight at plan time so a completed trip's

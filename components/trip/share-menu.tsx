@@ -3,21 +3,25 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Check, ExternalLink, FileText, Link2, Printer, Share2, Unlink } from "lucide-react";
 import { Button } from "@/components/ui";
-import { createTripShareLink, revokeTripShareLink } from "@/app/trips/actions";
+import { createTripShareLink, revokeTripShareLink, createTripEditLink, revokeTripEditLink } from "@/app/trips/actions";
 
 export function ShareMenu({
   tripId,
   initialToken,
+  initialEditToken,
   onGenerateReport,
 }: {
   tripId: number;
   initialToken: string | null;
+  initialEditToken: string | null;
   onGenerateReport: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState(initialToken);
+  const [editToken, setEditToken] = useState(initialEditToken);
   const [copied, setCopied] = useState(false);
   const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const [confirmEditRevoke, setConfirmEditRevoke] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const root = useRef<HTMLDivElement>(null);
@@ -64,6 +68,29 @@ export function ShareMenu({
     });
   };
 
+  const copyEditLink = () => start(async () => {
+    try {
+      const next = editToken ?? await createTripEditLink(tripId);
+      setEditToken(next);
+      await navigator.clipboard.writeText(`${window.location.origin}/share/trips/${next}`);
+      setMessage("Edit link copied. Anyone signed in with this link can edit the trip.");
+    } catch {
+      setMessage("The edit link is active. Open it below and copy the address.");
+    }
+  });
+
+  const revokeEdit = () => {
+    if (!confirmEditRevoke) { setConfirmEditRevoke(true); setMessage("Select revoke again to confirm."); return; }
+    start(async () => {
+      try {
+        await revokeTripEditLink(tripId);
+        setEditToken(null);
+        setConfirmEditRevoke(false);
+        setMessage("Edit access revoked.");
+      } catch { setMessage("Could not revoke the edit link. Try again."); }
+    });
+  };
+
   return (
     <div ref={root} className="relative">
       <Button variant="outline" onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open}>
@@ -93,6 +120,16 @@ export function ShareMenu({
               </button>
             </>
           )}
+          <div className="mt-1 border-t pt-1">
+            <button type="button" role="menuitem" onClick={copyEditLink} disabled={pending} className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-panel2 disabled:opacity-50">
+              <Link2 size={16} className="text-muted" />
+              <span><span className="block font-medium">{editToken ? "Copy edit link" : "Create edit link"}</span><span className="block text-xs text-muted">Sign-in required · private notes excluded</span></span>
+            </button>
+            {editToken && <>
+              <a href={`/share/trips/${editToken}`} target="_blank" rel="noreferrer" role="menuitem" className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm text-muted hover:bg-panel2 hover:text-ink"><ExternalLink size={16} /> Open edit link</a>
+              <button type="button" role="menuitem" onClick={revokeEdit} disabled={pending} className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-muted hover:bg-panel2 hover:text-ink disabled:opacity-50"><Unlink size={16} /> {confirmEditRevoke ? "Confirm revoke edit link" : "Revoke edit link"}</button>
+            </>}
+          </div>
           {message && <div role="status" className="border-t px-3 py-2 text-xs leading-relaxed text-muted">{message}</div>}
         </div>
       )}

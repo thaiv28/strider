@@ -18,6 +18,24 @@ export async function requireOwnedTrip(tripId: number, userId?: number) {
   return userId;
 }
 
+export async function tripAccess(tripId: number, userId: number) {
+  const [row] = await db.select({ ownerId: schema.trip.userId, editToken: schema.trip.editToken })
+    .from(schema.trip).where(eq(schema.trip.id, tripId));
+  if (!row) return null;
+  if (row.ownerId === userId) return { ownerId: row.ownerId, isOwner: true };
+  if (!row.editToken) return null;
+  const [visit] = await db.select({ tripId: schema.tripShareVisit.tripId })
+    .from(schema.tripShareVisit)
+    .where(and(eq(schema.tripShareVisit.tripId, tripId), eq(schema.tripShareVisit.userId, userId), eq(schema.tripShareVisit.permission, "edit")));
+  return visit ? { ownerId: row.ownerId, isOwner: false } : null;
+}
+
+export async function requireTripEditor(tripId: number, userId?: number) {
+  userId ??= await getCurrentUserId();
+  if (!await tripAccess(tripId, userId)) notFound("Trip");
+  return userId;
+}
+
 export async function requireOwnedGearItem(itemId: number, userId?: number) {
   userId ??= await getCurrentUserId();
   const [row] = await db
@@ -99,7 +117,7 @@ export async function requireOwnedTripChild(
   userId?: number,
 ) {
   userId ??= await getCurrentUserId();
-  await requireOwnedTrip(tripId, userId);
+  await requireTripEditor(tripId, userId);
   const row = kind === "gear"
     ? (await db.select({ id: schema.tripGear.id }).from(schema.tripGear).where(and(eq(schema.tripGear.id, childId), eq(schema.tripGear.tripId, tripId))))[0]
     : kind === "day"
