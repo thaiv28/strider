@@ -196,6 +196,8 @@ export function GearFrame({
             onRename={(id, name) => start(async () => await renameLoadout(id, name))}
             onDelete={(id) => start(async () => await deleteLoadout(id))}
             onSetDefault={(id) => start(async () => await setDefaultLoadout(id))}
+            onReorder={(ids) => start(async () => await reorderLoadouts(ids))}
+            pending={pending}
           />
 
           <div className="mt-4">
@@ -290,7 +292,7 @@ function LoadoutBar({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   const move = (from: number, to: number) => {
-    if (pending || from === to || to < 0 || to >= ordered.length) return;
+    if (pending || from < 0 || from === to || to < 0 || to >= ordered.length) return;
     const next = arrayMove(ordered, from, to);
     setOrdered(next);
     onReorder(next.map((l) => l.id));
