@@ -255,9 +255,9 @@ export function TripView(props: {
         </div>
         {tab === "logistics" && (
           <div className="space-y-6">
-            <Card id="overview" className="scroll-mt-24 grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
+            <Card id="overview" className="scroll-mt-24 grid min-w-0 grid-cols-1 gap-4 overflow-hidden p-4 sm:grid-cols-2">
               <Field label="Start date">
-                <Input type="date" defaultValue={trip.startDate ?? ""} onBlur={(e) => save({ startDate: e.target.value || null })} />
+                <Input type="date" defaultValue={trip.startDate ?? ""} className="block min-w-0 w-full max-w-full px-2 text-base sm:px-3 sm:text-sm" onBlur={(e) => save({ startDate: e.target.value || null })} />
               </Field>
               <Field label="Nights">
                 <div className="rounded-[calc(var(--radius)*0.6)] border bg-panel2/40 px-3 py-1.5 text-sm text-muted">

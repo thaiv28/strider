@@ -85,6 +85,13 @@
       "when": 1790112700000,
       "tag": "0011_reconcile_current_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790137414557,
+      "tag": "0012_loadout_order",
+      "breakpoints": true
     }
   ]
 }

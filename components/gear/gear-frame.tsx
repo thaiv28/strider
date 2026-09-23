@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { DndContext, MouseSensor, TouchSensor, KeyboardSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, useSortable, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Input, Select, Button } from "@/components/ui";
 import { BaseBar } from "./base-bar";
 import { GearList } from "./gear-list";
@@ -13,6 +16,7 @@ import {
   moveGear,
   createLoadout,
   renameLoadout,
+  reorderLoadouts,
   deleteLoadout,
   setDefaultLoadout,
   setLoadoutMember,
@@ -264,13 +268,7 @@ export function GearFrame({
 }
 
 function LoadoutBar({
-  loadouts,
-  selected,
-  onSelect,
-  onCreate,
-  onRename,
-  onDelete,
-  onSetDefault,
+  loadouts, selected, onSelect, onCreate, onRename, onDelete, onSetDefault, onReorder, pending,
 }: {
   loadouts: LoadoutLite[];
   selected: Sel;
@@ -279,57 +277,97 @@ function LoadoutBar({
   onRename: (id: number, name: string) => void;
   onDelete: (id: number) => void;
   onSetDefault: (id: number) => void;
+  onReorder: (ids: number[]) => void;
+  pending: boolean;
 }) {
+  const [open, setOpen] = useState(false);
+  const [ordered, setOrdered] = useState(loadouts);
+  const loadoutSignature = JSON.stringify(loadouts);
+  useEffect(() => setOrdered(loadouts), [loadoutSignature]);
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const move = (from: number, to: number) => {
+    if (pending || from === to || to < 0 || to >= ordered.length) return;
+    const next = arrayMove(ordered, from, to);
+    setOrdered(next);
+    onReorder(next.map((l) => l.id));
+  };
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) return;
+    move(ordered.findIndex((l) => l.id === active.id), ordered.findIndex((l) => l.id === over.id));
+  };
   const chip = (active: boolean) =>
-    `rounded-full border px-3 py-1 text-sm transition ${
-      active ? "border-accent bg-accent text-accentink" : "text-muted hover:text-ink"
-    }`;
-  const cur = selected !== "all" ? loadouts.find((l) => l.id === selected) : null;
+    `rounded-full border px-3 py-1 text-sm transition ${active ? "border-accent bg-accent text-accentink" : "text-muted hover:text-ink"}`;
   return (
-    <div className="mt-6 flex flex-wrap items-center gap-2">
-      <span className="eyebrow mr-1">Loadout</span>
-      <button onClick={() => onSelect("all")} className={chip(selected === "all")}>
-        All gear
-      </button>
-      {[...loadouts].reverse().map((l) => (
-        <button key={l.id} onClick={() => onSelect(l.id)} className={chip(selected === l.id)}>
-          {l.isDefault && "★ "}
-          {l.name}
-        </button>
-      ))}
-      <button
-        onClick={() => {
-          const n = prompt("New loadout name:");
-          if (n) onCreate(n);
-        }}
-        className="rounded-full px-2 py-1 text-sm text-muted hover:text-ink"
-      >
-        + New
-      </button>
-      {cur && (
-        <span className="ml-2 flex items-center gap-2 text-xs text-muted">
-          {!cur.isDefault && (
-            <button onClick={() => onSetDefault(cur.id)} className="hover:text-accent">
-              set default
-            </button>
-          )}
-          <button
-            onClick={() => {
-              const n = prompt("Rename loadout:", cur.name);
-              if (n) onRename(cur.id, n);
-            }}
-            className="hover:text-accent"
-          >
-            rename
+    <>
+      <div className="mt-6 flex flex-wrap items-center gap-2">
+        <span className="eyebrow mr-1">Loadout</span>
+        <button onClick={() => onSelect("all")} className={chip(selected === "all")}>All gear</button>
+        {loadouts.map((l) => (
+          <button key={l.id} onClick={() => onSelect(l.id)} className={chip(selected === l.id)}>
+            {l.isDefault && "★ "}{l.name}
           </button>
-          <button
-            onClick={() => confirm(`Delete loadout “${cur.name}”?`) && onDelete(cur.id)}
-            className="hover:text-accent"
-          >
-            delete
-          </button>
-        </span>
+        ))}
+        <Button variant="outline" onClick={() => setOpen(true)} aria-label="Manage loadouts">Manage loadouts</Button>
+      </div>
+      {open && (
+        <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm" onClick={() => setOpen(false)}>
+          <div role="dialog" aria-modal="true" aria-labelledby="loadout-manager-title" className="card flex max-h-[85vh] w-full max-w-md flex-col p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between gap-3">
+              <h2 id="loadout-manager-title" className="font-display text-lg font-bold">Manage loadouts</h2>
+              <button onClick={() => setOpen(false)} className="min-h-11 min-w-11 text-muted" aria-label="Close loadout manager">✕</button>
+            </div>
+            <p className="mb-3 text-sm text-muted">Drag a handle to reorder, or use the move buttons.</p>
+            <div className="min-h-0 overflow-y-auto">
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+                <SortableContext items={ordered.map((l) => l.id)} strategy={verticalListSortingStrategy}>
+                  <div className="space-y-2">
+                    {ordered.map((l, index) => (
+                      <SortableLoadout key={l.id} loadout={l} index={index} count={ordered.length} pending={pending}
+                        onMove={move} onRename={onRename} onDelete={onDelete} onSetDefault={onSetDefault} />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+              {ordered.length === 0 && <p className="py-4 text-sm text-muted">No loadouts yet.</p>}
+            </div>
+            <div className="mt-4 flex justify-between gap-2 border-t pt-4">
+              <Button disabled={pending} onClick={() => { const name = prompt("New loadout name:"); if (name?.trim()) onCreate(name); }}>+ Add loadout</Button>
+              <Button variant="outline" onClick={() => setOpen(false)}>Done</Button>
+            </div>
+          </div>
+        </div>
       )}
+    </>
+  );
+}
+
+function SortableLoadout({ loadout, index, count, pending, onMove, onRename, onDelete, onSetDefault }: {
+  loadout: LoadoutLite; index: number; count: number; pending: boolean;
+  onMove: (from: number, to: number) => void;
+  onRename: (id: number, name: string) => void;
+  onDelete: (id: number) => void;
+  onSetDefault: (id: number) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: loadout.id, disabled: pending });
+  return (
+    <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={`rounded-lg border bg-panel2 p-2 ${isDragging ? "relative z-10 shadow-lg" : ""}`}>
+      <div className="flex items-center gap-2">
+        <button type="button" {...attributes} {...listeners} disabled={pending}
+          aria-label={`Drag to reorder ${loadout.name}`} className="min-h-11 min-w-11 touch-none rounded border text-muted">☰</button>
+        <span className="min-w-0 flex-1 truncate text-sm font-medium">{loadout.isDefault && "★ "}{loadout.name}</span>
+        <button disabled={pending || index === 0} onClick={() => onMove(index, index - 1)} aria-label={`Move ${loadout.name} up`} className="min-h-11 min-w-9 disabled:opacity-30">↑</button>
+        <button disabled={pending || index === count - 1} onClick={() => onMove(index, index + 1)} aria-label={`Move ${loadout.name} down`} className="min-h-11 min-w-9 disabled:opacity-30">↓</button>
+      </div>
+      <div className="flex flex-wrap items-center gap-3 pl-12 text-xs">
+        {!loadout.isDefault && <button disabled={pending} onClick={() => onSetDefault(loadout.id)} className="py-2 text-accent">Set default</button>}
+        <button disabled={pending} onClick={() => { const name = prompt("Rename loadout:", loadout.name); if (name?.trim()) onRename(loadout.id, name); }} className="py-2 text-accent">Rename</button>
+        <button disabled={pending} onClick={() => { if (confirm(`Delete loadout “${loadout.name}”?`)) onDelete(loadout.id); }} className="py-2 text-accent">Delete</button>
+      </div>
     </div>
   );
 }

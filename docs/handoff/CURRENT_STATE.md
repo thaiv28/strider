@@ -19,8 +19,8 @@ developer's local GitHub CLI session—is the durable publication path.
 
 ## Working capabilities
 
-- Gear inventory, category ordering, kits, loadouts with bulk selection, wishlist
-  replacements, and projected loadout weight.
+- Gear inventory, category ordering, kits, loadouts with bulk selection and
+  persistent user-defined order, wishlist replacements, and projected loadout weight.
 - Meal/ingredient management, nutrition lookup, trip food planning, and calorie
   estimates.
 - Trip creation/import, daily distance/elevation, gear/food snapshots,

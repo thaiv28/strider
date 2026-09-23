@@ -49,17 +49,22 @@ export function BaseBar({ baseG, byCategory }: { baseG: number; byCategory: CatS
 
       {view === "bar" ? (
         <>
-          <div className="mt-4 flex h-3 overflow-hidden rounded-full border">
+          <div className="relative mt-4 flex h-11 overflow-hidden rounded-full" role="group" aria-label="Base weight by category">
             {slices.map((s) => (
-              <div
+              <button
+                type="button"
                 key={s.name}
+                aria-label={`${s.name}: ${fmtWeight(s.g)}. Show items`}
                 onMouseEnter={() => setHover(s.name)}
                 onMouseLeave={() => setHover(null)}
+                onFocus={() => setHover(s.name)}
+                onBlur={() => setHover(null)}
                 onClick={() => setSelected(s.name)}
-                style={{ width: `${(s.g / baseG) * 100}%`, background: categoryColor(s.name) }}
-                className={`cursor-pointer transition-opacity ${hover && hover !== s.name ? "opacity-30" : "opacity-100"}`}
-                title={`${s.name}: ${fmtWeight(s.g)} — click for items`}
-              />
+                style={{ width: `${(s.g / baseG) * 100}%` }}
+                className={`relative h-full min-w-0 touch-manipulation transition-opacity focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-accent ${hover && hover !== s.name ? "opacity-30" : "opacity-100"}`}
+              >
+                <span className="absolute inset-x-0 top-4 h-3" style={{ background: categoryColor(s.name) }} />
+              </button>
             ))}
           </div>
           <Legend slices={slices} baseG={baseG} cols="sm:grid-cols-2" hover={hover} setHover={setHover} onSelect={setSelected} />
@@ -193,12 +198,15 @@ function Legend({
   return (
     <div className={`mt-3 grid ${cols} gap-x-6 gap-y-1.5`}>
       {slices.map((s) => (
-        <div
+        <button
+          type="button"
           key={s.name}
           onMouseEnter={() => setHover(s.name)}
           onMouseLeave={() => setHover(null)}
+          onFocus={() => setHover(s.name)}
+          onBlur={() => setHover(null)}
           onClick={() => onSelect(s.name)}
-          className={`flex cursor-pointer items-center gap-2 text-sm transition-opacity ${
+          className={`flex min-h-11 w-full touch-manipulation items-center text-left gap-2 text-sm transition-opacity ${
             hover && hover !== s.name ? "opacity-40" : "opacity-100"
           }`}
         >
@@ -207,7 +215,7 @@ function Legend({
           <span className="readout ml-auto text-muted">
             {gToOz(s.g).toFixed(1)} oz{pct && ` · ${((s.g / baseG) * 100).toFixed(0)}%`}
           </span>
-        </div>
+        </button>
       ))}
     </div>
   );
