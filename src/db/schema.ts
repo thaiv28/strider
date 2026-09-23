@@ -156,6 +156,7 @@ export const loadout = pgTable("loadout", {
     .references(() => users.id),
   name: text("name").notNull(),
   isDefault: boolean("is_default").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
   notes: text("notes"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });

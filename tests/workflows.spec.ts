@@ -128,11 +128,17 @@ test("view and edit links grant distinct, revocable access", async ({ browser })
     await expect(guestPage).toHaveURL(/\/login\?callbackUrl=/);
     await guestPage.goto(viewLink!);
     await expect(guestPage.getByTestId("shared-trip")).toBeVisible();
+    await expect(guestPage.getByRole("link", { name: "STRIDER" })).toHaveCount(0);
 
     await authenticate(visitorPage, "e2e-collaborator@strider.invalid");
     await visitorPage.goto(viewLink!);
-    await visitorPage.goto("/trips");
-    await visitorPage.getByRole("tab", { name: /Shared with me/ }).click();
+    await expect(visitorPage.getByRole("link", { name: "STRIDER" })).toBeVisible();
+    await visitorPage.getByRole("link", { name: "Gear", exact: true }).click();
+    await expect(visitorPage).toHaveURL(/\/gear$/);
+    await visitorPage.goto(viewLink!);
+    await visitorPage.getByRole("link", { name: "Trips", exact: true }).click();
+    await expect(visitorPage).toHaveURL(/\/trips\?section=shared$/);
+    await expect(visitorPage.getByRole("tab", { name: /Shared with me/ })).toHaveAttribute("aria-selected", "true");
     await expect(visitorPage.getByRole("link", { name: /View only/ })).toContainText(name);
     expect((await visitorPage.getByRole("link", { name: /View only/ }).getAttribute("href"))).toBe(viewLink);
     expect((await visitorPage.goto(tripUrl!))?.status()).toBe(404);
@@ -268,8 +274,16 @@ test("a trip can be planned, shared, exported, and deleted", async ({ browser, c
       const profile = phonePage.getByTestId("elevation-profile");
       await expect(profile).toBeVisible();
       await profile.tap({ position: { x: 90, y: 100 } });
-      await expect(profile.getByRole("button", { name: "1" })).toHaveCount(1);
-      await expect(profile.getByRole("button", { name: "2" })).toHaveCount(0);
+      const campsite = profile.getByRole("button", { name: "Night 1 campsite" });
+      await expect(campsite).toHaveCount(1);
+      await campsite.tap();
+      await expect(phonePage.getByRole("button", { name: "Remove campsite" })).toBeVisible();
+      await expect(profile.getByRole("button", { name: "Night 2 campsite" })).toHaveCount(0);
+      await phonePage.getByRole("button", { name: "Remove campsite" }).click();
+      await expect(campsite).toHaveCount(0);
+      await phonePage.reload();
+      await phonePage.getByRole("button", { name: "Logistics", exact: true }).click();
+      await expect(phonePage.getByTestId("elevation-profile").getByRole("button", { name: "Night 1 campsite" })).toHaveCount(0);
     } finally {
       await phone.close();
     }

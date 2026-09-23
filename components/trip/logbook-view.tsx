@@ -13,8 +13,8 @@ const tone = (s: string) => (s === "completed" ? "current" : s === "planned" ? "
 const elev = (ft: number | null) => (ft == null || ft === 0 ? "—" : `${(ft / 1000).toFixed(1)}k ft`);
 const wt = (g: number) => (g === 0 ? "—" : fmtLbs(g));
 
-export function LogbookView({ trips, shared }: { trips: TripSummary[]; shared: (TripSummary & { permission: "view" | "edit"; href: string })[] }) {
-  const [section, setSection] = useState<"mine" | "shared">("mine");
+export function LogbookView({ trips, shared, initialSection }: { trips: TripSummary[]; shared: (TripSummary & { permission: "view" | "edit"; href: string })[]; initialSection: "mine" | "shared" }) {
+  const [section, setSection] = useState<"mine" | "shared">(initialSection);
   const [mode, setMode] = useState<Mode>("list");
   useEffect(() => {
     const saved = localStorage.getItem("bp_logbookMode");

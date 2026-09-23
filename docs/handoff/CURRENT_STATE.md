@@ -19,8 +19,8 @@ developer's local GitHub CLI session—is the durable publication path.
 
 ## Working capabilities
 
-- Gear inventory, category ordering, kits, loadouts with bulk selection, wishlist
-  replacements, and projected loadout weight.
+- Gear inventory, category ordering, kits, loadouts with bulk selection and
+  persistent user-defined order, wishlist replacements, and projected loadout weight.
 - Meal/ingredient management, nutrition lookup, trip food planning, and calorie
   estimates.
 - Trip creation/import, daily distance/elevation, gear/food snapshots,
@@ -28,6 +28,8 @@ developer's local GitHub CLI session—is the durable publication path.
 - Consolidated trip sharing menu for printing, reports, and separate persistent
   view-only and edit links. View links work without sign-in; edit links require
   sign-in. Opening either link while signed in adds the Trip to Shared with me.
+  Signed-in viewers retain Strider's navigation on the view-only page, with
+  Trips returning to Shared with me; guests see the standalone view.
   The owner can revoke either link independently. Private Trip Report notes,
   link controls, and deletion remain owner-only.
 - Public link previews use Strider artwork, and live shared-trip links include

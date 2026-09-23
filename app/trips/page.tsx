@@ -9,8 +9,9 @@ import { eq } from "drizzle-orm";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Trips" };
 
-export default async function TripsPage() {
+export default async function TripsPage({ searchParams }: { searchParams: Promise<{ section?: string }> }) {
   const userId = await getCurrentUserId();
+  const { section } = await searchParams;
   const [trips, visits] = await Promise.all([
     getTripsSummary(userId),
     db.select({ tripId: schema.tripShareVisit.tripId, permission: schema.tripShareVisit.permission,
@@ -42,7 +43,7 @@ export default async function TripsPage() {
       </div>
 
       <div className="mt-6">
-        <LogbookView trips={trips} shared={shared} />
+        <LogbookView trips={trips} shared={shared} initialSection={section === "shared" ? "shared" : "mine"} />
       </div>
     </div>
   );
