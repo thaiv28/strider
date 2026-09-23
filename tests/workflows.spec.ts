@@ -191,8 +191,16 @@ test("a trip can be planned, shared, exported, and deleted", async ({ browser, c
       const profile = phonePage.getByTestId("elevation-profile");
       await expect(profile).toBeVisible();
       await profile.tap({ position: { x: 90, y: 100 } });
-      await expect(profile.getByRole("button", { name: "1" })).toHaveCount(1);
-      await expect(profile.getByRole("button", { name: "2" })).toHaveCount(0);
+      const campsite = profile.getByRole("button", { name: "Night 1 campsite" });
+      await expect(campsite).toHaveCount(1);
+      await campsite.tap();
+      await expect(phonePage.getByRole("button", { name: "Remove campsite" })).toBeVisible();
+      await expect(profile.getByRole("button", { name: "Night 2 campsite" })).toHaveCount(0);
+      await phonePage.getByRole("button", { name: "Remove campsite" }).click();
+      await expect(campsite).toHaveCount(0);
+      await phonePage.reload();
+      await phonePage.getByRole("button", { name: "Logistics", exact: true }).click();
+      await expect(phonePage.getByTestId("elevation-profile").getByRole("button", { name: "Night 1 campsite" })).toHaveCount(0);
     } finally {
       await phone.close();
     }

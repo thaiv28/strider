@@ -34,6 +34,7 @@ export function RoutePanel({
   const [local, setLocal] = useState<Campsite[]>(campsites);
   const [hover, setHover] = useState<RoutePoint | null>(null);
   const [drag, setDrag] = useState<{ id: number; prev: Campsite } | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const suppressClick = useRef(false);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
@@ -59,6 +60,7 @@ export function RoutePanel({
 
   // Sort by distance so night numbers stay in trail order (updates live on drag).
   const shown = [...local].sort((a, b) => a.distanceMi - b.distanceMi).map((c, i) => ({ ...c, night: i + 1 }));
+  const selectedSite = shown.find((c) => c.id === selectedId);
 
   const onMove = (e: React.PointerEvent) => {
     const p = nearest(fracFromEvent(e) * maxD);
@@ -66,9 +68,17 @@ export function RoutePanel({
     if (drag) setLocal((cs) => cs.map((c) => (c.id === drag.id ? { ...c, distanceMi: p.d, lat: p.lat, lon: p.lon, eleFt: p.e } : c)));
   };
   const addAt = (p: RoutePoint) => {
+    setSelectedId(null);
     start(async () => {
       const id = await addCampsite(tripId, { distanceMi: p.d, lat: p.lat, lon: p.lon, eleFt: p.e });
       pushUndo("Added campsite", () => removeCampsite(id, tripId));
+    });
+  };
+  const removeSite = (site: Campsite) => {
+    setSelectedId(null);
+    start(async () => await removeCampsite(site.id, tripId));
+    pushUndo("Removed campsite", async () => {
+      await addCampsite(tripId, { distanceMi: site.distanceMi, lat: site.lat, lon: site.lon, eleFt: site.eleFt });
     });
   };
   const onUp = (e: React.PointerEvent) => {
@@ -85,9 +95,10 @@ export function RoutePanel({
     }
     const p = nearest(fracFromEvent(e) * maxD);
     const { id, prev } = drag;
-    suppressClick.current = true;
     setDrag(null);
     touchStart.current = null;
+    if (p.d === prev.distanceMi) return;
+    suppressClick.current = true;
     start(async () => await moveCampsite(id, tripId, { distanceMi: p.d, lat: p.lat, lon: p.lon, eleFt: p.e }));
     pushUndo("Moved campsite", () =>
       moveCampsite(id, tripId, { distanceMi: prev.distanceMi, lat: prev.lat, lon: prev.lon, eleFt: prev.eleFt }),
@@ -114,7 +125,7 @@ export function RoutePanel({
 
       <div className="space-y-3 px-4 pt-3 pb-4">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-muted">Tap or click the profile to drop a campsite · drag to move · right-click to remove</span>
+        <span className="text-xs text-muted">Tap or click the profile to drop a campsite · tap a marker to remove · drag to move</span>
         {shown.length > 0 && (
           <button
             onClick={() => confirm("Clear all campsites?") && start(async () => await clearCampsites(tripId))}
@@ -168,18 +179,32 @@ export function RoutePanel({
                 onPointerDown={(e) => {
                   if (e.button !== 0) return;
                   e.stopPropagation();
+                  if (e.pointerType === "touch") {
+                    setSelectedId(c.id);
+                    return;
+                  }
                   setDrag({ id: c.id, prev: c });
                   setHover({ d: c.distanceMi, lat: c.lat ?? 0, lon: c.lon ?? 0, e: c.eleFt ?? 0 });
+                }}
+                onPointerUp={(e) => {
+                  if (e.pointerType === "touch") e.stopPropagation();
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  touchClick.current = null;
+                  if (suppressClick.current) {
+                    suppressClick.current = false;
+                    return;
+                  }
+                  setSelectedId(c.id);
                 }}
                 onContextMenu={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  const site = c;
-                  start(async () => await removeCampsite(site.id, tripId));
-                  pushUndo("Removed campsite", async () => {
-                    await addCampsite(tripId, { distanceMi: site.distanceMi, lat: site.lat, lon: site.lon, eleFt: site.eleFt });
-                  });
+                  removeSite(c);
                 }}
+                aria-label={`Night ${c.night} campsite`}
+                aria-pressed={selectedId === c.id}
                 className="absolute flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 cursor-grab items-center justify-center rounded-full border-2 border-ink bg-accent text-xs font-bold text-accentink active:cursor-grabbing"
                 style={{ left: `${leftPct(c.distanceMi)}%`, top: `${topPct(c.eleFt ?? minE)}%` }}
               >
@@ -191,6 +216,14 @@ export function RoutePanel({
             <span>0 mi</span>
             <span>{maxD.toFixed(1)} mi</span>
           </div>
+          {selectedSite && (
+            <div className="mt-3 flex items-center justify-between gap-3 rounded border border-ink/15 bg-panel2 px-3 py-2 text-sm">
+              <span>Night {selectedSite.night} campsite · {selectedSite.distanceMi.toFixed(1)} mi</span>
+              <button type="button" className="shrink-0 font-semibold text-accent hover:underline" onClick={() => removeSite(selectedSite)}>
+                Remove campsite
+              </button>
+            </div>
+          )}
         </div>
       </div>
       </div>

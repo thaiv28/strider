@@ -74,10 +74,12 @@ test("a trip detail page fits the phone viewport", async ({ page }) => {
   const dateInput = page.locator('input[type="date"]').first();
   if (await dateInput.count()) {
     const dateWidths = await dateInput.evaluate((element) => ({
-      clientWidth: element.clientWidth,
-      parentWidth: element.parentElement?.clientWidth ?? 0,
+      right: element.getBoundingClientRect().right,
+      parentRight: element.parentElement?.getBoundingClientRect().right ?? 0,
+      viewport: document.documentElement.clientWidth,
     }));
-    expect(dateWidths.clientWidth).toBeLessThanOrEqual(dateWidths.parentWidth + 1);
+    expect(dateWidths.right).toBeLessThanOrEqual(dateWidths.parentRight + 1);
+    expect(dateWidths.right).toBeLessThanOrEqual(dateWidths.viewport + 1);
   }
   await page.waitForTimeout(1_500);
   await expectNoHorizontalOverflow(page);

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/src/db/index";
 import { getCurrentUserId, OTHER_CATEGORY_ID } from "@/lib/gear";
 import { ozToG } from "@/lib/util";
@@ -178,12 +178,31 @@ export async function setWishlistLoadout(
 
 export async function createLoadout(name: string): Promise<number> {
   const userId = await getCurrentUserId();
+  const [first] = await db.select({ order: sql<number>`coalesce(min(${schema.loadout.sortOrder}), 0) - 1` })
+    .from(schema.loadout).where(eq(schema.loadout.userId, userId));
   const [l] = await db
     .insert(schema.loadout)
-    .values({ userId, name: name.trim() || "New Loadout" })
+    .values({ userId, name: name.trim() || "New Loadout", sortOrder: first.order })
     .returning({ id: schema.loadout.id });
   revalidatePath("/gear");
   return l.id;
+}
+
+export async function reorderLoadouts(orderedIds: number[]) {
+  const userId = await getCurrentUserId();
+  const existing = await db.select({ id: schema.loadout.id }).from(schema.loadout)
+    .where(eq(schema.loadout.userId, userId));
+  const owned = existing.map((row) => row.id);
+  if (orderedIds.length !== owned.length || new Set(orderedIds).size !== owned.length ||
+      orderedIds.some((id) => !owned.includes(id))) throw new Error("Invalid loadout order");
+  await db.transaction(async (tx) => {
+    for (let index = 0; index < orderedIds.length; index++) {
+      await tx.update(schema.loadout).set({ sortOrder: index })
+        .where(and(eq(schema.loadout.id, orderedIds[index]), eq(schema.loadout.userId, userId)));
+    }
+  });
+  revalidatePath("/gear");
+  revalidatePath("/basecamp");
 }
 
 export async function renameLoadout(id: number, name: string) {

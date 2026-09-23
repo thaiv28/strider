@@ -37,7 +37,7 @@ export type Group = {
   wornG: number;
 };
 
-export type LoadoutLite = { id: number; name: string; isDefault: boolean };
+export type LoadoutLite = { id: number; name: string; isDefault: boolean; sortOrder: number };
 export type Membership = Record<number, Record<number, "base" | "worn">>;
 // wishlistItemId → loadoutId → forced included/excluded (overrides the assumption).
 export type WishlistOverrides = Record<number, Record<number, boolean>>;
@@ -46,10 +46,10 @@ export async function getLoadoutData(
   userId: number,
 ): Promise<{ loadouts: LoadoutLite[]; membership: Membership; wishlistOverrides: WishlistOverrides }> {
   const loadouts = await db
-    .select({ id: schema.loadout.id, name: schema.loadout.name, isDefault: schema.loadout.isDefault })
+    .select({ id: schema.loadout.id, name: schema.loadout.name, isDefault: schema.loadout.isDefault, sortOrder: schema.loadout.sortOrder })
     .from(schema.loadout)
     .where(eq(schema.loadout.userId, userId))
-    .orderBy(asc(schema.loadout.id));
+    .orderBy(asc(schema.loadout.sortOrder), asc(schema.loadout.id));
   const items = await db
     .select({
       loadoutId: schema.loadoutItem.loadoutId,
@@ -77,7 +77,6 @@ export async function getLoadoutData(
   for (const o of overrides) {
     (wishlistOverrides[o.wishlistItemId] ??= {})[o.loadoutId] = o.included;
   }
-  loadouts.sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.id - b.id);
   return { loadouts, membership, wishlistOverrides };
 }
 
