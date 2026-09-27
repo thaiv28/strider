@@ -1,12 +1,14 @@
-# backpack-app
+# Strider
 
 Backpacking trip planner + gear/weight tracker. Stores gear, meals, trips,
 routes, and per-trip weight/calorie rollups in a private workspace for each
 verified Google account.
 
-The hosted app is published at `https://backpack.thaiv.dev` through
+The hosted app is published at `https://strider.thaiv.dev` through
 the `main` branch deployment workflow. See `docs/adr/` for the initial hosting
 and data-protection decisions.
+
+`https://backpack.thaiv.dev` remains an alias during the hostname transition.
 
 Agents and new contributors should start with `AGENTS.md`, then read the current
 handoff in `docs/handoff/CURRENT_STATE.md`. Architecture, conventions, and the
@@ -62,7 +64,7 @@ npm run test:workflow  # authenticated trip create/edit/upload/print/delete flow
 
 Pull requests run these checks against an isolated Postgres service, including
 cross-account isolation. Deployments repeat both browser suites against
-`backpack.thaiv.dev`; workflow-created records use isolated test identities,
+`strider.thaiv.dev`; workflow-created records use isolated test identities,
 unique names, and test cleanup.
 
 ## Layout

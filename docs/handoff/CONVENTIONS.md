@@ -1,4 +1,4 @@
-# backpack-app — Conventions and gotchas
+# Strider — Conventions and gotchas
 
 Read alongside `ARCHITECTURE.md`. These are the non-obvious rules that keep
 changes correct.
@@ -68,7 +68,7 @@ come from `categoryColor()` in `lib/categories.ts`.
   the environment contract in `playwright.config.ts` and the GitHub workflows;
   never put a real production secret into source or shell history.
 - Pull requests must pass isolated CI. A push to `main` publishes to production
-  and then runs both browser suites against `https://backpack.thaiv.dev`.
+  and then runs both browser suites against `https://strider.thaiv.dev`.
 - `.env` is gitignored (holds secrets); never commit it. Do not commit unless
   explicitly asked.
 - Don't cache weather tiles persistently (staleness); only static base tiles are

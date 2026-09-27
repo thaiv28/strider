@@ -8,7 +8,7 @@ import { auth } from "@/auth";
 const DESCRIPTION = "Backpacking trip planner and gear tracker";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://backpack.thaiv.dev"),
+  metadataBase: new URL("https://strider.thaiv.dev"),
   title: { default: "Strider", template: "%s · Strider" },
   description: DESCRIPTION,
   applicationName: "Strider",
