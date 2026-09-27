@@ -28,7 +28,7 @@ AUTH_GOOGLE_ID=${auth_google_id}
 AUTH_GOOGLE_SECRET=${auth_google_secret}
 AUTH_OWNER_EMAIL=${auth_owner_email}
 AUTH_E2E_PASSWORD_HASH=${auth_e2e_password_hash}
-AUTH_URL=https://backpack.thaiv.dev
+AUTH_URL=https://strider.thaiv.dev
 FDC_API_KEY=${fdc_api_key}
 GEOAPIFY_API_KEY=${geoapify_api_key}
 EOF

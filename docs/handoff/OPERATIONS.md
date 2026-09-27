@@ -1,7 +1,7 @@
 # Strider operations
 
 This is the runbook for the deployed instance at
-`https://backpack.thaiv.dev`. It documents observable contracts and safe
+`https://strider.thaiv.dev`. It documents observable contracts and safe
 recovery boundaries; secret values and account-specific identifiers remain in
 GitHub/AWS configuration.
 
@@ -9,7 +9,7 @@ GitHub/AWS configuration.
 
 | Layer | Responsibility |
 | --- | --- |
-| Route 53 | Resolves `backpack.thaiv.dev` to CloudFront. |
+| Route 53 | Resolves `strider.thaiv.dev` to CloudFront. |
 | CloudFront | Terminates public HTTPS, supplies the private origin header, and caches safe edge responses. |
 | Nginx on EC2 | Rejects requests without the origin header and proxies accepted traffic to `backpack-app:3000`. |
 | Next.js container | Serves Strider, validates Auth.js sessions, enforces ownership, and runs server actions. |
@@ -85,7 +85,7 @@ Do not print values while diagnosing configuration.
 Public health check:
 
 ```bash
-curl --fail https://backpack.thaiv.dev/api/health
+curl --fail https://strider.thaiv.dev/api/health
 ```
 
 A healthy result is `{"ok":true}` and proves the Next.js process can query
@@ -103,8 +103,8 @@ npm run test:workflow
 Useful workflow inspection:
 
 ```bash
-gh run list --repo thaiv28/backpack-app --limit 5
-gh run view RUN_ID --repo thaiv28/backpack-app --log-failed
+gh run list --repo thaiv28/strider --limit 5
+gh run view RUN_ID --repo thaiv28/strider --log-failed
 ```
 
 The mobile suite runs 24 checks across three phone widths. The workflow suite

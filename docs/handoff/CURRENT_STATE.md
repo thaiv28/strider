@@ -1,12 +1,13 @@
 # Strider current state
 
-Last reviewed: 2026-09-22.
+Last reviewed: 2026-09-24.
 
 ## Deployed baseline
 
-- Repository: `thaiv28/backpack-app` (private)
-- Production: `https://backpack.thaiv.dev`
-- Health: `https://backpack.thaiv.dev/api/health`
+- Repository: `thaiv28/strider` (private)
+- Production: `https://strider.thaiv.dev`
+- Health: `https://strider.thaiv.dev/api/health`
+- Previous hostname: `https://backpack.thaiv.dev` remains an alias during migration
 - Release branch: `main`
 - Publication: automatic GitHub Actions deployment on every push to `main`
 - Runtime: ARM64 Next.js and PostgreSQL containers on one Graviton EC2 instance

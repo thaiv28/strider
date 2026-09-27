@@ -4,7 +4,7 @@ const nextConfig = {
   serverExternalPackages: ["pg"],
   experimental: {
     serverActions: {
-      allowedOrigins: ["backpack.thaiv.dev"],
+      allowedOrigins: ["backpack.thaiv.dev", "strider.thaiv.dev"],
     },
   },
 };

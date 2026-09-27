@@ -1,7 +1,7 @@
 # Strider agent guide
 
 This repository deploys the private Strider backpacking planner at
-`https://backpack.thaiv.dev`. Treat production data and infrastructure as real,
+`https://strider.thaiv.dev`. Treat production data and infrastructure as real,
 persistent user data.
 
 ## Read before changing code

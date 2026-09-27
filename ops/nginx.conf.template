@@ -11,8 +11,8 @@ http {
 
     location / {
       proxy_http_version 1.1;
-      proxy_set_header Host backpack.thaiv.dev;
-      proxy_set_header X-Forwarded-Host backpack.thaiv.dev;
+      proxy_set_header Host strider.thaiv.dev;
+      proxy_set_header X-Forwarded-Host strider.thaiv.dev;
       proxy_set_header X-Forwarded-Proto https;
       proxy_set_header X-Real-IP $remote_addr;
       proxy_set_header Upgrade $http_upgrade;

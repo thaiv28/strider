@@ -1,4 +1,4 @@
-# backpack-app — Architecture
+# Strider — Architecture
 
 Strider is a multi-user backpacking trip planner and gear/weight tracker. Auth.js
 uses verified Google identity for public, self-service sign-in and JWT sessions
