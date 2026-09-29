@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Card, Button, Badge, Input } from "@/components/ui";
+import { Card, Button, Badge, Input, PageTabs } from "@/components/ui";
 import { gToOz } from "@/lib/util";
 import { kcalPerOz } from "@/lib/food";
 import type { IngredientRow, MealRow } from "@/lib/pantry";
@@ -54,17 +54,13 @@ export function PantryView({ ingredients, meals }: { ingredients: IngredientRow[
       </div>
 
       {!openMeal && (
-        <div className="mt-4 inline-flex overflow-hidden rounded-md border">
-          {(["meals", "ingredients"] as Tab[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-4 py-1.5 text-sm capitalize transition ${tab === t ? "bg-accent text-accentink" : "hover:bg-panel2/60"}`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
+        <PageTabs
+          label="Food sections"
+          tabs={[{ value: "meals", label: "Meals" }, { value: "ingredients", label: "Ingredients" }]}
+          value={tab}
+          onChange={setTab}
+          className="mt-6"
+        />
       )}
 
       <div className="mt-4">

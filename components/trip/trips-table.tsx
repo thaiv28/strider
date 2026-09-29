@@ -15,6 +15,7 @@ const fmtDate = (d: string | null) => {
   const [y, m] = d.split("-");
   return `${Number(m)}/${y.slice(2)}`;
 };
+const STATUS_ORDER: Record<TripSummary["status"], number> = { completed: 0, planned: 1, idea: 2 };
 
 const GRID = "grid grid-cols-[minmax(0,1fr)_4rem_5.5rem_2.75rem_3rem_3.25rem_3.5rem_3.5rem] items-center gap-x-2";
 
@@ -37,7 +38,9 @@ export function TripsTable({ trips }: { trips: TripSummary[] }) {
     const av = a[sort.key];
     const bv = b[sort.key];
     let cmp: number;
-    if (typeof av === "number" || typeof bv === "number") {
+    if (sort.key === "status") {
+      cmp = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
+    } else if (typeof av === "number" || typeof bv === "number") {
       cmp = ((av as number) ?? -Infinity) - ((bv as number) ?? -Infinity);
     } else {
       cmp = String(av ?? "").localeCompare(String(bv ?? ""));
@@ -54,7 +57,7 @@ export function TripsTable({ trips }: { trips: TripSummary[] }) {
         Sort
         <select
           value={sort.key}
-          onChange={(e) => setSort({ key: e.target.value as Key, dir: e.target.value === "startDate" ? 1 : -1 })}
+          onChange={(e) => setSort({ key: e.target.value as Key, dir: e.target.value === "startDate" || e.target.value === "status" ? 1 : -1 })}
           className="min-h-11 rounded-md border bg-panel px-3"
         >
           <option value="startDate">Date</option>

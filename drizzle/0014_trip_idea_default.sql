@@ -1,0 +1,1 @@
+ALTER TABLE "trip" ALTER COLUMN "status" SET DEFAULT 'idea';

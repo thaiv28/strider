@@ -33,7 +33,8 @@ A reusable selection of Gear Items with a base-or-worn classification.
 _Avoid_: Pack, packing list
 
 **Trip**:
-A planned or completed backpacking outing with frozen gear and food snapshots.
+An idea, planned, or completed backpacking outing with gear and food snapshots
+that freeze at completion.
 _Avoid_: Hike, expedition
 
 **Trail**:

@@ -216,6 +216,17 @@ test("a trip can be planned, shared, exported, and deleted", async ({ browser, c
     ]);
     tripUrl = page.url();
 
+    await expect(page.getByLabel("Trip name")).toHaveValue(initialName);
+    await expect(page.getByRole("combobox").filter({ has: page.locator('option[value="idea"]') })).toHaveValue("idea");
+    await fillAndSave(page, "Start date", "2026-10-15");
+    await expect(page.getByLabel("Start date")).toHaveValue("2026-10-15");
+    await Promise.all([
+      page.waitForResponse((response) => response.request().method() === "POST" && response.ok()),
+      page.getByRole("button", { name: "Clear start date" }).click(),
+    ]);
+    await page.reload();
+    await expect(page.getByLabel("Start date")).toHaveValue("");
+
     await fillAndSave(page, "Trip name", updatedName);
     await fillAndSave(page, "Region", "E2E Test Range");
     await fillAndSave(page, "Area type", "Test wilderness");

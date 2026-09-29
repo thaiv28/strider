@@ -1,6 +1,6 @@
 # Strider current state
 
-Last reviewed: 2026-09-24.
+Last reviewed: 2026-09-28.
 
 ## Deployed baseline
 
@@ -24,7 +24,8 @@ developer's local GitHub CLI session—is the durable publication path.
   persistent user-defined order, wishlist replacements, and projected loadout weight.
 - Meal/ingredient management, nutrition lookup, trip food planning, and calorie
   estimates.
-- Trip creation/import, daily distance/elevation, gear/food snapshots,
+- Trips start as ideas, can advance to planned or completed, and can have their
+  dates cleared. Trip creation/import, daily distance/elevation, gear/food snapshots,
   campsites, packing lists, GPX upload, permit upload, and printable trip sheets.
 - Consolidated trip sharing menu for printing, reports, and separate persistent
   view-only and edit links. View links work without sign-in; edit links require

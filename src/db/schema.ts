@@ -200,7 +200,7 @@ export const trip = pgTable("trip", {
     .references(() => users.id),
   trailId: integer("trail_id").references(() => trail.id),
   name: text("name").notNull(),
-  status: tripStatus("status").notNull().default("planned"),
+  status: tripStatus("status").notNull().default("idea"),
   startDate: date("start_date"),
   nights: integer("nights"),
   partySize: integer("party_size").notNull().default(1),

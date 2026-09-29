@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Badge } from "@/components/ui";
+import { Badge, PageTabs } from "@/components/ui";
 import { fmtLbs } from "@/lib/util";
 import { TripsTable } from "./trips-table";
 import { RouteMapThumb } from "./route-map-thumb";
@@ -27,12 +27,13 @@ export function LogbookView({ trips, shared, initialSection }: { trips: TripSumm
 
   return (
     <div>
-      <div role="tablist" aria-label="Trip ownership" className="mb-5 inline-flex rounded-md border p-1">
-        <button type="button" role="tab" aria-selected={section === "mine"} onClick={() => setSection("mine")}
-          className={`rounded px-4 py-2 text-sm ${section === "mine" ? "bg-accent text-accentink" : "text-muted"}`}>My trips</button>
-        <button type="button" role="tab" aria-selected={section === "shared"} onClick={() => setSection("shared")}
-          className={`rounded px-4 py-2 text-sm ${section === "shared" ? "bg-accent text-accentink" : "text-muted"}`}>Shared with me ({shared.length})</button>
-      </div>
+      <PageTabs
+        label="Trip ownership"
+        tabs={[{ value: "mine", label: "My trips" }, { value: "shared", label: "Shared with me", count: shared.length }]}
+        value={section}
+        onChange={setSection}
+        className="mb-5"
+      />
       {section === "shared" ? (
         <div className="grid gap-3 sm:grid-cols-2">
           {shared.length === 0 && <p className="text-sm text-muted">Open a trip link while signed in to find it here.</p>}

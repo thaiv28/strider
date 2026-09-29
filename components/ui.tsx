@@ -92,6 +92,57 @@ export function Button({
   );
 }
 
+export function PageTabs<T extends string>({
+  label,
+  tabs,
+  value,
+  onChange,
+  className,
+}: {
+  label: string;
+  tabs: readonly { value: T; label: string; count?: number }[];
+  value: T;
+  onChange: (value: T) => void;
+  className?: string;
+}) {
+  const selectByKey = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    let next: number;
+    if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
+    else if (event.key === "ArrowLeft") next = (index - 1 + tabs.length) % tabs.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = tabs.length - 1;
+    else return;
+    event.preventDefault();
+    onChange(tabs[next].value);
+    event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("[role=tab]")[next]?.focus();
+  };
+
+  return (
+    <div role="tablist" aria-label={label} className={cn("flex gap-1 border-b border-line", className)}>
+      {tabs.map((tab, index) => (
+        <button
+          key={tab.value}
+          type="button"
+          role="tab"
+          aria-selected={value === tab.value}
+          tabIndex={value === tab.value ? 0 : -1}
+          onClick={() => onChange(tab.value)}
+          onKeyDown={(event) => selectByKey(event, index)}
+          className={cn(
+            "-mb-px min-h-11 border-b-2 px-3 py-2 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent sm:min-h-0 sm:py-2",
+            value === tab.value
+              ? "border-accent font-semibold text-ink"
+              : "border-transparent text-muted hover:border-line hover:text-ink",
+          )}
+        >
+          {tab.label}
+          {tab.count != null && <span className="ml-1.5 text-xs font-normal text-muted">({tab.count})</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
   ({ className, ...props }, ref) => (
     <input
