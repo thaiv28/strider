@@ -31,6 +31,8 @@ export default defineConfig({
     {
       name: "workflow",
       testMatch: /workflows\.spec\.ts/,
+      // Cleanup scans E2E trips, so workflow tests must not delete each other's records.
+      workers: 1,
       use: { ...devices["Desktop Chrome"] },
     },
     {

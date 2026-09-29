@@ -271,7 +271,6 @@ export function TripView(props: {
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
                     onBlur={(e) => {
-                      if (e.relatedTarget instanceof HTMLElement && e.relatedTarget.dataset.clearDate === "true") return;
                       if (e.target.value !== (trip.startDate ?? "")) saveDate(e.target.value || null);
                     }}
                     className="block min-w-0 w-full max-w-full px-2 text-base sm:px-3 sm:text-sm"
@@ -279,7 +278,6 @@ export function TripView(props: {
                   {startDate && (
                     <button
                       type="button"
-                      data-clear-date="true"
                       onClick={() => {
                         setStartDate("");
                         saveDate(null);
