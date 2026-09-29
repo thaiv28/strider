@@ -27,7 +27,8 @@ developer's local GitHub CLI session—is the durable publication path.
 - Meal/ingredient management, nutrition lookup, trip food planning, and calorie
   estimates.
 - Trips start as ideas, can advance to planned or completed, and can have their
-  dates cleared. Trip creation/import, daily distance/elevation, gear/food snapshots,
+  dates cleared. The Trips page defaults to newest dates first, with undated trips
+  last. Trip creation/import, daily distance/elevation, gear/food snapshots,
   campsites, packing lists, GPX upload, permit upload, and printable trip sheets.
 - Consolidated trip sharing menu for printing, reports, and separate persistent
   view-only and edit links. View links work without sign-in; edit links require
