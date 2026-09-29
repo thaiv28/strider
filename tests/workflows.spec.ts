@@ -159,12 +159,14 @@ test("view and edit links grant distinct, revocable access", async ({ browser })
     await ownerPage.getByRole("button", { name: "Share", exact: true }).click();
     await ownerPage.getByRole("menuitem", { name: "Revoke edit link" }).click();
     await ownerPage.getByRole("menuitem", { name: "Confirm revoke edit link" }).click();
+    await expect(ownerPage.getByRole("status")).toContainText("Edit access revoked.");
     expect((await visitorPage.goto(tripUrl!))?.status()).toBe(404);
     await visitorPage.goto("/trips");
     await visitorPage.getByRole("tab", { name: /Shared with me/ }).click();
     await expect(visitorPage.getByRole("link", { name: /View only/ })).toBeVisible();
     await ownerPage.getByRole("menuitem", { name: "Revoke view-only link" }).click();
     await ownerPage.getByRole("menuitem", { name: "Confirm revoke" }).click();
+    await expect(ownerPage.getByRole("status")).toContainText("View-only link revoked.");
     await visitorPage.reload();
     await visitorPage.getByRole("tab", { name: /Shared with me/ }).click();
     await expect(visitorPage.getByText("Open a trip link while signed in")).toBeVisible();
