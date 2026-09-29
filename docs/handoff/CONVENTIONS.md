@@ -99,7 +99,8 @@ come from `categoryColor()` in `lib/categories.ts`.
 - Runtime deployment is defined by `.github/workflows/deploy.yml`, `Dockerfile`,
   and `ops/deploy-ec2.sh`; update `docs/handoff/OPERATIONS.md` when this flow
   changes.
-- ARM64 is the runtime target. The Docker build stage runs on the native builder
-  platform; only the production runtime layer is assembled for ARM64.
+- ARM64 is the runtime target. CI checks the ARM64 image on a native ARM64
+  runner; deployment also builds on native ARM64 hardware. Keep the build and
+  runtime stages on that architecture so native dependencies match.
 - The runtime image installs production dependencies only. Do not reintroduce a
   runtime dependency on TypeScript-only configuration or development packages.

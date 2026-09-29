@@ -1,6 +1,6 @@
 # Strider current state
 
-Last reviewed: 2026-09-28.
+Last reviewed: 2026-09-29.
 
 ## Deployed baseline
 
@@ -10,6 +10,8 @@ Last reviewed: 2026-09-28.
 - Previous hostname: `https://backpack.thaiv.dev` remains an alias during migration
 - Release branch: `main`
 - Publication: automatic GitHub Actions deployment on every push to `main`
+- Image verification: pull requests build the ARM64 runtime image; deployment
+  builds it on a native ARM64 runner.
 - Runtime: ARM64 Next.js and PostgreSQL containers on one Graviton EC2 instance
 - Access: public self-service Google sign-in through Auth.js
 - Data identity: private per-user workspaces resolved from the authenticated session
