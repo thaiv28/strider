@@ -264,9 +264,11 @@ export function TripView(props: {
         {tab === "logistics" && (
           <div className="space-y-6">
             <Card id="overview" className="scroll-mt-24 grid min-w-0 grid-cols-1 gap-4 overflow-hidden p-4 sm:grid-cols-2">
-              <Field label="Start date">
+              <div className="min-w-0 max-w-full">
+                <label htmlFor="trip-start-date" className="eyebrow mb-1 block">Start date</label>
                 <div className="flex min-w-0 items-center gap-2">
                   <Input
+                    id="trip-start-date"
                     type="date"
                     value={startDate}
                     onChange={(e) => {
@@ -289,7 +291,7 @@ export function TripView(props: {
                     </button>
                   )}
                 </div>
-              </Field>
+              </div>
               <Field label="Nights">
                 <div className="rounded-[calc(var(--radius)*0.6)] border bg-panel2/40 px-3 py-1.5 text-sm text-muted">
                   {trip.nights ?? "—"}

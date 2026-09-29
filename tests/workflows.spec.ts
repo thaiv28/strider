@@ -220,17 +220,18 @@ test("a trip can be planned, shared, exported, and deleted", async ({ browser, c
 
     await expect(page.getByLabel("Trip name")).toHaveValue(initialName);
     await expect(page.getByRole("combobox").filter({ has: page.locator('option[value="idea"]') })).toHaveValue("idea");
+    const dateInput = page.getByLabel("Start date", { exact: true });
     await Promise.all([
       page.waitForResponse((response) => response.request().method() === "POST" && response.ok()),
-      page.getByLabel("Start date").fill("2026-10-15"),
+      dateInput.fill("2026-10-15"),
     ]);
-    await expect(page.getByLabel("Start date")).toHaveValue("2026-10-15");
+    await expect(dateInput).toHaveValue("2026-10-15");
     await Promise.all([
       page.waitForResponse((response) => response.request().method() === "POST" && response.ok()),
       page.getByRole("button", { name: "Clear start date" }).click(),
     ]);
     await page.reload();
-    await expect(page.getByLabel("Start date")).toHaveValue("");
+    await expect(dateInput).toHaveValue("");
 
     await fillAndSave(page, "Trip name", updatedName);
     await fillAndSave(page, "Region", "E2E Test Range");
