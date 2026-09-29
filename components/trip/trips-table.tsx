@@ -32,11 +32,14 @@ const COLS: { key: Key; label: string; num?: boolean; right?: boolean }[] = [
 ];
 
 export function TripsTable({ trips }: { trips: TripSummary[] }) {
-  const [sort, setSort] = useState<{ key: Key; dir: 1 | -1 }>({ key: "startDate", dir: 1 });
+  const [sort, setSort] = useState<{ key: Key; dir: 1 | -1 }>({ key: "startDate", dir: -1 });
 
   const sorted = [...trips].sort((a, b) => {
     const av = a[sort.key];
     const bv = b[sort.key];
+    if (sort.key === "startDate" && (av == null || bv == null)) {
+      return av == null ? (bv == null ? 0 : 1) : -1;
+    }
     let cmp: number;
     if (sort.key === "status") {
       cmp = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
@@ -57,7 +60,7 @@ export function TripsTable({ trips }: { trips: TripSummary[] }) {
         Sort
         <select
           value={sort.key}
-          onChange={(e) => setSort({ key: e.target.value as Key, dir: e.target.value === "startDate" || e.target.value === "status" ? 1 : -1 })}
+          onChange={(e) => setSort({ key: e.target.value as Key, dir: e.target.value === "status" ? 1 : -1 })}
           className="min-h-11 rounded-md border bg-panel px-3"
         >
           <option value="startDate">Date</option>
