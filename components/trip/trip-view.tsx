@@ -269,9 +269,9 @@ export function TripView(props: {
                   <Input
                     type="date"
                     value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    onBlur={(e) => {
-                      if (e.target.value !== (trip.startDate ?? "")) saveDate(e.target.value || null);
+                    onChange={(e) => {
+                      setStartDate(e.target.value);
+                      saveDate(e.target.value || null);
                     }}
                     className="block min-w-0 w-full max-w-full px-2 text-base sm:px-3 sm:text-sm"
                   />
