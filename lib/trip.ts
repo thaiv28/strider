@@ -1,4 +1,4 @@
-import { and, eq, asc, inArray } from "drizzle-orm";
+import { and, eq, asc, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/src/db/index";
 import { DEFAULT_COOK_WATER_ML } from "@/lib/fuel";
 
@@ -233,7 +233,7 @@ export async function getTripsSummary(userId: number, sharedIds?: number[]): Pro
     .leftJoin(schema.trail, eq(schema.trip.trailId, schema.trail.id))
     .leftJoin(schema.tripGpx, eq(schema.tripGpx.tripId, schema.trip.id))
     .where(filter)
-    .orderBy(asc(schema.trip.startDate));
+    .orderBy(sql`${schema.trip.startDate} DESC NULLS LAST`, asc(schema.trip.id));
   const gear = await db
     .select({
       tripId: schema.tripGear.tripId,
