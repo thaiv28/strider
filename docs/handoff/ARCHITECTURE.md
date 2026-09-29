@@ -131,11 +131,12 @@ for the bbox, then overlays the track + numbered campsites as SVG.
 
 - `.github/workflows/ci.yml` runs on pull requests and manual dispatch with an
   isolated PostgreSQL service. It migrates/seeds the database, type-checks,
-  builds, and runs both Playwright suites.
+  builds, runs both Playwright suites, and verifies the ARM64 runtime image on a
+  native ARM64 runner.
 - `.github/workflows/deploy.yml` runs on every push to `main`. It builds the
-  Next.js app, assumes the AWS role, publishes an ARM64 image, updates runtime
-  secrets/assets, deploys through SSM, invalidates CloudFront, and validates the
-  live site.
+  Next.js app on a native ARM64 runner, assumes the AWS role, publishes an ARM64
+  image, updates runtime secrets/assets, deploys through SSM, invalidates
+  CloudFront, and validates the live site.
 - `tests/mobile.spec.ts` checks primary pages at 360, 390, and 430 CSS pixels,
   including overflow, the trip tab strip, dates, maps, and mobile navigation.
 - `tests/workflows.spec.ts` checks authentication, cross-user isolation, and a full trip lifecycle:

@@ -31,9 +31,10 @@ before changing or duplicating centrally managed AWS resources.
 
 Every push to `main` starts `.github/workflows/deploy.yml`:
 
-1. Install dependencies, type-check, and build Next.js on the GitHub runner.
+1. Install dependencies, type-check, and build Next.js on a native ARM64 GitHub runner.
 2. Assume the deployment role using GitHub OIDC.
-3. Build and push an ARM64 runtime image tagged with `GITHUB_SHA`.
+3. Build and push an ARM64 runtime image tagged with `GITHUB_SHA`, without QEMU
+   emulation. Pull requests also build the ARM64 image without publishing it.
 4. Write the current GitHub secret values into the project's Secrets Manager
    secret and upload the deployment script, Nginx template, and encrypted seed.
 5. Invoke `ops/deploy-ec2.sh` through Systems Manager.
@@ -150,7 +151,7 @@ currently performed by this repository.
 | Configuration | Confirm the named GitHub variables/secrets exist; never reveal their values. |
 | Type-check/build | Reproduce with the pinned Node major and `npm ci`; inspect the first compiler error. |
 | AWS credentials | Check OIDC trust, repository/branch conditions, role ARN, and region. |
-| Image publication | Inspect Buildx cache/output and ECR permissions; the target must be `linux/arm64`. |
+| Image publication | Inspect the native ARM runner, Buildx output, cache, and ECR permissions; the target must be `linux/arm64`. |
 | SSM deployment | Inspect the command invocation output; check instance online status, disk, Docker, secret/S3/ECR access, and migration output. |
 | Internal health | Inspect `docker logs --tail 100 backpack-app`, then database readiness and `runtime.env` presence/permissions without printing it. |
 | Public health | Compare internal health with CloudFront origin/header behavior and invalidation state. |
