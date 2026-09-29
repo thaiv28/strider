@@ -159,12 +159,14 @@ test("view and edit links grant distinct, revocable access", async ({ browser })
     await ownerPage.getByRole("button", { name: "Share", exact: true }).click();
     await ownerPage.getByRole("menuitem", { name: "Revoke edit link" }).click();
     await ownerPage.getByRole("menuitem", { name: "Confirm revoke edit link" }).click();
+    await expect(ownerPage.getByRole("status")).toContainText("Edit access revoked.");
     expect((await visitorPage.goto(tripUrl!))?.status()).toBe(404);
     await visitorPage.goto("/trips");
     await visitorPage.getByRole("tab", { name: /Shared with me/ }).click();
     await expect(visitorPage.getByRole("link", { name: /View only/ })).toBeVisible();
     await ownerPage.getByRole("menuitem", { name: "Revoke view-only link" }).click();
     await ownerPage.getByRole("menuitem", { name: "Confirm revoke" }).click();
+    await expect(ownerPage.getByRole("status")).toContainText("View-only link revoked.");
     await visitorPage.reload();
     await visitorPage.getByRole("tab", { name: /Shared with me/ }).click();
     await expect(visitorPage.getByText("Open a trip link while signed in")).toBeVisible();
@@ -215,6 +217,21 @@ test("a trip can be planned, shared, exported, and deleted", async ({ browser, c
       page.getByRole("button", { name: "+ New trip" }).click(),
     ]);
     tripUrl = page.url();
+
+    await expect(page.getByLabel("Trip name")).toHaveValue(initialName);
+    await expect(page.getByRole("combobox").filter({ has: page.locator('option[value="idea"]') })).toHaveValue("idea");
+    const dateInput = page.getByLabel("Start date", { exact: true });
+    await Promise.all([
+      page.waitForResponse((response) => response.request().method() === "POST" && response.ok()),
+      dateInput.fill("2026-10-15"),
+    ]);
+    await expect(dateInput).toHaveValue("2026-10-15");
+    await Promise.all([
+      page.waitForResponse((response) => response.request().method() === "POST" && response.ok()),
+      page.getByRole("button", { name: "Clear start date" }).click(),
+    ]);
+    await page.reload();
+    await expect(dateInput).toHaveValue("");
 
     await fillAndSave(page, "Trip name", updatedName);
     await fillAndSave(page, "Region", "E2E Test Range");

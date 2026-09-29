@@ -18,7 +18,7 @@ export function BaseBar({ baseG, byCategory }: { baseG: number; byCategory: CatS
   const open = selected ? slices.find((s) => s.name === selected) ?? null : null;
 
   return (
-    <div className="card p-5">
+    <div className="card p-4">
       <div className="flex items-baseline justify-between gap-3">
         <span className="eyebrow">◇ Base weight</span>
         <div className="flex overflow-hidden rounded-full border text-xs">
@@ -36,7 +36,7 @@ export function BaseBar({ baseG, byCategory }: { baseG: number; byCategory: CatS
         </div>
       </div>
 
-      <div className="mt-2 flex items-baseline gap-3">
+      <div className="mt-1.5 flex items-baseline gap-3">
         <span className="readout text-4xl font-bold leading-none">{fmtWeight(baseG)}</span>
         {active && (
           <span className="readout flex items-center gap-1.5 text-sm text-muted">
@@ -49,7 +49,7 @@ export function BaseBar({ baseG, byCategory }: { baseG: number; byCategory: CatS
 
       {view === "bar" ? (
         <>
-          <div className="relative mt-4 flex h-11 overflow-hidden rounded-full" role="group" aria-label="Base weight by category">
+          <div className="relative mt-3 flex h-8 overflow-hidden rounded-full" role="group" aria-label="Base weight by category">
             {slices.map((s) => (
               <button
                 type="button"
@@ -63,14 +63,14 @@ export function BaseBar({ baseG, byCategory }: { baseG: number; byCategory: CatS
                 style={{ width: `${(s.g / baseG) * 100}%` }}
                 className={`relative h-full min-w-0 touch-manipulation transition-opacity focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-accent ${hover && hover !== s.name ? "opacity-30" : "opacity-100"}`}
               >
-                <span className="absolute inset-x-0 top-4 h-3" style={{ background: categoryColor(s.name) }} />
+                <span className="absolute inset-x-0 top-2.5 h-3" style={{ background: categoryColor(s.name) }} />
               </button>
             ))}
           </div>
-          <Legend slices={slices} baseG={baseG} cols="sm:grid-cols-2" hover={hover} setHover={setHover} onSelect={setSelected} />
+          <Legend slices={slices} baseG={baseG} cols="sm:grid-cols-2 lg:grid-cols-3" hover={hover} setHover={setHover} onSelect={setSelected} />
         </>
       ) : (
-        <div className="mt-4 flex flex-wrap items-center gap-6">
+        <div className="mt-3 flex flex-wrap items-center gap-4">
           <Donut slices={slices} baseG={baseG} hover={hover} setHover={setHover} active={active} onSelect={setSelected} />
           <div className="min-w-48 flex-1">
             <Legend slices={slices} baseG={baseG} cols="grid-cols-1" pct hover={hover} setHover={setHover} onSelect={setSelected} />
@@ -134,7 +134,7 @@ function Donut({
   const C = 2 * Math.PI * r;
   let offset = 0;
   return (
-    <div className="relative h-40 w-40 shrink-0">
+    <div className="relative h-32 w-32 shrink-0">
       <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
         {slices.map((s) => {
           const frac = s.g / baseG;
@@ -196,7 +196,7 @@ function Legend({
   onSelect: (n: string) => void;
 }) {
   return (
-    <div className={`mt-3 grid ${cols} gap-x-6 gap-y-1.5`}>
+    <div className={`mt-2 grid ${cols} gap-x-6 gap-y-0.5`}>
       {slices.map((s) => (
         <button
           type="button"
@@ -206,7 +206,7 @@ function Legend({
           onFocus={() => setHover(s.name)}
           onBlur={() => setHover(null)}
           onClick={() => onSelect(s.name)}
-          className={`flex min-h-11 w-full touch-manipulation items-center text-left gap-2 text-sm transition-opacity ${
+          className={`flex min-h-11 w-full touch-manipulation items-center text-left gap-2 text-sm transition-opacity sm:min-h-7 ${
             hover && hover !== s.name ? "opacity-40" : "opacity-100"
           }`}
         >

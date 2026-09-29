@@ -102,6 +102,12 @@ export function TripView(props: {
   const { trip, weights, groups, days } = props;
   const router = useRouter();
   const [pending, start] = useTransition();
+  const [startDate, setStartDate] = useState(trip.startDate ?? "");
+  const dateSaveQueue = useRef(Promise.resolve());
+  const saveDate = (value: string | null) => {
+    dateSaveQueue.current = dateSaveQueue.current.catch(() => {}).then(() => updateTrip(trip.id, { startDate: value }));
+    start(async () => await dateSaveQueue.current);
+  };
   const del = () => {
     if (!confirm(`Delete "${trip.name}"? This removes its gear, food, route and campsites and can't be undone.`)) return;
     start(async () => {
@@ -258,9 +264,34 @@ export function TripView(props: {
         {tab === "logistics" && (
           <div className="space-y-6">
             <Card id="overview" className="scroll-mt-24 grid min-w-0 grid-cols-1 gap-4 overflow-hidden p-4 sm:grid-cols-2">
-              <Field label="Start date">
-                <Input type="date" defaultValue={trip.startDate ?? ""} className="block min-w-0 w-full max-w-full px-2 text-base sm:px-3 sm:text-sm" onBlur={(e) => save({ startDate: e.target.value || null })} />
-              </Field>
+              <div className="min-w-0 max-w-full">
+                <label htmlFor="trip-start-date" className="eyebrow mb-1 block">Start date</label>
+                <div className="flex min-w-0 items-center gap-2">
+                  <Input
+                    id="trip-start-date"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => {
+                      setStartDate(e.target.value);
+                      saveDate(e.target.value || null);
+                    }}
+                    className="block min-w-0 w-full max-w-full px-2 text-base sm:px-3 sm:text-sm"
+                  />
+                  {startDate && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStartDate("");
+                        saveDate(null);
+                      }}
+                      aria-label="Clear start date"
+                      className="shrink-0 text-sm text-muted underline underline-offset-2 hover:text-ink"
+                    >
+                      Clear date
+                    </button>
+                  )}
+                </div>
+              </div>
               <Field label="Nights">
                 <div className="rounded-[calc(var(--radius)*0.6)] border bg-panel2/40 px-3 py-1.5 text-sm text-muted">
                   {trip.nights ?? "—"}

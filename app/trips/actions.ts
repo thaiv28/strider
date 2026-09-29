@@ -85,10 +85,11 @@ export async function createTrip(name: string, loadoutId?: number): Promise<numb
   if (loadoutId) await requireOwnedLoadout(loadoutId, userId);
   const [t] = await db
     .insert(schema.trip)
-    .values({ userId, name: name.trim() || "New Trip", status: "planned" })
+    .values({ userId, name: name.trim() || "New Trip", status: "idea" })
     .returning({ id: schema.trip.id });
   if (loadoutId) await seedTripFromLoadout(t.id, loadoutId);
   revalidatePath("/trips");
+  revalidatePath("/basecamp");
   return t.id;
 }
 
@@ -143,7 +144,7 @@ export async function importTrip(json: string): Promise<{ tripId?: number; error
     .values({
       userId,
       name: t.name.trim().slice(0, 200),
-      status: "planned",
+      status: "idea",
       startDate: typeof t.startDate === "string" ? t.startDate : null,
       nights: Number.isFinite(t.nights) ? t.nights : null,
       region: t.region ?? null,

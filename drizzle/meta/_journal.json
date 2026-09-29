@@ -99,6 +99,13 @@
       "when": 1790200000000,
       "tag": "0013_trip_collaboration",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790648744997,
+      "tag": "0014_trip_idea_default",
+      "breakpoints": true
     }
   ]
 }

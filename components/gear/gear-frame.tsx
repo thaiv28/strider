@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { DndContext, MouseSensor, TouchSensor, KeyboardSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Input, Select, Button } from "@/components/ui";
+import { Input, Select, Button, PageTabs } from "@/components/ui";
 import { BaseBar } from "./base-bar";
 import { GearList } from "./gear-list";
 import { GearDialog } from "./gear-dialog";
@@ -169,22 +169,13 @@ export function GearFrame({
         </Button>
       </div>
 
-      <div className="mt-6 flex gap-1 border-b">
-        {(["inventory", "wishlist"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`-mb-px border-b-2 px-3 py-1.5 text-sm capitalize transition ${
-              tab === t ? "border-accent font-semibold text-ink" : "border-transparent text-muted hover:text-ink"
-            }`}
-          >
-            {t}
-            {t === "wishlist" && wishlist.length > 0 && (
-              <span className="ml-1.5 text-xs text-muted">{wishlist.length}</span>
-            )}
-          </button>
-        ))}
-      </div>
+      <PageTabs
+        label="Gear sections"
+        tabs={[{ value: "inventory", label: "Inventory" }, { value: "wishlist", label: "Wishlist", count: wishlist.length || undefined }]}
+        value={tab}
+        onChange={setTab}
+        className="mt-6"
+      />
 
       {tab === "inventory" ? (
         <>
