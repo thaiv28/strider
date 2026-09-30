@@ -116,13 +116,13 @@ export function TripView(props: {
     });
   };
   const [picker, setPicker] = useState(false);
-  type Tab = "logistics" | "planning" | "gear" | "food" | "report";
+  type Tab = "logistics" | "planning" | "gear" | "food" | "weather" | "report";
   const [tab, setTab] = useState<Tab>("logistics");
   const [generateReportRequest, setGenerateReportRequest] = useState(0);
   const tabKey = `bp_tripTab_${trip.id}`;
   useEffect(() => {
     const saved = localStorage.getItem(tabKey);
-    if (saved && ["logistics", "planning", "gear", "food", "report"].includes(saved)) setTab(saved as Tab);
+    if (saved && ["logistics", "planning", "gear", "food", "weather", "report"].includes(saved)) setTab(saved as Tab);
   }, [tabKey]);
   const pickTab = (k: Tab) => {
     setTab(k);
@@ -242,6 +242,7 @@ export function TripView(props: {
           ["planning", "Planning"],
           ["gear", "Gear"],
           ["food", "Food"],
+          ["weather", "Weather"],
           ["report", "Report"],
         ] as const).map(([k, label]) => (
           <button
@@ -362,21 +363,6 @@ export function TripView(props: {
                 campsites={props.campsites}
               />
             </div>
-
-            <div id="weather" className="scroll-mt-24">
-              <WeatherPanel
-                lat={props.lat}
-                lon={props.lon}
-                startDate={trip.startDate}
-                days={days}
-                nights={trip.nights ?? props.campsites.length}
-                campsites={props.campsites.map((c) => ({ night: c.night, lat: c.lat, lon: c.lon }))}
-                endCoord={
-                  props.perDayAuto.length ? { lat: props.perDayAuto[props.perDayAuto.length - 1].lat, lon: props.perDayAuto[props.perDayAuto.length - 1].lon } : null
-                }
-                elevationFt={props.gpx?.maxEleFt ?? null}
-              />
-            </div>
           </div>
         )}
 
@@ -476,6 +462,21 @@ export function TripView(props: {
               />
             </div>
           </div>
+        )}
+
+        {tab === "weather" && (
+          <WeatherPanel
+            lat={props.lat}
+            lon={props.lon}
+            startDate={trip.startDate}
+            days={days}
+            nights={trip.nights ?? props.campsites.length}
+            campsites={props.campsites.map((c) => ({ night: c.night, lat: c.lat, lon: c.lon }))}
+            endCoord={
+              props.perDayAuto.length ? { lat: props.perDayAuto[props.perDayAuto.length - 1].lat, lon: props.perDayAuto[props.perDayAuto.length - 1].lon } : null
+            }
+            elevationFt={props.gpx?.maxEleFt ?? null}
+          />
         )}
 
         {tab === "report" && (
@@ -590,7 +591,6 @@ function SectionNav({ tab, groups }: { tab: string; groups: { category: string }
           { id: "overview", label: "Overview" },
           { id: "by-day", label: "By day" },
           { id: "route", label: "Route & GPX" },
-          { id: "weather", label: "Weather" },
         ]
       : tab === "planning"
       ? [
@@ -606,6 +606,11 @@ function SectionNav({ tab, groups }: { tab: string; groups: { category: string }
           { id: "meals", label: "Meals by day" },
           { id: "fuel-calc", label: "Fuel calculator" },
           { id: "shopping", label: "Grocery list" },
+        ]
+      : tab === "weather"
+      ? [
+          { id: "weather", label: "Weather" },
+          { id: "snow", label: "Snow depth" },
         ]
       : tab === "report"
       ? [

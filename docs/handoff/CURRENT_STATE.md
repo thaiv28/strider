@@ -30,6 +30,10 @@ developer's local GitHub CLI session—is the durable publication path.
   dates cleared. The Trips page defaults to newest dates first, with undated trips
   last. Trip creation/import, daily distance/elevation, gear/food snapshots,
   campsites, packing lists, GPX upload, permit upload, and printable trip sheets.
+- A trip's Weather tab shows per-day conditions and a separate Snow depth section:
+  modeled Open-Meteo depth now at the trip start plus each day's depth (historical,
+  forecast, or a 10-year typical beyond the 16-day forecast). Snow depth needs
+  sign-in, so guests on a view-only link see weather without it.
 - Consolidated trip sharing menu for printing, reports, and separate persistent
   view-only and edit links. View links work without sign-in; edit links require
   sign-in. Opening either link while signed in adds the Trip to Shared with me.
