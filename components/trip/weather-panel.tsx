@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui";
 import { addDays, prettyDate as pretty, clock, describe, isFarFuture, type DailyWx, type Climo } from "@/lib/weather";
 import { getClimatology } from "@/app/weather/actions";
+import { SnowPanel } from "./snow-panel";
 
 type Site = { night: number; lat: number | null; lon: number | null };
 
@@ -37,21 +38,24 @@ export function WeatherPanel({
   }
 
   return (
-    <div>
-      <div className="eyebrow">Weather</div>
-      <Card className="mt-2 min-w-0 p-3 sm:p-4">
-        {rows.length === 0 ? (
-          <div className="text-sm text-muted">
-            {startDate ? "Add a route or coordinates to the trip to load weather." : "Set a start date to load weather."}
-          </div>
-        ) : (
-          <div className="min-w-0 divide-y overflow-hidden rounded-lg border">
-            {rows.map(({ key, ...r }) => (
-              <WeatherRow key={key} {...r} elevationFt={elevationFt} />
-            ))}
-          </div>
-        )}
-      </Card>
+    <div className="space-y-6">
+      <div id="weather" className="scroll-mt-24">
+        <div className="eyebrow">Weather</div>
+        <Card className="mt-2 min-w-0 p-3 sm:p-4">
+          {rows.length === 0 ? (
+            <div className="text-sm text-muted">
+              {startDate ? "Add a route or coordinates to the trip to load weather." : "Set a start date to load weather."}
+            </div>
+          ) : (
+            <div className="min-w-0 divide-y overflow-hidden rounded-lg border">
+              {rows.map(({ key, ...r }) => (
+                <WeatherRow key={key} {...r} elevationFt={elevationFt} />
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
+      <SnowPanel lat={lat} lon={lon} startDate={startDate} days={rows} />
     </div>
   );
 }

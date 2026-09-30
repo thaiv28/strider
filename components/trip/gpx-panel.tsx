@@ -65,7 +65,7 @@ export function GpxPanel({
               type="file"
               name="gpx"
               accept=".gpx,application/gpx+xml"
-              className="text-sm file:mr-3 file:rounded-md file:border file:bg-panel2 file:px-3 file:py-1.5 file:text-sm"
+              className="min-w-0 max-w-full text-sm file:mr-3 file:rounded-md file:border file:bg-panel2 file:px-3 file:py-1.5 file:text-sm"
             />
             <Button type="submit" disabled={pending}>
               {pending ? "Reading…" : "Upload"}
