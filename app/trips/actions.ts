@@ -588,6 +588,51 @@ export async function uploadGpx(tripId: number, fd: FormData): Promise<string | 
   return null;
 }
 
+// Flip the route so the end becomes the start. Campsites keep their physical
+// spot but their mileage is measured from the new start, then days regenerate.
+// Running it twice restores the original route.
+export async function reverseGpx(tripId: number) {
+  await requireTripEditor(tripId);
+  const [g] = await db.select().from(schema.tripGpx).where(eq(schema.tripGpx.tripId, tripId));
+  const pts = g?.points ?? [];
+  if (pts.length < 2) return;
+  const total = pts[pts.length - 1].d;
+  const flip = (d: number) => +Math.max(0, total - d).toFixed(3);
+  const points = pts
+    .slice()
+    .reverse()
+    .map((p) => ({ ...p, d: flip(p.d) }));
+  // Climbing one way is descending the other: reversed gain = forward loss =
+  // forward gain minus the net rise from start to end.
+  const gain =
+    g.elevationGainFt != null ? Math.max(0, g.elevationGainFt + pts[0].e - pts[pts.length - 1].e) : null;
+  const camps = await db
+    .select({ id: schema.tripCampsite.id, distanceMi: schema.tripCampsite.distanceMi })
+    .from(schema.tripCampsite)
+    .where(eq(schema.tripCampsite.tripId, tripId));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(schema.tripGpx)
+      .set({
+        startLat: String(points[0].lat),
+        startLon: String(points[0].lon),
+        elevationGainFt: gain,
+        points,
+        track: points.map((p) => [p.lat, p.lon] as [number, number]),
+        profile: points.map((p) => ({ d: p.d, e: p.e })),
+      })
+      .where(eq(schema.tripGpx.id, g.id));
+    for (const c of camps) {
+      await tx
+        .update(schema.tripCampsite)
+        .set({ distanceMi: String(flip(Number(c.distanceMi))) })
+        .where(eq(schema.tripCampsite.id, c.id));
+    }
+  });
+  await syncDaysFromCampsites(tripId);
+  bump(tripId);
+}
+
 export async function removeGpx(tripId: number) {
   await requireTripEditor(tripId);
   await db.delete(schema.tripGpx).where(eq(schema.tripGpx.tripId, tripId));
