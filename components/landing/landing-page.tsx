@@ -18,7 +18,7 @@ export function LandingPage() {
           <a href="#top" className="font-display text-lg font-bold tracking-[0.16em]">STRIDER</a>
           <div className="flex items-center gap-4">
             <a href="#features" className="hidden text-sm text-[#c8c8b9] transition hover:text-white sm:block">Features</a>
-            <Link href="/login" className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium backdrop-blur transition hover:bg-white/15">Enter Strider</Link>
+            <Link href="/login" className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium backdrop-blur transition hover:bg-white/15">Log in</Link>
           </div>
         </div>
       </header>

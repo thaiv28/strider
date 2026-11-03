@@ -49,7 +49,7 @@ export default function PrivacyPage() {
       <header className="border-b border-black/10 bg-[#101713] text-[#f4f1e8]">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-5 py-5 sm:px-8">
           <Link href="/" className="font-display text-lg font-bold tracking-[0.16em]">STRIDER</Link>
-          <Link href="/login" className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium transition hover:bg-white/15">Enter Strider</Link>
+          <Link href="/login" className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium transition hover:bg-white/15">Log in</Link>
         </div>
       </header>
 
