@@ -61,25 +61,28 @@ export function TripFoodPanel({
             <div className="mt-3 divide-y rounded-lg border">
               {d.entries.length === 0 && <div className="px-3 py-2 text-sm text-muted">Nothing planned.</div>}
               {d.entries.map((e) => (
-                <div key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5 sm:flex-nowrap sm:py-2">
+                <div key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5 sm:flex-nowrap sm:py-2">
                   {e.isMeal && e.mealId ? (
                     <Link
                       href={`/food?meal=${e.mealId}&back=/trips/${tripId}`}
-                      className="min-w-0 basis-[calc(100%-3rem)] text-sm leading-snug break-words transition hover:text-accent sm:basis-auto sm:truncate"
+                      className="min-w-0 flex-1 text-sm leading-snug break-words transition hover:text-accent sm:truncate"
                       title="Edit this meal"
                     >
                       {e.name}
                     </Link>
                   ) : (
-                    <span className="min-w-0 basis-[calc(100%-3rem)] text-sm leading-snug break-words sm:basis-auto sm:flex-1 sm:truncate">{e.name}</span>
+                    <span className="min-w-0 flex-1 text-sm leading-snug break-words sm:truncate">{e.name}</span>
                   )}
-                  <QtyInput isMeal={e.isMeal} value={e.isMeal ? e.servings : e.weightG} onCommit={(q) => run(() => setTripMealQty(e.id, tripId, q))} />
-                  <span className="readout w-16 text-right text-xs text-muted">{e.kcal.toLocaleString()} kcal</span>
-                  <span className="readout w-14 text-right text-xs text-muted">{gToOz(e.weightG).toFixed(1)} oz</span>
-                  <button onClick={() => run(() => copyTripMealToAll(e.id, tripId))} className="grid h-11 w-11 place-items-center rounded text-muted hover:bg-panel2 hover:text-accent sm:h-auto sm:w-auto" title="Copy to all days">
+                  {/* On phones the numbers drop to a right-aligned second line under the name. */}
+                  <div className="order-last flex basis-full items-center justify-end gap-x-3 sm:order-none sm:basis-auto">
+                    <QtyInput isMeal={e.isMeal} value={e.isMeal ? e.servings : e.weightG} onCommit={(q) => run(() => setTripMealQty(e.id, tripId, q))} />
+                    <span className="readout w-[4.5rem] shrink-0 whitespace-nowrap text-right text-xs text-muted">{e.kcal.toLocaleString()} kcal</span>
+                    <span className="readout w-14 shrink-0 whitespace-nowrap text-right text-xs text-muted">{gToOz(e.weightG).toFixed(1)} oz</span>
+                  </div>
+                  <button onClick={() => run(() => copyTripMealToAll(e.id, tripId))} className="-my-2 grid h-11 w-11 shrink-0 place-items-center rounded text-muted hover:bg-panel2 hover:text-accent sm:h-7 sm:w-7" title="Copy to all days">
                     <Copy size={14} />
                   </button>
-                  <button onClick={() => run(() => removeTripMeal(e.id, tripId))} className="grid h-11 w-11 place-items-center rounded text-muted hover:bg-accent/10 hover:text-accent sm:h-auto sm:w-auto" title="Remove">✕</button>
+                  <button onClick={() => run(() => removeTripMeal(e.id, tripId))} className="-my-2 grid h-11 w-11 shrink-0 place-items-center rounded text-muted hover:bg-accent/10 hover:text-accent sm:h-7 sm:w-7" title="Remove">✕</button>
                 </div>
               ))}
             </div>
@@ -224,7 +227,7 @@ function QtyInput({ isMeal, value, onCommit }: { isMeal: boolean; value: number;
     if (Number.isFinite(n) && n > 0 && n !== value) onCommit(isMeal ? Math.round(n) : Math.round(n));
   };
   return (
-    <span className="inline-flex items-center gap-1">
+    <span className="inline-flex w-[4.75rem] shrink-0 items-center justify-end gap-1">
       <Input
         type="number"
         min={isMeal ? "1" : "0"}
@@ -233,9 +236,9 @@ function QtyInput({ isMeal, value, onCommit }: { isMeal: boolean; value: number;
         onChange={(e) => setV(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-        className="w-16 text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+        className={`${isMeal ? "w-10!" : "w-13!"} px-2! py-1! text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none`}
       />
-      <span className="w-8 text-xs text-muted">{isMeal ? "srv" : "g"}</span>
+      <span className="w-5 text-xs text-muted">{isMeal ? "srv" : "g"}</span>
     </span>
   );
 }
