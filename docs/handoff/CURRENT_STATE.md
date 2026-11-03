@@ -29,7 +29,9 @@ developer's local GitHub CLI session—is the durable publication path.
 - Trips start as ideas, can advance to planned or completed, and can have their
   dates cleared. The Trips page defaults to newest dates first, with undated trips
   last. Trip creation/import, daily distance/elevation, gear/food snapshots,
-  campsites, packing lists, GPX upload, permit upload, and printable trip sheets.
+  campsites, packing lists, GPX upload (reversible: swapping start and end flips
+  the elevation profile and re-measures campsites and days), permit upload, and
+  printable trip sheets.
 - A trip's Weather tab shows per-day conditions and a separate Snow depth section:
   modeled Open-Meteo depth now at the trip start plus each day's depth (historical,
   forecast, or a 10-year typical beyond the 16-day forecast). Snow depth needs

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Card, Button } from "@/components/ui";
-import { uploadGpx, removeGpx, restoreGpx, updateTrip } from "@/app/trips/actions";
+import { uploadGpx, removeGpx, restoreGpx, reverseGpx, updateTrip } from "@/app/trips/actions";
 import { RoutePanel, type Campsite, type RoutePoint } from "./route-panel";
 import { buildGpx, gpxFilename } from "@/lib/gpx-export";
 
@@ -84,6 +84,17 @@ export function GpxPanel({
         <div className="-my-2 flex items-center gap-1">
           <button onClick={downloadGpx} disabled={!gpx.points.length} className="eyebrow px-2 py-2 hover:text-accent disabled:opacity-40">
             download
+          </button>
+          <button
+            onClick={() => {
+              start(async () => await reverseGpx(tripId));
+              pushUndo("Reversed route", () => reverseGpx(tripId));
+            }}
+            disabled={pending || gpx.points.length < 2}
+            title="Swap start and end"
+            className="eyebrow px-2 py-2 hover:text-accent disabled:opacity-40"
+          >
+            reverse
           </button>
           <button
             onClick={() => {
