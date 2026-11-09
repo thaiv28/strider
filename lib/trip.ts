@@ -15,6 +15,21 @@ export type TripGearRow = {
 
 const n = (s: string | null) => (s == null ? null : Number(s));
 
+type RouteStatsSource = { distanceMi: string | null; elevationGainFt: number | null };
+type TrailRouteDefaults = { typicalDistanceMi: string | null; typicalElevationFt: number | null };
+
+// Precedence: trip's own value → GPX-derived → trail default.
+export function effectiveRouteStats(
+  trip: RouteStatsSource,
+  gpx: RouteStatsSource | null | undefined,
+  trail: TrailRouteDefaults | null | undefined,
+) {
+  return {
+    distanceMi: n(trip.distanceMi) ?? n(gpx?.distanceMi ?? null) ?? n(trail?.typicalDistanceMi ?? null),
+    elevationFt: trip.elevationGainFt ?? gpx?.elevationGainFt ?? trail?.typicalElevationFt ?? null,
+  };
+}
+
 export type TripFoodEntry = {
   id: number;
   dayNumber: number;
@@ -264,9 +279,7 @@ export async function getTripsSummary(userId: number, sharedIds?: number[]): Pro
       startDate: t.startDate,
       region: t.region ?? r.trail?.region ?? null,
       nights: t.nights,
-      distanceMi:
-        n(t.distanceMi) ?? (r.trip_gpx ? n(r.trip_gpx.distanceMi) : null) ?? (r.trail ? n(r.trail.typicalDistanceMi) : null),
-      elevationFt: t.elevationGainFt ?? r.trip_gpx?.elevationGainFt ?? r.trail?.typicalElevationFt ?? null,
+      ...effectiveRouteStats(t, r.trip_gpx, r.trail),
       baseG: a.base,
       skinOutG: a.base + consumableG + a.worn,
       track: r.trip_gpx?.track ?? null,
@@ -378,9 +391,7 @@ export async function getTripView(tripId: number, userId: number) {
     trailName: trail?.name ?? null,
     region: t.region ?? trail?.region ?? null,
     areaType: t.areaType ?? trail?.areaType ?? null,
-    // Precedence: trip's own value → GPX-derived → trail default.
-    distanceMi: n(t.distanceMi) ?? (gpxRow ? n(gpxRow.distanceMi) : null) ?? (trail ? n(trail.typicalDistanceMi) : null),
-    elevationFt: t.elevationGainFt ?? gpxRow?.elevationGainFt ?? trail?.typicalElevationFt ?? null,
+    ...effectiveRouteStats(t, gpxRow, trail),
     lat: n(t.lat) ?? (gpxRow ? n(gpxRow.startLat) : null),
     lon: n(t.lon) ?? (gpxRow ? n(gpxRow.startLon) : null),
     days,
