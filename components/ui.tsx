@@ -58,7 +58,7 @@ export function Badge({ tone = "neutral", children }: { tone?: string; children:
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full border px-2 py-0.5 text-[0.6875rem] font-medium tracking-wide uppercase",
+        "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold",
         badgeTones[tone] ?? badgeTones.neutral,
       )}
     >
@@ -72,18 +72,19 @@ export function Button({
   className,
   ...props
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "ghost" | "outline" | "danger";
+  variant?: "primary" | "ghost" | "outline" | "danger" | "header";
 }) {
   const styles = {
     primary: "bg-accent text-accentink hover:opacity-90",
-    outline: "border bg-panel hover:bg-panel2",
+    outline: "border border-fieldborder bg-panel text-ink hover:bg-panel2",
     ghost: "text-muted hover:bg-panel2 hover:text-ink",
-    danger: "text-accent hover:bg-accent/10",
+    danger: "text-signal hover:bg-signal/10",
+    header: "bg-headerink text-headeractionink hover:opacity-90 focus-visible:outline-headerink",
   }[variant];
   return (
     <button
       className={cn(
-        "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[calc(var(--radius)*0.6)] px-3 py-1.5 text-sm font-medium transition disabled:opacity-50 sm:min-h-0",
+        "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-4 py-1.5 text-sm font-semibold transition disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
         styles,
         className,
       )}
@@ -95,12 +96,14 @@ export function Button({
 export function PageTabs<T extends string>({
   label,
   tabs,
+  tone = "page",
   value,
   onChange,
   className,
 }: {
   label: string;
   tabs: readonly { value: T; label: string; count?: number }[];
+  tone?: "page" | "header";
   value: T;
   onChange: (value: T) => void;
   className?: string;
@@ -118,7 +121,7 @@ export function PageTabs<T extends string>({
   };
 
   return (
-    <div role="tablist" aria-label={label} className={cn("flex gap-1 border-b border-line", className)}>
+    <div role="tablist" aria-label={label} className={cn("flex flex-wrap gap-1.5", className)}>
       {tabs.map((tab, index) => (
         <button
           key={tab.value}
@@ -129,14 +132,19 @@ export function PageTabs<T extends string>({
           onClick={() => onChange(tab.value)}
           onKeyDown={(event) => selectByKey(event, index)}
           className={cn(
-            "-mb-px min-h-11 border-b-2 px-3 py-2 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent sm:min-h-0 sm:py-2",
-            value === tab.value
-              ? "border-accent font-semibold text-ink"
-              : "border-transparent text-muted hover:border-line hover:text-ink",
+            "min-h-11 rounded-xl px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2",
+            tone === "header" ? "focus-visible:outline-headerink" : "focus-visible:outline-accent",
+            tone === "header"
+              ? value === tab.value
+                ? "border border-headerink bg-headerink text-headeractionink"
+                : "border border-headerborder text-headerink hover:bg-headeractive"
+              : value === tab.value
+                ? "border border-accent bg-accent text-accentink"
+                : "border border-fieldborder bg-panel text-ink hover:bg-panel2",
           )}
         >
           {tab.label}
-          {tab.count != null && <span className="ml-1.5 text-xs font-normal text-muted">({tab.count})</span>}
+          {tab.count != null && <span className="ml-1.5 text-xs font-normal">({tab.count})</span>}
         </button>
       ))}
     </div>
@@ -148,7 +156,7 @@ export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttribute
     <input
       ref={ref}
       className={cn(
-        "min-w-0 max-w-full w-full rounded-[calc(var(--radius)*0.6)] border bg-panel2 px-3 py-1.5 text-sm outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25",
+        "min-w-0 max-w-full w-full min-h-11 rounded-[10px] border border-fieldborder bg-panel px-3 text-sm text-ink outline-none focus:border-accent/60 focus:ring-2 focus:ring-accent/25",
         className,
       )}
       {...props}
@@ -189,10 +197,72 @@ export const Select = React.forwardRef<
   <select
     ref={ref}
     className={cn(
-      "rounded-[calc(var(--radius)*0.6)] border bg-panel2 px-3 py-1.5 text-sm outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25",
+      "min-h-11 rounded-[10px] border border-fieldborder bg-panel px-3 text-sm text-ink outline-none focus:border-accent/60 focus:ring-2 focus:ring-accent/25",
       className,
     )}
     {...props}
   />
 ));
 Select.displayName = "Select";
+
+export const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(
+  ({ className, ...props }, ref) => (
+    <textarea ref={ref} className={cn("rounded-[10px] border border-fieldborder bg-panel px-3 py-2 text-sm text-ink outline-none focus:border-accent/60 focus:ring-2 focus:ring-accent/25", className)} {...props} />
+  ),
+);
+Textarea.displayName = "Textarea";
+
+export function Field({ label, hint, className, children }: { label: string; hint?: React.ReactNode; className?: string; children: React.ReactNode }) {
+  return (
+    <label className={cn("block", className)}>
+      <span className="mb-1 block text-[13px] font-semibold text-muted">{label}</span>
+      {children}
+      {hint && <span className="block text-[13px] text-muted">{hint}</span>}
+    </label>
+  );
+}
+
+export function Chip({ selected = false, type = "button", className, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { selected?: boolean }) {
+  return <button {...props} type={type} aria-pressed={selected} className={cn(
+    "min-h-11 shrink-0 rounded-xl border px-3.5 text-sm font-semibold transition",
+    selected ? "border-accent bg-accent text-accentink" : "border-fieldborder bg-panel text-ink hover:bg-panel2", className,
+  )} />;
+}
+
+export function IconButton({ surface = false, type = "button", className, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { "aria-label": string; surface?: boolean }) {
+  return <button type={type} className={cn(
+    "grid h-11 w-11 shrink-0 place-items-center rounded-xl transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+    surface ? "bg-panel text-ink hover:bg-panel2" : "text-muted hover:bg-panel2 hover:text-ink", className,
+  )} {...props} />;
+}
+
+export function SegmentedControl<T extends string>({ label, options, value, onChange, className }: {
+  label: string;
+  options: readonly { value: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+  className?: string;
+}) {
+  const selectByKey = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    let next: number;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") next = (index + 1) % options.length;
+    else if (event.key === "ArrowLeft" || event.key === "ArrowUp") next = (index - 1 + options.length) % options.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = options.length - 1;
+    else return;
+    event.preventDefault();
+    onChange(options[next].value);
+    event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("[role=radio]")[next]?.focus();
+  };
+  return (
+    <div role="radiogroup" aria-label={label} className={cn("grid gap-0.5 rounded-xl bg-canvas p-[3px]", className)} style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}>
+      {options.map((option, index) => (
+        <button key={option.value} type="button" role="radio" aria-checked={value === option.value} tabIndex={value === option.value ? 0 : -1}
+          onClick={() => onChange(option.value)} onKeyDown={(event) => selectByKey(event, index)}
+          className={cn("min-h-11 rounded-[9px] text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-accent", value === option.value ? "bg-panel text-ink shadow-sm" : "text-muted hover:text-ink")}>
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}

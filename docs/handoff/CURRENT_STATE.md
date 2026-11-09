@@ -48,7 +48,8 @@ developer's local GitHub CLI session—is the durable publication path.
 - Interactive route maps with topo/OSM layers and optional weather, snow, and
   air-quality overlays.
 - Calendar feeds and configurable report/energy settings.
-- Mobile navigation and responsive coverage at 360, 390, and 430 CSS pixels.
+- Light/Dark/System appearance setting, defaulting to light and saved per device.
+- Mobile navigation and responsive coverage at 360, 390, 430 and 720 CSS pixels.
 - Public, responsive Strider landing page at `/`; the authenticated dashboard is
   available at `/basecamp`.
 - Verified Google accounts can create isolated Strider workspaces. The configured
