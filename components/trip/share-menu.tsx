@@ -2,20 +2,32 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Check, ExternalLink, FileText, Link2, Printer, Share2, Unlink } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Sheet } from "@/components/sheet";
 import { Button } from "@/components/ui";
 import { createTripShareLink, revokeTripShareLink, createTripEditLink, revokeTripEditLink } from "@/app/trips/actions";
 
 export function ShareMenu({
+  icon = false,
   tripId,
   initialToken,
   initialEditToken,
   onGenerateReport,
 }: {
+  icon?: boolean;
   tripId: number;
   initialToken: string | null;
   initialEditToken: string | null;
   onGenerateReport: () => void;
 }) {
+  const [phone, setPhone] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 639px)");
+    const update = () => setPhone(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState(initialToken);
   const [editToken, setEditToken] = useState(initialEditToken);
@@ -24,11 +36,12 @@ export function ShareMenu({
   const [confirmEditRevoke, setConfirmEditRevoke] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const popup = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const close = (event: PointerEvent) => {
-      if (!root.current?.contains(event.target as Node)) setOpen(false);
+      if (!root.current?.contains(event.target as Node) && !popup.current?.contains(event.target as Node)) setOpen(false);
     };
     document.addEventListener("pointerdown", close);
     return () => document.removeEventListener("pointerdown", close);
@@ -91,47 +104,48 @@ export function ShareMenu({
     });
   };
 
+  const menu = <div role="menu" aria-label="Trip sharing" className="text-ink">
+    <a href={`/trips/${tripId}/print`} target="_blank" rel="noreferrer" role="menuitem" className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm hover:bg-panel2">
+      <Printer size={18} className="shrink-0 text-muted" />
+      <span><span className="block font-semibold">Print trip</span><span className="block text-xs text-muted">Open the printable trip sheet</span></span>
+    </a>
+    <button type="button" role="menuitem" onClick={() => { setOpen(false); onGenerateReport(); }} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-panel2">
+      <FileText size={18} className="shrink-0 text-muted" />
+      <span><span className="block font-semibold">Generate pre-trip report</span><span className="block text-xs text-muted">Choose sections and export</span></span>
+    </button>
+    <div className="mt-3 rounded-xl bg-panel2 p-3">
+      <div className="font-semibold">View-only link</div>
+      <p className="mt-1 text-xs text-muted">Live trip details, no private notes</p>
+      <div className="mt-2 flex gap-2">
+        <Button role="menuitem" className="flex-1" aria-label={copied ? "Link copied" : token ? "Copy view-only link" : "Create view-only link"} onClick={copyLink} disabled={pending}>
+          {copied ? <Check size={16} /> : <Link2 size={16} />}{copied ? "Copied" : token ? "Copy link" : "Create link"}
+        </Button>
+        {token && <Button role="menuitem" variant="danger" aria-label={confirmRevoke ? "Confirm revoke" : "Revoke view-only link"} onClick={revoke} disabled={pending}><Unlink size={16} />{confirmRevoke ? "Confirm" : "Revoke"}</Button>}
+      </div>
+      {token && <a href={`/share/trips/${token}`} target="_blank" rel="noreferrer" role="menuitem" className="mt-1 flex min-h-11 items-center gap-2 text-xs text-muted hover:text-ink"><ExternalLink size={14} />Open view-only page</a>}
+    </div>
+    <div className="mt-3 rounded-xl bg-panel2 p-3">
+      <div className="font-semibold">Edit link</div>
+      <p className="mt-1 text-xs text-muted">Sign-in required · private notes excluded</p>
+      <div className="mt-2 flex gap-2">
+        <Button role="menuitem" className="flex-1" aria-label={editToken ? "Copy edit link" : "Create edit link"} onClick={copyEditLink} disabled={pending}><Link2 size={16} />{editToken ? "Copy link" : "Create link"}</Button>
+        {editToken && <Button role="menuitem" variant="danger" aria-label={confirmEditRevoke ? "Confirm revoke edit link" : "Revoke edit link"} onClick={revokeEdit} disabled={pending}><Unlink size={16} />{confirmEditRevoke ? "Confirm" : "Revoke"}</Button>}
+      </div>
+      {editToken && <a href={`/share/trips/${editToken}`} target="_blank" rel="noreferrer" role="menuitem" className="mt-1 flex min-h-11 items-center gap-2 text-xs text-muted hover:text-ink"><ExternalLink size={14} />Open edit link</a>}
+    </div>
+    {message && <div role="status" className="mt-3 border-t px-3 py-2 text-xs leading-relaxed text-muted">{message}</div>}
+  </div>;
+
   return (
     <div ref={root} className="relative">
-      <Button variant="outline" onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open}>
-        <Share2 size={16} /> Share
+      <Button variant={icon ? "headerOutline" : "header"} className={icon ? "w-11 px-0" : undefined} aria-label="Share" onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open}>
+        {icon && <Share2 size={18} />}{!icon && "Share"}
       </Button>
-      {open && (
-        <div role="menu" className="absolute right-0 z-[1200] mt-2 w-64 overflow-hidden rounded-lg border bg-panel p-1.5 shadow-xl">
-          <a href={`/trips/${tripId}/print`} target="_blank" rel="noreferrer" role="menuitem" className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm hover:bg-panel2">
-            <Printer size={16} className="text-muted" />
-            <span><span className="block font-medium">Print trip</span><span className="block text-xs text-muted">Open the printable trip sheet</span></span>
-          </a>
-          <button type="button" role="menuitem" onClick={() => { setOpen(false); onGenerateReport(); }} className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-panel2">
-            <FileText size={16} className="text-muted" />
-            <span><span className="block font-medium">Generate pre-trip report</span><span className="block text-xs text-muted">Choose sections and export</span></span>
-          </button>
-          <button type="button" role="menuitem" onClick={copyLink} disabled={pending} className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-panel2 disabled:opacity-50">
-            {copied ? <Check size={16} className="text-accent" /> : <Link2 size={16} className="text-muted" />}
-            <span><span className="block font-medium">{copied ? "Link copied" : token ? "Copy view-only link" : "Create view-only link"}</span><span className="block text-xs text-muted">Live trip details, no private notes</span></span>
-          </button>
-          {token && (
-            <>
-              <a href={`/share/trips/${token}`} target="_blank" rel="noreferrer" role="menuitem" className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm text-muted hover:bg-panel2 hover:text-ink">
-                <ExternalLink size={16} /> Open view-only page
-              </a>
-              <button type="button" role="menuitem" onClick={revoke} disabled={pending} className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-muted hover:bg-panel2 hover:text-ink disabled:opacity-50">
-                <Unlink size={16} /> {confirmRevoke ? "Confirm revoke" : "Revoke view-only link"}
-              </button>
-            </>
-          )}
-          <div className="mt-1 border-t pt-1">
-            <button type="button" role="menuitem" onClick={copyEditLink} disabled={pending} className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-panel2 disabled:opacity-50">
-              <Link2 size={16} className="text-muted" />
-              <span><span className="block font-medium">{editToken ? "Copy edit link" : "Create edit link"}</span><span className="block text-xs text-muted">Sign-in required · private notes excluded</span></span>
-            </button>
-            {editToken && <>
-              <a href={`/share/trips/${editToken}`} target="_blank" rel="noreferrer" role="menuitem" className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm text-muted hover:bg-panel2 hover:text-ink"><ExternalLink size={16} /> Open edit link</a>
-              <button type="button" role="menuitem" onClick={revokeEdit} disabled={pending} className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-muted hover:bg-panel2 hover:text-ink disabled:opacity-50"><Unlink size={16} /> {confirmEditRevoke ? "Confirm revoke edit link" : "Revoke edit link"}</button>
-            </>}
-          </div>
-          {message && <div role="status" className="border-t px-3 py-2 text-xs leading-relaxed text-muted">{message}</div>}
-        </div>
+      {phone ? <Sheet open={open} onClose={() => setOpen(false)} title="Share trip">{menu}</Sheet> : open && createPortal(
+        <div ref={popup} style={{ top: (root.current?.getBoundingClientRect().bottom ?? 0) + 8, right: Math.max(16, window.innerWidth - (root.current?.getBoundingClientRect().right ?? window.innerWidth)) }} className="fixed z-[2200] w-80 max-w-[calc(100vw-2rem)] rounded-2xl border bg-panel p-3 shadow-xl" onKeyDown={(event) => { if (event.key === "Escape") setOpen(false); }}>
+          <h2 className="mb-2 px-3 font-display text-xl font-bold">Share trip</h2>
+          {menu}
+        </div>, document.body
       )}
     </div>
   );

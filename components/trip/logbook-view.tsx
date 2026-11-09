@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Badge, Chip, SegmentedControl } from "@/components/ui";
-import { fmtLbs } from "@/lib/util";
+import { fmtLbs, fmtDateRange } from "@/lib/util";
 import { TripsTable } from "./trips-table";
 import { RouteMapThumb } from "./route-map-thumb";
 import type { TripSummary } from "@/lib/trip";
@@ -43,7 +43,7 @@ export function LogbookView({ trips, shared, initialSection }: { trips: TripSumm
       <div className="min-w-0 flex-1 p-5 sm:p-6">
         <p className="text-sm font-semibold text-signal">Next up{countdown != null ? ` · in ${countdown} days` : ""}</p>
         <h2 className="mt-2 break-words font-display text-[28px] font-bold leading-tight sm:text-[32px]">{next.name}</h2>
-        <p className="mt-1 text-sm text-muted">{[next.region, next.startDate ?? "No dates"].filter(Boolean).join(" · ")}</p>
+        <p className="mt-1 text-sm text-muted">{[next.region, fmtDateRange(next.startDate, next.nights) ?? "No dates"].filter(Boolean).join(" · ")}</p>
         <div className="mt-5 grid grid-cols-4 gap-2">
           {[["Miles", next.distanceMi ?? "—"], ["Feet gain", elevation(next.elevationFt)], ["Nights", next.nights ?? "—"], ["Base lb", (next.baseG / 453.59237).toFixed(1)]].map(([label, value]) => <div key={label}><div className="font-display text-[23px] font-bold">{value}</div><div className="text-xs text-muted">{label}</div></div>)}
         </div>
@@ -57,7 +57,7 @@ export function LogbookView({ trips, shared, initialSection }: { trips: TripSumm
       {shared.length === 0 && <p className="text-sm text-muted">Open a trip link while signed in to find it here.</p>}
       {shared.map((t) => <Link key={t.id} href={t.href} className="card block p-4 transition hover:border-accent/50">
         <div className="flex items-start justify-between gap-3"><span className="font-display font-semibold">{t.name}</span><Badge tone={t.permission === "edit" ? "current" : "neutral"}>{t.permission === "edit" ? "Can edit" : "View only"}</Badge></div>
-        <div className="readout mt-2 text-sm text-muted">{[t.region, t.startDate, t.distanceMi == null ? null : `${t.distanceMi} mi`].filter(Boolean).join(" · ")}</div>
+        <div className="readout mt-2 text-sm text-muted">{[t.region, fmtDateRange(t.startDate, t.nights) ?? "No dates", t.distanceMi == null ? null : `${t.distanceMi} mi`].filter(Boolean).join(" · ")}</div>
       </Link>)}
     </div> : <>
       {visible.length === 0 && <p className="py-4 text-sm text-muted">No trips in this section yet.</p>}
@@ -67,8 +67,8 @@ export function LogbookView({ trips, shared, initialSection }: { trips: TripSumm
           <Thumbnail trip={t} className="h-auto min-h-[88px] w-[68px] sm:h-24 sm:min-h-0 sm:w-full" />
           <div className="min-w-0 p-3">
             <h2 className="break-words font-display text-base font-bold">{t.name}</h2>
-            <p className="mt-0.5 text-xs text-muted">{[t.region, t.startDate ?? "No dates"].filter(Boolean).join(" · ")}</p>
-            <p className="readout mt-1 text-xs">{t.distanceMi ?? "—"} mi · {elevation(t.elevationFt)} ft · {t.nights ?? "—"} nights</p>
+            <p className="mt-0.5 text-xs text-muted">{[t.region, fmtDateRange(t.startDate, t.nights) ?? "No dates"].filter(Boolean).join(" · ")}</p>
+            <p className="readout mt-1 text-xs">{t.status === "idea" && t.distanceMi == null && t.elevationFt == null && t.nights == null ? "Idea · no route yet" : [t.distanceMi == null ? null : `${t.distanceMi} mi`, t.elevationFt == null ? null : `${elevation(t.elevationFt)} ft`, t.nights == null ? null : `${t.nights} nights`].filter(Boolean).join(" · ")}</p>
             <span className="sr-only">Base {fmtLbs(t.baseG)}</span>
           </div>
         </Link>)}

@@ -11,7 +11,7 @@ export type CatSlice = { name: string; g: number; items: SliceItem[] };
 
 // Base weight only — consumables and worn gear are trip-specific and live on
 // the trip page, not in this generic number. Two views of the same breakdown.
-export function BaseBar({ baseG, byCategory, loadoutControl }: { baseG: number; byCategory: CatSlice[]; loadoutControl?: ReactNode }) {
+export function BaseBar({ baseG, byCategory, loadoutControl, layout = "list" }: { baseG: number; byCategory: CatSlice[]; loadoutControl?: ReactNode; layout?: "list" | "inline" }) {
   const [expanded, setExpanded] = useState(false);
   const [view, setView] = useState<"bar" | "pie">("bar");
   const [hover, setHover] = useState<string | null>(null);
@@ -55,13 +55,13 @@ export function BaseBar({ baseG, byCategory, loadoutControl }: { baseG: number; 
               </button>
             ))}
           </div>
-          <Legend slices={slices} baseG={baseG} cols="grid-cols-1 sm:grid-cols-2 desk:grid-cols-1" hover={hover} setHover={setHover} onSelect={setSelected} />
+          <Legend slices={slices} baseG={baseG} inline={layout === "inline"} cols="grid-cols-1 sm:grid-cols-2 desk:grid-cols-1" hover={hover} setHover={setHover} onSelect={setSelected} />
         </>
       ) : (
         <div className="mt-3 flex flex-wrap items-center gap-4">
           <Donut slices={slices} baseG={baseG} hover={hover} setHover={setHover} active={active} onSelect={setSelected} />
           <div className="min-w-48 flex-1">
-            <Legend slices={slices} baseG={baseG} cols="grid-cols-1" pct hover={hover} setHover={setHover} onSelect={setSelected} />
+            <Legend slices={slices} baseG={baseG} inline={layout === "inline"} cols="grid-cols-1" pct hover={hover} setHover={setHover} onSelect={setSelected} />
           </div>
         </div>
       )}
@@ -171,6 +171,7 @@ function Legend({
   slices,
   baseG,
   cols,
+  inline = false,
   pct,
   hover,
   setHover,
@@ -179,13 +180,14 @@ function Legend({
   slices: CatSlice[];
   baseG: number;
   cols: string;
+  inline?: boolean;
   pct?: boolean;
   hover: string | null;
   setHover: (n: string | null) => void;
   onSelect: (n: string) => void;
 }) {
   return (
-    <div className={`mt-2 grid ${cols} gap-x-6 gap-y-0.5`}>
+    <div className={`mt-2 ${inline ? "flex flex-wrap" : `grid ${cols}`} gap-x-6 gap-y-0.5`}>
       {slices.map((s) => (
         <button
           type="button"
@@ -195,13 +197,13 @@ function Legend({
           onFocus={() => setHover(s.name)}
           onBlur={() => setHover(null)}
           onClick={() => onSelect(s.name)}
-          className={`flex min-h-11 w-full touch-manipulation items-center text-left gap-2 text-sm transition-opacity sm:min-h-7 ${
+          className={`flex min-h-11 ${inline ? "w-auto" : "w-full"} touch-manipulation items-center text-left gap-2 text-sm transition-opacity sm:min-h-7 ${
             hover && hover !== s.name ? "opacity-40" : "opacity-100"
           }`}
         >
           <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: categoryColor(s.name) }} />
           <span className={hover === s.name ? "font-semibold" : "font-medium"}>{s.name}</span>
-          <span className="readout ml-auto text-muted">
+          <span className={`readout ${inline ? "" : "ml-auto"} text-muted`}>
             {gToOz(s.g).toFixed(1)} oz{pct && ` · ${((s.g / baseG) * 100).toFixed(0)}%`}
           </span>
         </button>

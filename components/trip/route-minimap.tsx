@@ -2,6 +2,7 @@
 
 import "leaflet/dist/leaflet.css";
 import { MapContainer, TileLayer, Polyline } from "react-leaflet";
+import { MAP_COLORS } from "@/lib/map-style";
 import type { LatLngBoundsExpression } from "leaflet";
 
 // Non-interactive tile map for cards. All gestures off; the wrapping card owns
@@ -29,7 +30,7 @@ export default function RouteMiniMap({ track, className }: { track: [number, num
       className={className}
     >
       <TileLayer url="https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}" maxNativeZoom={16} />
-      <Polyline positions={track} pathOptions={{ color: "#c42e63", weight: 3 }} />
+      <Polyline positions={track} pathOptions={{ color: MAP_COLORS.route, weight: 3 }} />
     </MapContainer>
   );
 }

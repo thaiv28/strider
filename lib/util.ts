@@ -41,3 +41,18 @@ export function fmtUsd(cents: number | null | undefined): string {
     maximumFractionDigits: 2,
   })}`;
 }
+
+/** Format calendar dates in UTC, keeping the stored day in every timezone. */
+export function fmtDateRange(startDate: string | null, nights: number | null): string | null {
+  if (!startDate) return null;
+  const [year, month, day] = startDate.split("-").map(Number);
+  const start = new Date(Date.UTC(year, month - 1, day));
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + (nights ?? 0));
+  const monthName = (date: Date) => date.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
+  const short = (date: Date) => `${monthName(date)} ${date.getUTCDate()}`;
+  const full = (date: Date) => `${short(date)}, ${date.getUTCFullYear()}`;
+  if (!nights) return full(start);
+  if (start.getUTCFullYear() !== end.getUTCFullYear()) return `${full(start)}–${full(end)}`;
+  return `${short(start)}–${start.getUTCMonth() === end.getUTCMonth() ? end.getUTCDate() : short(end)}, ${end.getUTCFullYear()}`;
+}

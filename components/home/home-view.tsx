@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fmtDateRange } from "@/lib/util";
 import { PageHeader, PageBody } from "@/components/page-header";
 
 import { BaseBar, type CatSlice } from "@/components/gear/base-bar";
@@ -43,7 +44,7 @@ export function HomeView({ trips, baseG, byCategory, nextReady }: Props) {
 
   const recent = [...trips].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime() || b.id - a.id).slice(0, 3);
   const days = next?.startDate ? Math.max(0, Math.ceil((new Date(`${next.startDate}T00:00:00`).getTime() - Date.now()) / 86400000)) : null;
-  const where = (t: TripCard) => [t.region, t.startDate ?? "Date TBD"].filter(Boolean).join(" · ");
+  const where = (t: TripCard) => [t.region, fmtDateRange(t.startDate, t.nights) ?? "No dates"].filter(Boolean).join(" · ");
   return (
     <>
       <PageHeader title="Basecamp">
@@ -66,7 +67,7 @@ export function HomeView({ trips, baseG, byCategory, nextReady }: Props) {
             </div>
           </div>
         </Link>}
-        <BaseBar baseG={baseG} byCategory={byCategory} />
+        <BaseBar layout="inline" baseG={baseG} byCategory={byCategory} />
         <section aria-label="Recent trips">
           <div className="flex items-center justify-between gap-3">
             <h2 className="font-display text-[22px] font-bold">Recent trips</h2>
@@ -76,7 +77,7 @@ export function HomeView({ trips, baseG, byCategory, nextReady }: Props) {
             {recent.map((t) => <a key={t.id} href={`/trips/${t.id}`} className="card overflow-hidden transition hover:border-accent/50">
               {t.track && t.track.length > 1 ? <RouteMapThumb track={t.track} className="h-28 w-full" /> : <div className="h-28 bg-map" aria-hidden="true" />}
               <div className="p-3"><div className="font-bold">{t.name}</div><div className="mt-1 text-xs text-muted">{where(t)}</div>
-                <div className="mt-2 text-sm tabular-nums">{t.distanceMi || "—"} mi · {t.elevationFt ? `${(t.elevationFt / 1000).toFixed(1)}k ft` : "—"} · {t.nights ?? "—"} nights</div>
+                <div className="mt-2 text-sm tabular-nums">{t.status === "idea" && !t.distanceMi && !t.elevationFt && t.nights == null ? "Idea · no route yet" : [!t.distanceMi ? null : `${t.distanceMi} mi`, !t.elevationFt ? null : `${(t.elevationFt / 1000).toFixed(1)}k ft`, t.nights == null ? null : `${t.nights} nights`].filter(Boolean).join(" · ")}</div>
               </div>
             </a>)}
           </div>

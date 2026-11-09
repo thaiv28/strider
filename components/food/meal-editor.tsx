@@ -153,9 +153,9 @@ export function MealEditor({ meal, ingredients, onBack, exitRef, isNew = false }
           <Stat label="Efficiency">{calOz != null ? `${calOz.toFixed(0)} cal/oz` : "—"}</Stat>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className="mt-3 flex items-center gap-2 whitespace-nowrap">
           <label htmlFor={`meal-preview-${meal.id}`} className="text-[13px] font-semibold text-muted">Show amounts for</label>
-          <Input id={`meal-preview-${meal.id}`} className="w-16" type="number" min="1" step="1" value={preview}
+          <Input id={`meal-preview-${meal.id}`} className="!w-16 shrink-0" type="number" min="1" step="1" value={preview}
             onChange={(e) => setPreview(Math.max(1, Number(e.target.value) || 1))} />
           <span className="text-sm text-muted">servings</span>
         </div>

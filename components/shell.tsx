@@ -20,7 +20,7 @@ const MOBILE_NAV = [...NAV, { href: "/calendar", label: "Calendar", icon: Calend
 export function Shell({ children, signedIn }: { children: React.ReactNode; signedIn: boolean }) {
   const path = usePathname();
   const { requestNavigate } = useUnsaved();
-  const tripDetail = /^\/trips\/\d+$/.test(path);
+  const tripDetail = /^\/trips\/\d+$/.test(path) || (signedIn && path.startsWith("/share/trips/"));
   const sharedTrip = path.startsWith("/share/trips/");
   const tripsHref = sharedTrip ? "/trips?section=shared" : "/trips";
   const isActive = (href: string) => path.startsWith(href) || (href === "/trips" && sharedTrip);

@@ -72,13 +72,14 @@ export function Button({
   className,
   ...props
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "ghost" | "outline" | "danger" | "header";
+  variant?: "primary" | "ghost" | "outline" | "danger" | "header" | "headerOutline";
 }) {
   const styles = {
     primary: "bg-accent text-accentink hover:opacity-90",
     outline: "border border-fieldborder bg-panel text-ink hover:bg-panel2",
     ghost: "text-muted hover:bg-panel2 hover:text-ink",
     danger: "text-signal hover:bg-signal/10",
+    headerOutline: "border border-headerborder bg-transparent text-headerink hover:bg-headeractive focus-visible:outline-headerink",
     header: "bg-headerink text-headeractionink hover:opacity-90 focus-visible:outline-headerink",
   }[variant];
   return (

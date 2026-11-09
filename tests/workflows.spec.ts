@@ -27,7 +27,9 @@ test.afterAll(async ({ browser }) => {
       const trip = page.locator('a[href^="/trips/"]').filter({ hasText: /^E2E (?:trip|verified) / }).first();
       if (!(await trip.count())) break;
       await trip.click();
-      const button = page.getByRole("button", { name: "Delete trip" });
+      const more = page.getByRole("button", { name: "More trip options", exact: true });
+      if (await more.isVisible().catch(() => false)) await more.click();
+      const button = page.getByRole("menuitem", { name: "Delete trip", exact: true });
       page.once("dialog", (dialog) => dialog.accept());
       await Promise.all([page.waitForURL((url) => url.pathname === "/trips"), button.click()]);
     }
@@ -60,7 +62,7 @@ test("protected pages redirect to sign in", async ({ browser }) => {
   await expect(page.getByRole("heading", { name: "Privacy Policy", exact: true })).toBeVisible();
   await page.goto(`${baseURL}/trips`);
   await expect.poll(() => new URL(page.url()).pathname).toBe("/login");
-  await expect(page.getByRole("heading", { name: "Sign in to Strider" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Strider", exact: true })).toBeVisible();
   await context.close();
 });
 
@@ -89,7 +91,9 @@ test("private trips are isolated between accounts", async ({ browser }) => {
   } finally {
     if (tripUrl) {
       await ownerPage.goto(tripUrl);
-      const button = ownerPage.getByRole("button", { name: "Delete trip" });
+      const more = ownerPage.getByRole("button", { name: "More trip options", exact: true });
+      if (await more.isVisible().catch(() => false)) await more.click();
+      const button = ownerPage.getByRole("menuitem", { name: "Delete trip", exact: true });
       if (await button.isVisible().catch(() => false)) {
         ownerPage.once("dialog", (dialog) => dialog.accept());
         await Promise.all([ownerPage.waitForURL((url) => url.pathname === "/trips"), button.click()]);
@@ -128,17 +132,17 @@ test("view and edit links grant distinct, revocable access", async ({ browser })
     await expect(guestPage).toHaveURL(/\/login\?callbackUrl=/);
     await guestPage.goto(viewLink!);
     await expect(guestPage.getByTestId("shared-trip")).toBeVisible();
-    await expect(guestPage.getByRole("link", { name: "STRIDER" })).toHaveCount(0);
+    await expect(guestPage.getByRole("link", { name: "Strider", exact: true })).toBeVisible();
 
     await authenticate(visitorPage, "e2e-collaborator@strider.invalid");
     await visitorPage.goto(viewLink!);
-    await expect(visitorPage.getByRole("link", { name: "STRIDER" })).toBeVisible();
+    await expect(visitorPage.getByRole("link", { name: "Strider", exact: true })).toBeVisible();
     await visitorPage.getByRole("link", { name: "Gear", exact: true }).click();
     await expect(visitorPage).toHaveURL(/\/gear$/);
     await visitorPage.goto(viewLink!);
     await visitorPage.getByRole("link", { name: "Trips", exact: true }).click();
     await expect(visitorPage).toHaveURL(/\/trips\?section=shared$/);
-    await expect(visitorPage.getByRole("tab", { name: /Shared with me/ })).toHaveAttribute("aria-selected", "true");
+    await expect(visitorPage.getByRole("button", { name: /Shared with me/ })).toHaveAttribute("aria-pressed", "true");
     await expect(visitorPage.getByRole("link", { name: /View only/ })).toContainText(name);
     expect((await visitorPage.getByRole("link", { name: /View only/ }).getAttribute("href"))).toBe(viewLink);
     expect((await visitorPage.goto(tripUrl!))?.status()).toBe(404);
@@ -146,6 +150,7 @@ test("view and edit links grant distinct, revocable access", async ({ browser })
     await visitorPage.goto(editLink!);
     await expect(visitorPage).toHaveURL(tripUrl!);
     await expect(visitorPage.getByRole("button", { name: "Delete trip" })).toHaveCount(0);
+    await expect(visitorPage.getByRole("menuitem", { name: "Delete trip" })).toHaveCount(0);
     await expect(visitorPage.getByRole("button", { name: "Share", exact: true })).toHaveCount(0);
     await visitorPage.getByRole("button", { name: "Report", exact: true }).click();
     await expect(visitorPage.getByText("Trip report (private notes)")).toHaveCount(0);
@@ -153,7 +158,7 @@ test("view and edit links grant distinct, revocable access", async ({ browser })
     await ownerPage.reload();
     await expect(ownerPage.getByLabel("Trip name")).toHaveValue(`${name} edited`);
     await visitorPage.goto("/trips");
-    await visitorPage.getByRole("tab", { name: /Shared with me/ }).click();
+    await visitorPage.getByRole("button", { name: /Shared with me/ }).click();
     await expect(visitorPage.getByRole("link", { name: /Can edit/ })).toContainText(`${name} edited`);
 
     await ownerPage.getByRole("button", { name: "Share", exact: true }).click();
@@ -162,18 +167,20 @@ test("view and edit links grant distinct, revocable access", async ({ browser })
     await expect(ownerPage.getByRole("status")).toContainText("Edit access revoked.");
     expect((await visitorPage.goto(tripUrl!))?.status()).toBe(404);
     await visitorPage.goto("/trips");
-    await visitorPage.getByRole("tab", { name: /Shared with me/ }).click();
+    await visitorPage.getByRole("button", { name: /Shared with me/ }).click();
     await expect(visitorPage.getByRole("link", { name: /View only/ })).toBeVisible();
     await ownerPage.getByRole("menuitem", { name: "Revoke view-only link" }).click();
     await ownerPage.getByRole("menuitem", { name: "Confirm revoke" }).click();
     await expect(ownerPage.getByRole("status")).toContainText("View-only link revoked.");
     await visitorPage.reload();
-    await visitorPage.getByRole("tab", { name: /Shared with me/ }).click();
+    await visitorPage.getByRole("button", { name: /Shared with me/ }).click();
     await expect(visitorPage.getByText("Open a trip link while signed in")).toBeVisible();
   } finally {
     if (tripUrl) {
       await ownerPage.goto(tripUrl);
-      const button = ownerPage.getByRole("button", { name: "Delete trip" });
+      const more = ownerPage.getByRole("button", { name: "More trip options", exact: true });
+      if (await more.isVisible().catch(() => false)) await more.click();
+      const button = ownerPage.getByRole("menuitem", { name: "Delete trip", exact: true });
       if (await button.isVisible().catch(() => false)) {
         ownerPage.once("dialog", (dialog) => dialog.accept());
         await Promise.all([ownerPage.waitForURL((url) => url.pathname === "/trips"), button.click()]);
@@ -199,7 +206,9 @@ test("a trip can be planned, shared, exported, and deleted", async ({ browser, c
   const deleteCreatedTrip = async () => {
     if (!tripUrl) return;
     await page.goto(tripUrl);
-    const button = page.getByRole("button", { name: "Delete trip" });
+    const more = page.getByRole("button", { name: "More trip options", exact: true });
+    if (await more.isVisible().catch(() => false)) await more.click();
+    const button = page.getByRole("menuitem", { name: "Delete trip", exact: true });
     if (!(await button.isVisible().catch(() => false))) return;
     page.once("dialog", (dialog) => dialog.accept());
     await Promise.all([
@@ -237,7 +246,7 @@ test("a trip can be planned, shared, exported, and deleted", async ({ browser, c
     await fillAndSave(page, "Region", "E2E Test Range");
     await fillAndSave(page, "Area type", "Test wilderness");
 
-    await page.getByRole("button", { name: "+ Add day" }).click();
+    await page.getByRole("button", { name: "Add day", exact: true }).click();
     await expect(page.getByLabel("Day 1 distance in miles")).toBeVisible();
     await fillAndSave(page, "Day 1 distance in miles", "4.5");
     await fillAndSave(page, "Day 1 elevation gain in feet", "1200");
@@ -270,7 +279,9 @@ test("a trip can be planned, shared, exported, and deleted", async ({ browser, c
       buffer: Buffer.from(gpx),
     });
     await page.getByRole("button", { name: "Upload", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Use these for the trip" })).toBeVisible();
+    await page.getByRole("button", { name: "Route options", exact: true }).click();
+    await expect(page.getByRole("menuitem", { name: "Use route distance and gain", exact: true })).toBeVisible();
+    await page.keyboard.press("Escape");
 
     await page.getByRole("button", { name: "Planning", exact: true }).click();
     const permitInput = page.locator('input[type="file"][accept^="application/pdf"]');
@@ -286,7 +297,7 @@ test("a trip can be planned, shared, exported, and deleted", async ({ browser, c
     await page.getByRole("button", { name: "Logistics", exact: true }).click();
     await expect(page.getByLabel("Region", { exact: true })).toHaveValue("E2E Test Range");
     await expect(page.getByLabel("Day 1 distance in miles")).toHaveValue(/4\.5/);
-    await expect(page.getByRole("button", { name: "Use these for the trip" })).toBeVisible();
+    await expect(page.getByTestId("elevation-profile")).toBeVisible();
 
     // Use a real touch context: a tap may not deliver a pointermove before click.
     const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
@@ -333,6 +344,7 @@ test("a trip can be planned, shared, exported, and deleted", async ({ browser, c
     expect(imageResponse.status()).toBe(200);
     expect(imageResponse.headers()["content-type"]).toContain("image/png");
     await expect(sharedPage.getByText("Trip report (private notes)")).toHaveCount(0);
+    await sharedPage.getByRole("button", { name: "Planning", exact: true }).click();
     await expect(sharedPage.getByRole("link", { name: "permit.pdf" })).toBeVisible();
     await guest.close();
 

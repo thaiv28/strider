@@ -68,7 +68,7 @@ export default function RouteMap({
   return (
     <MapContainer bounds={bounds} scrollWheelZoom={false} className={className} style={{ height: fill ? "100%" : "20rem", width: "100%" }}>
       <ResizeMap />
-      <LayersControl position={fill ? "bottomright" : "topright"}>
+      <LayersControl position="topright">
         <LayersControl.BaseLayer checked name="Topo">
           <TileLayer
             attribution="&copy; USGS The National Map"
@@ -114,10 +114,10 @@ export default function RouteMap({
             key={label}
             center={[grp[0].lat!, grp[0].lon!]}
             radius={9}
-            pathOptions={{ color: "var(--accentink)", weight: 2, fillColor: "var(--accent)", fillOpacity: 1 }}
+            pathOptions={{ color: "#ffffff", weight: 2, fillColor: "#17382d", fillOpacity: 1 }}
           >
             <Tooltip permanent direction="top" offset={[0, -6]}>
-              <span style={{ fontWeight: 700, color: "var(--accent)" }}>{label}</span>
+              <span style={{ fontWeight: 700, color: "#17382d" }}>{label}</span>
             </Tooltip>
           </CircleMarker>
         );

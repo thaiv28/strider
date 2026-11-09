@@ -118,8 +118,8 @@ export function CalendarView({ initial }: { initial: CalendarData }) {
   return (
     <div className={pending ? "opacity-60 transition" : "transition"}>
       <PageHeader title="Calendar" actions={<div className="flex items-center gap-2">
-        <IconButton onClick={() => shift(-1)} className="border border-headerborder text-headerink hover:bg-headeractive hover:text-headerink" aria-label="Previous month"><ChevronLeft size={18} /></IconButton>
-        <IconButton onClick={() => shift(1)} className="border border-headerborder text-headerink hover:bg-headeractive hover:text-headerink" aria-label="Next month"><ChevronRight size={18} /></IconButton>
+        <IconButton onClick={() => shift(-1)} className="border border-headerborder text-headerink! hover:bg-headeractive! hover:text-headerink!" aria-label="Previous month"><ChevronLeft size={18} /></IconButton>
+        <IconButton onClick={() => shift(1)} className="border border-headerborder text-headerink! hover:bg-headeractive! hover:text-headerink!" aria-label="Next month"><ChevronRight size={18} /></IconButton>
         <Button variant="header" onClick={jumpToday}>Today</Button>
       </div>}><p className="text-headermuted">{data.label}</p></PageHeader>
       <PageBody className="space-y-3">
