@@ -242,6 +242,13 @@ test("a trip can be planned, shared, exported, and deleted", async ({ browser, c
     await fillAndSave(page, "Day 1 distance in miles", "4.5");
     await fillAndSave(page, "Day 1 elevation gain in feet", "1200");
 
+    // Basecamp must reflect the trip's own stats, not only linked-trail defaults.
+    await page.goto("/basecamp");
+    const basecampCard = page.locator('a[href^="/trips/"]').filter({ hasText: updatedName });
+    await expect(basecampCard).toContainText("4.5 mi");
+    await expect(basecampCard).toContainText("1.2k ft");
+    await page.goto(tripUrl);
+
     await page.getByRole("button", { name: "Share", exact: true }).click();
     const printHref = await page
       .getByRole("menuitem", { name: /Print trip/ })

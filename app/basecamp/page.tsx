@@ -1,12 +1,11 @@
 import { eq, asc } from "drizzle-orm";
 import { db, schema } from "@/src/db/index";
 import { getCurrentUserId, getDefaultBaseBreakdown } from "@/lib/gear";
+import { effectiveRouteStats } from "@/lib/trip";
 import { HomeView, type TripCard, type NextReady } from "@/components/home/home-view";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: { absolute: "Basecamp · Strider" } };
-
-const num = (s: string | null) => (s == null ? 0 : Number(s) || 0);
 
 export default async function BasecampPage() {
   const userId = await getCurrentUserId();
@@ -22,8 +21,12 @@ export default async function BasecampPage() {
         trailRegion: schema.trail.region,
         areaType: schema.trip.areaType,
         trailAreaType: schema.trail.areaType,
-        distanceMi: schema.trail.typicalDistanceMi,
-        elevationFt: schema.trail.typicalElevationFt,
+        distanceMi: schema.trip.distanceMi,
+        elevationGainFt: schema.trip.elevationGainFt,
+        gpxDistanceMi: schema.tripGpx.distanceMi,
+        gpxElevationGainFt: schema.tripGpx.elevationGainFt,
+        typicalDistanceMi: schema.trail.typicalDistanceMi,
+        typicalElevationFt: schema.trail.typicalElevationFt,
         track: schema.tripGpx.track,
       })
       .from(schema.trip)
@@ -34,18 +37,25 @@ export default async function BasecampPage() {
     getDefaultBaseBreakdown(userId),
   ]);
 
-  const trips: TripCard[] = rows.map((t) => ({
-    id: t.id,
-    name: t.name,
-    status: t.status,
-    startDate: t.startDate,
-    nights: t.nights,
-    region: t.region ?? t.trailRegion ?? null,
-    areaType: t.areaType ?? t.trailAreaType ?? null,
-    distanceMi: num(t.distanceMi),
-    elevationFt: t.elevationFt,
-    track: t.track ?? null,
-  }));
+  const trips: TripCard[] = rows.map((t) => {
+    const route = effectiveRouteStats(
+      t,
+      { distanceMi: t.gpxDistanceMi, elevationGainFt: t.gpxElevationGainFt },
+      t,
+    );
+    return {
+      id: t.id,
+      name: t.name,
+      status: t.status,
+      startDate: t.startDate,
+      nights: t.nights,
+      region: t.region ?? t.trailRegion ?? null,
+      areaType: t.areaType ?? t.trailAreaType ?? null,
+      distanceMi: route.distanceMi ?? 0,
+      elevationFt: route.elevationFt,
+      track: t.track ?? null,
+    };
+  });
 
   // Readiness chips for the next planned objective reflect what's actually attached.
   const next = trips.find((t) => t.status === "planned");
