@@ -24,26 +24,28 @@ export default async function SettingsPage() {
   return (
     <>
       <PageHeader title="Settings" actions={<form action={logout}><Button variant="header" type="submit">Log out</Button></form>} />
-      <PageBody className="max-w-2xl space-y-6">
-        <AppearanceSetting />
-        <EnergyModel
-          params={{
-            bmr: ep?.bmr ?? 1735,
-            calPerMile: ep?.calPerEnergyMile ?? 200,
-            ftPerMile: ep?.ftPerEnergyMile ?? 625,
-            sex: ep?.sex ?? null,
-            weightLb: num(ep?.weightLb ?? null),
-            heightIn: num(ep?.heightIn ?? null),
-            ageYears: ep?.ageYears ?? null,
-          }}
-        />
-
-        <ReportTemplate
-          template={rs?.template ?? DEFAULT_TEMPLATE}
-          packingDefault={rs?.packingDefault ?? DEFAULT_PACKING}
-        />
-
-        <CalendarFeeds feeds={feeds.map((f) => ({ id: f.id, label: f.label, color: f.color, url: f.url }))} />
+      <PageBody className="grid items-start gap-4 desk:grid-cols-2">
+        <div className="min-w-0 space-y-3">
+          <AppearanceSetting />
+          <EnergyModel
+            params={{
+              bmr: ep?.bmr ?? 1735,
+              calPerMile: ep?.calPerEnergyMile ?? 200,
+              ftPerMile: ep?.ftPerEnergyMile ?? 625,
+              sex: ep?.sex ?? null,
+              weightLb: num(ep?.weightLb ?? null),
+              heightIn: num(ep?.heightIn ?? null),
+              ageYears: ep?.ageYears ?? null,
+            }}
+          />
+        </div>
+        <div className="min-w-0 space-y-3">
+          <CalendarFeeds feeds={feeds.map((f) => ({ id: f.id, label: f.label, color: f.color, url: f.url }))} />
+          <ReportTemplate
+            template={rs?.template ?? DEFAULT_TEMPLATE}
+            packingDefault={rs?.packingDefault ?? DEFAULT_PACKING}
+          />
+        </div>
       </PageBody>
     </>
   );

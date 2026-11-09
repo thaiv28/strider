@@ -20,13 +20,16 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Badge, WornToggle } from "@/components/ui";
+import { Button, IconButton } from "@/components/ui";
+import { Sheet } from "@/components/sheet";
+import { GripVertical, ChevronDown, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/util";
 import { fmtOz } from "@/lib/util";
 import type { GearRow, Group } from "@/lib/gear";
 
 type Props = {
   groups: Group[];
+  reorder?: boolean;
   onEdit: (r: GearRow) => void;
   onDelete: (r: GearRow) => void;
   onMove: (itemId: number, toCategoryId: number, orderedIds: number[]) => void;
@@ -34,10 +37,6 @@ type Props = {
   memberMap: Record<number, "base" | "worn"> | null;
   onToggleMember: (itemId: number, present: boolean, cls?: "base" | "worn") => void;
 };
-
-const GRID_BASE = "grid grid-cols-[1.25rem_1.25rem_minmax(0,1fr)_2.75rem] items-center gap-x-2 sm:grid-cols-[1.25rem_1.25rem_minmax(0,1fr)_5rem_4.5rem_1.75rem]";
-const GRID_LOADOUT =
-  "grid grid-cols-[1.5rem_1.25rem_1.25rem_minmax(0,1fr)_2.75rem] items-center gap-x-2 sm:grid-cols-[1.5rem_1.25rem_1.25rem_minmax(0,1fr)_6.5rem_4.5rem_1.75rem]";
 
 type Container = { id: number; name: string; baseG: number; consumableG: number; wornG: number; itemIds: number[] };
 
@@ -146,6 +145,7 @@ function CategoryCard({
   onDelete,
   loadoutMode,
   memberMap,
+  reorder,
   onToggleMember,
 }: { c: Container; byId: Map<number, GearRow> } & Omit<Props, "groups" | "onMove">) {
   const { setNodeRef } = useDroppable({ id: `cat:${c.id}` });
@@ -157,13 +157,13 @@ function CategoryCard({
       return next;
     });
   return (
-    <div className="card overflow-hidden">
+    <div className="card">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b bg-panel2/60 px-3 py-2.5 sm:px-4">
-        <span className="min-w-0 font-display font-semibold break-words">{c.name}</span>
+        <span className="min-w-0 font-bold break-words">{c.name}</span>
         <span className="readout text-xs sm:text-sm">
           <span className="text-cbase">{fmtOz(c.baseG)} base</span>
-          {c.consumableG > 0 && <span className="text-ccons"> · {fmtOz(c.consumableG)} cons</span>}
-          {c.wornG > 0 && <span className="text-cworn"> · {fmtOz(c.wornG)} worn</span>}
+          {c.consumableG > 0 && <span className="hidden text-ccons sm:inline"> · {fmtOz(c.consumableG)} cons</span>}
+          {c.wornG > 0 && <span className="hidden text-cworn sm:inline"> · {fmtOz(c.wornG)} worn</span>}
         </span>
       </div>
       <div ref={setNodeRef}>
@@ -175,6 +175,7 @@ function CategoryCard({
               <div key={id}>
                 <SortableRow
                   r={r}
+                  reorder={reorder}
                   onEdit={onEdit}
                   onDelete={onDelete}
                   loadoutMode={loadoutMode}
@@ -209,116 +210,38 @@ function KitContents({ r, loadoutMode }: { r: GearRow; loadoutMode: boolean }) {
   );
 }
 
-function SortableRow({
-  r,
-  onEdit,
-  onDelete,
-  loadoutMode,
-  member,
-  onToggleMember,
-  expanded,
-  onToggleExpand,
-}: {
-  r: GearRow;
-  onEdit: (r: GearRow) => void;
-  onDelete: (r: GearRow) => void;
-  loadoutMode: boolean;
-  member: "base" | "worn" | undefined;
-  onToggleMember: (itemId: number, present: boolean, cls?: "base" | "worn") => void;
-  expanded: boolean;
-  onToggleExpand: () => void;
+function SortableRow({ r, onEdit, onDelete, loadoutMode, member, onToggleMember, expanded, onToggleExpand, reorder }: {
+  r: GearRow; onEdit: (r: GearRow) => void; onDelete: (r: GearRow) => void;
+  loadoutMode: boolean; member: "base" | "worn" | undefined;
+  onToggleMember: Props["onToggleMember"]; expanded: boolean; onToggleExpand: () => void; reorder?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: String(r.id) });
+  const [menu, setMenu] = useState(false);
+  const [sheet, setSheet] = useState(false);
   const included = member !== undefined;
   const canMember = loadoutMode && r.status === "current";
-
+  const worn = (loadoutMode ? member : r.defaultWeightClass) === "worn";
+  const close = () => { setMenu(false); setSheet(false); };
+  const actions = <>
+    <Button variant="ghost" className="w-full justify-start" onClick={() => { close(); onEdit(r); }}>Edit</Button>
+    {canMember && <Button variant="ghost" className="w-full justify-start" onClick={() => { close(); onToggleMember(r.id, true, worn ? "base" : "worn"); }}>{worn ? "Mark as packed" : "Mark as worn"}</Button>}
+    <Button variant="danger" className="w-full justify-start" onClick={() => { close(); onDelete(r); }}>Delete</Button>
+  </>;
   return (
-    <div
-      ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={cn(
-        loadoutMode ? GRID_LOADOUT : GRID_BASE,
-        "border-b px-3 py-2.5 last:border-0 hover:bg-panel2/40 sm:px-4 sm:py-2",
-        isDragging && "relative z-10 bg-panel opacity-90 shadow",
-        canMember && !included && "opacity-45",
-      )}
-    >
-      {loadoutMode &&
-        (canMember ? (
-          <input
-            type="checkbox"
-            checked={included}
-            onChange={(e) => onToggleMember(r.id, e.target.checked, r.defaultWeightClass === "worn" ? "worn" : "base")}
-            aria-label={`Include ${r.name}`}
-            className="h-4 w-4 accent-[var(--accent)]"
-          />
-        ) : (
-          <span />
-        ))}
-      <button
-        {...attributes}
-        {...listeners}
-        aria-label="Drag to reorder"
-        className="cursor-grab touch-none text-muted/60 hover:text-muted active:cursor-grabbing"
-      >
-        ⠿
+    <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={cn("relative flex items-center gap-2 border-b px-3 py-2 last:border-0 hover:bg-panel2/40 sm:px-4", isDragging && "z-10 bg-panel shadow", canMember && !included && "opacity-45")}>
+      <button {...attributes} {...listeners} aria-label={`Drag ${r.name} to reorder`} className={cn("min-h-11 shrink-0 touch-none cursor-grab text-muted", reorder ? "block" : "hidden sm:block")}><GripVertical size={18} /></button>
+      {loadoutMode && <span className="grid min-h-11 w-7 shrink-0 place-items-center">{canMember && <input type="checkbox" checked={included} onChange={(e) => onToggleMember(r.id, e.target.checked, r.defaultWeightClass === "worn" ? "worn" : "base")} aria-label={`Include ${r.name}`} className="h-5 w-5 accent-[var(--accent)]" />}</span>}
+      {r.isKit && <button onClick={onToggleExpand} aria-label={expanded ? "Collapse kit" : "Expand kit"} aria-expanded={expanded} className="min-h-11 shrink-0 text-muted"><ChevronDown size={16} className={expanded ? "rotate-180" : ""} /></button>}
+      <button onClick={() => { if (window.matchMedia("(min-width: 640px)").matches) onEdit(r); else setSheet(true); }} className="min-h-11 min-w-0 flex-1 text-left">
+        <span className="block truncate font-semibold">{r.name}{r.quantity > 1 && ` ×${r.quantity}`}</span>
+        {(r.isKit || r.status === "retired") && <span className="block text-xs text-muted">{[r.isKit && `Kit · ${r.componentCount} items`, r.status === "retired" && "Retired"].filter(Boolean).join(" · ")}</span>}
       </button>
-      {r.isKit && r.componentCount > 0 ? (
-        <button
-          onClick={onToggleExpand}
-          aria-label={expanded ? "Collapse kit" : "Expand kit"}
-          title={expanded ? "Collapse contents" : "Show contents"}
-          className="text-cworn transition hover:text-accent"
-        >
-          {expanded ? "▤" : "▣"}
-        </button>
-      ) : (
-        <span className="text-cworn">{r.isKit ? "▣" : ""}</span>
-      )}
-      <button
-        onClick={() => onEdit(r)}
-        className="flex min-w-0 items-baseline gap-1.5 py-1 text-left transition hover:text-accent sm:py-0.5"
-      >
-        <span className="line-clamp-2 font-medium leading-snug sm:block sm:truncate">{r.name}</span>
-        {r.quantity > 1 && <span className="shrink-0 text-sm text-muted">×{r.quantity}</span>}
-        {r.isKit && r.componentCount > 0 && (
-          <span className="shrink-0 text-xs text-muted">· {r.componentCount}</span>
-        )}
-      </button>
-      <span className="hidden text-right sm:block">
-        {canMember && included ? (
-          <WornToggle value={member!} onChange={(cls) => onToggleMember(r.id, true, cls)} />
-        ) : !loadoutMode && r.defaultWeightClass !== "base" ? (
-          <Badge tone={r.defaultWeightClass}>{r.defaultWeightClass === "consumable" ? "cons" : r.defaultWeightClass}</Badge>
-        ) : null}
-      </span>
-      <span className="readout hidden text-right text-sm text-muted sm:block">
-        {fmtOz(r.weightG == null ? null : r.weightG * r.quantity)}
-      </span>
-      <span className={cn("col-span-2 col-start-3 row-start-2 mt-1 flex min-w-0 flex-wrap items-center gap-2 pb-0.5 text-xs text-muted sm:hidden", loadoutMode && "col-start-4")}>
-        <span className="readout">{fmtOz(r.weightG == null ? null : r.weightG * r.quantity)}</span>
-        {canMember && included ? (
-          <WornToggle value={member!} onChange={(cls) => onToggleMember(r.id, true, cls)} />
-        ) : !loadoutMode && r.defaultWeightClass !== "base" ? (
-          <Badge tone={r.defaultWeightClass}>{r.defaultWeightClass === "consumable" ? "cons" : r.defaultWeightClass}</Badge>
-        ) : null}
-      </span>
-      <DeleteBtn r={r} onDelete={onDelete} loadoutMode={loadoutMode} />
+      {worn && <span className="shrink-0 text-xs font-bold text-signal">Worn</span>}
+      <button tabIndex={-1} onClick={() => setSheet(true)} className="shrink-0 text-right text-sm tabular-nums sm:pointer-events-none">{fmtOz(r.weightG == null ? null : r.weightG * r.quantity)}</button>
+      <div className="relative hidden sm:block"><IconButton aria-label={`More options for ${r.name}`} aria-expanded={menu} onClick={() => setMenu(!menu)}><MoreHorizontal size={18} /></IconButton>
+        {menu && <><button className="fixed inset-0 z-20 cursor-default" aria-label="Close options" onClick={close} /><div role="group" aria-label={`Options for ${r.name}`} className="absolute right-0 top-full z-30 w-44 rounded-xl border bg-panel p-1 shadow-lg" onKeyDown={(e) => { if (e.key === "Escape") close(); }}>{actions}</div></>}
+      </div>
+      <Sheet open={sheet} onClose={close} title={r.name}><div className="mt-3">{actions}</div></Sheet>
     </div>
-  );
-}
-
-function DeleteBtn({ r, onDelete, loadoutMode }: { r: GearRow; onDelete: (r: GearRow) => void; loadoutMode: boolean }) {
-  return (
-    <button
-      onClick={() => onDelete(r)}
-      aria-label={`Delete ${r.name}`}
-      className={cn(
-        "col-start-4 row-start-1 grid h-11 w-11 justify-self-end place-items-center rounded text-muted transition hover:bg-accent/10 hover:text-accent sm:col-auto sm:row-auto sm:h-auto sm:w-auto sm:p-1",
-        loadoutMode && "col-start-5 sm:col-auto",
-      )}
-    >
-      ✕
-    </button>
   );
 }

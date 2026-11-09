@@ -32,7 +32,7 @@ async function expectNoHorizontalOverflow(page: Page) {
 
 const pages = [
   { path: "/basecamp", heading: "Basecamp" },
-  { path: "/gear", heading: "Gear Library" },
+  { path: "/gear", heading: "Gear" },
   { path: "/food", heading: "Food" },
   { path: "/trips", heading: "Trips" },
   { path: "/calendar", heading: "Calendar" },
@@ -62,15 +62,9 @@ test("a trip detail page fits the phone viewport", async ({ page }) => {
   const href = await firstTrip.getAttribute("href");
   expect(href).toBeTruthy();
   await page.goto(href!);
-  await expect(page.getByText("Logistics", { exact: true }).first()).toBeVisible();
-  const tabStrip = page.getByRole("button", { name: "Logistics", exact: true }).locator("..");
-  await expect(tabStrip).toHaveCSS("position", "static");
-  await expect(tabStrip).toHaveCSS("overflow-y", "hidden");
-  const tabStripHeight = await tabStrip.evaluate((element) => ({
-    clientHeight: element.clientHeight,
-    scrollHeight: element.scrollHeight,
-  }));
-  expect(tabStripHeight.scrollHeight).toBeLessThanOrEqual(tabStripHeight.clientHeight + 1);
+  const logistics = page.getByRole("button", { name: "Logistics", exact: true });
+  await expect(logistics).toBeVisible();
+  if ((page.viewportSize()?.width ?? 0) < 640) await logistics.click();
   const dateInput = page.locator('input[type="date"]').first();
   if (await dateInput.count()) {
     const dateWidths = await dateInput.evaluate((element) => ({

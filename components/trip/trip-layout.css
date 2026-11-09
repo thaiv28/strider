@@ -1,0 +1,48 @@
+/* These shared panels also render at page width. Keep their compact layout
+   when the trip's section column, rather than the viewport, is narrow. */
+.trip-section-column {
+  container: trip-sections / inline-size;
+}
+
+@container trip-sections (max-width: 520px) {
+  .trip-section-column #weather [class~="sm:flex"] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    padding-inline: 12px;
+  }
+
+  .trip-section-column #weather [class~="sm:w-24"],
+  .trip-section-column #weather [class~="sm:w-40"] {
+    width: auto;
+  }
+
+  .trip-section-column #weather [class~="col-span-2"] {
+    grid-column: span 2 / span 2;
+  }
+
+  .trip-section-column #weather [class~="row-start-2"] {
+    grid-row-start: 2;
+  }
+
+  .trip-section-column #weather [class~="row-start-3"] {
+    grid-row-start: 3;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-top-width: 1px;
+    padding-top: 12px;
+  }
+
+  .trip-section-column #weather [class~="col-start-2"] {
+    grid-column-start: 2;
+    grid-row-start: 1;
+  }
+
+  .trip-section-column #meals [class~="sm:flex-nowrap"] {
+    flex-wrap: wrap;
+  }
+
+  .trip-section-column #meals [class~="basis-full"] {
+    flex-basis: 100%;
+    order: 9999;
+  }
+}

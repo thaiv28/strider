@@ -20,6 +20,7 @@ const MOBILE_NAV = [...NAV, { href: "/calendar", label: "Calendar", icon: Calend
 export function Shell({ children, signedIn }: { children: React.ReactNode; signedIn: boolean }) {
   const path = usePathname();
   const { requestNavigate } = useUnsaved();
+  const tripDetail = /^\/trips\/\d+$/.test(path);
   const sharedTrip = path.startsWith("/share/trips/");
   const tripsHref = sharedTrip ? "/trips?section=shared" : "/trips";
   const isActive = (href: string) => path.startsWith(href) || (href === "/trips" && sharedTrip);
@@ -48,10 +49,10 @@ export function Shell({ children, signedIn }: { children: React.ReactNode; signe
     requestNavigate(dest);
   };
   return (
-    <div className="min-h-screen pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:pb-0">
+    <div className={cn("min-h-screen pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:pb-0", tripDetail && "max-sm:pb-0")}>
       <header data-noprint className="relative overflow-hidden bg-header text-headerink">
         <ContourBand />
-        <div className="relative flex min-h-14 items-center justify-between px-4 sm:hidden">
+        <div className={cn("relative flex min-h-14 items-center justify-between px-4 sm:hidden", tripDetail && "max-sm:hidden")}>
           <Link href="/basecamp" onClick={onNav("/basecamp")} className="font-display text-xl font-bold text-headerink">
             Strider
           </Link>
@@ -77,7 +78,7 @@ export function Shell({ children, signedIn }: { children: React.ReactNode; signe
       </header>
       {sharedTrip ? children : <main>{children}</main>}
       <nav data-noprint aria-label="Primary navigation"
-        className="fixed inset-x-0 bottom-0 z-[2000] grid grid-cols-5 border-t border-line bg-panel px-1 pb-[env(safe-area-inset-bottom)] sm:hidden">
+        className={cn("fixed inset-x-0 bottom-0 z-[2000] grid grid-cols-5 border-t border-line bg-panel px-1 pb-[env(safe-area-inset-bottom)] sm:hidden", tripDetail && "max-sm:hidden")}>
         {MOBILE_NAV.map((item) => {
           const Icon = item.icon;
           return (

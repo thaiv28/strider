@@ -37,7 +37,7 @@ export function PlanWithAI() {
 
   return (
     <>
-      <Button variant="outline" onClick={() => setOpen(true)}>Plan with AI</Button>
+      <Button variant="outline" className="border border-headerborder text-headerink bg-transparent hover:bg-headeractive" onClick={() => setOpen(true)}>Plan with AI</Button>
 
       {open && (
         <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm" onClick={() => !importing && setOpen(false)}>

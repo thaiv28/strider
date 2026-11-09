@@ -78,7 +78,7 @@ test("private trips are isolated between accounts", async ({ browser }) => {
     ownerPage.once("dialog", (dialog) => dialog.accept(name));
     await Promise.all([
       ownerPage.waitForURL(/\/trips\/\d+$/),
-      ownerPage.getByRole("button", { name: "+ New trip" }).click(),
+      ownerPage.getByRole("button", { name: "New trip" }).click(),
     ]);
     tripUrl = ownerPage.url();
 
@@ -115,7 +115,7 @@ test("view and edit links grant distinct, revocable access", async ({ browser })
     await authenticate(ownerPage);
     await ownerPage.goto("/trips");
     ownerPage.once("dialog", (dialog) => dialog.accept(name));
-    await Promise.all([ownerPage.waitForURL(/\/trips\/\d+$/), ownerPage.getByRole("button", { name: "+ New trip" }).click()]);
+    await Promise.all([ownerPage.waitForURL(/\/trips\/\d+$/), ownerPage.getByRole("button", { name: "New trip" }).click()]);
     tripUrl = ownerPage.url();
     await ownerPage.getByRole("button", { name: "Share", exact: true }).click();
     await ownerPage.getByRole("menuitem", { name: /Create view-only link/ }).click();
@@ -214,7 +214,7 @@ test("a trip can be planned, shared, exported, and deleted", async ({ browser, c
     page.once("dialog", (dialog) => dialog.accept(initialName));
     await Promise.all([
       page.waitForURL(/\/trips\/\d+$/),
-      page.getByRole("button", { name: "+ New trip" }).click(),
+      page.getByRole("button", { name: "New trip" }).click(),
     ]);
     tripUrl = page.url();
 
@@ -294,10 +294,10 @@ test("a trip can be planned, shared, exported, and deleted", async ({ browser, c
       const phonePage = await phone.newPage();
       await authenticate(phonePage);
       await phonePage.goto(tripUrl);
-      await phonePage.getByRole("button", { name: "Logistics", exact: true }).click();
+      await phonePage.getByRole("button", { name: "Map", exact: true }).click();
       const profile = phonePage.getByTestId("elevation-profile");
       await expect(profile).toBeVisible();
-      await profile.tap({ position: { x: 90, y: 100 } });
+      await profile.tap({ position: { x: 90, y: 44 } });
       const campsite = profile.getByRole("button", { name: "Night 1 campsite" });
       await expect(campsite).toHaveCount(1);
       await campsite.tap();
@@ -306,7 +306,7 @@ test("a trip can be planned, shared, exported, and deleted", async ({ browser, c
       await phonePage.getByRole("button", { name: "Remove campsite" }).click();
       await expect(campsite).toHaveCount(0);
       await phonePage.reload();
-      await phonePage.getByRole("button", { name: "Logistics", exact: true }).click();
+      await phonePage.getByRole("button", { name: "Map", exact: true }).click();
       await expect(phonePage.getByTestId("elevation-profile").getByRole("button", { name: "Night 1 campsite" })).toHaveCount(0);
     } finally {
       await phone.close();

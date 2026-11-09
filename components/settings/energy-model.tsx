@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Card, Button, Input, Select } from "@/components/ui";
+import { Card, Button, Input, Select, Field } from "@/components/ui";
 import { mifflinBmr, type EnergyParams } from "@/lib/energy";
 import { updateEnergyParams } from "@/app/settings/actions";
 import { useUnsavedGuard } from "@/components/unsaved-changes";
@@ -42,12 +42,12 @@ export function EnergyModel({ params }: { params: EnergyParams }) {
   });
 
   return (
-    <Card className="p-5">
-      <div className="eyebrow">Energy model</div>
+    <Card className="min-w-0 p-4 sm:p-5">
+      <h2 className="text-[17px] font-bold">Energy model</h2>
       <p className="mt-2 text-sm text-muted">
         Each day&apos;s calorie target is your resting burn plus the effort of moving:
       </p>
-      <p className="readout mt-2 rounded-md border bg-panel2/40 px-3 py-2 text-sm">
+      <p className="readout mt-2 rounded-xl bg-panel2 px-3 py-2 text-sm break-words">
         target = <b>{f.bmr.toLocaleString()}</b> + ( miles + gain_ft / <b>{f.ftPerMile}</b> ) × <b>{f.calPerMile}</b>
       </p>
 
@@ -67,8 +67,8 @@ export function EnergyModel({ params }: { params: EnergyParams }) {
       </p>
 
       <div className="mt-5 rounded-lg border bg-panel2/30 p-4">
-        <div className="eyebrow">BMR calculator (Mifflin–St Jeor)</div>
-        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <h3 className="text-[15px] font-bold">BMR calculator (Mifflin–St Jeor)</h3>
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 desk:grid-cols-2">
           <Field label="Sex">
             <Select value={f.sex ?? ""} onChange={(e) => set("sex", e.target.value || null)} className="w-full">
               <option value="">—</option>
@@ -89,7 +89,7 @@ export function EnergyModel({ params }: { params: EnergyParams }) {
             <Input type="number" value={f.ageYears ?? ""} onChange={(e) => set("ageYears", numOrNull(e.target.value) as number | null)} />
           </Field>
         </div>
-        <div className="mt-3 flex items-center gap-3">
+        <div className="mt-3 flex flex-wrap items-center gap-3">
           <span className="text-sm text-muted">
             Calculated BMR: <b className="text-ink">{calc != null ? `${calc.toLocaleString()} kcal` : "—"}</b>
           </span>
@@ -104,14 +104,5 @@ export function EnergyModel({ params }: { params: EnergyParams }) {
         <Button disabled={!dirty} onClick={save}>Save</Button>
       </div>
     </Card>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="eyebrow mb-1 block">{label}</span>
-      {children}
-    </label>
   );
 }

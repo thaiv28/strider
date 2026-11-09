@@ -92,8 +92,8 @@ export function TripsTable({ trips }: { trips: TripSummary[] }) {
         ))}
       </div>
 
-      <div className="card hidden overflow-hidden sm:block">
-        <div className={`${GRID} border-b bg-panel2/60 px-4 py-2`}>
+      <div className="card hidden overflow-hidden rounded-2xl bg-panel sm:block">
+        <div className={`${GRID} border-b bg-panel px-4 py-3`}>
           {COLS.map((c) => (
             <button
               key={c.key}

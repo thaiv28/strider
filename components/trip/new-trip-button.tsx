@@ -10,6 +10,7 @@ export function NewTripButton() {
   const [pending, start] = useTransition();
   return (
     <Button
+      variant="header"
       disabled={pending}
       onClick={() => {
         const name = prompt("Trip name:");
@@ -20,7 +21,7 @@ export function NewTripButton() {
         });
       }}
     >
-      + New trip
+      New trip
     </Button>
   );
 }

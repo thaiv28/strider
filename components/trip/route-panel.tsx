@@ -2,14 +2,14 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import dynamic from "next/dynamic";
-import { Button } from "@/components/ui";
+import { Chip } from "@/components/ui";
 import { addCampsite, moveCampsite, removeCampsite, clearCampsites } from "@/app/trips/actions";
 
 // Reserve the map's height while the client-only Leaflet chunk loads so the
 // content below doesn't jump once it mounts.
 const RouteMap = dynamic(() => import("./route-map"), {
   ssr: false,
-  loading: () => <div className="h-80 w-full animate-pulse bg-panel2/50" />,
+  loading: () => <div className="h-full w-full animate-pulse bg-map" />,
 });
 
 export type RoutePoint = { d: number; lat: number; lon: number; e: number };
@@ -120,24 +120,29 @@ export function RoutePanel({
   const line = points.map((p) => `${leftPct(p.d).toFixed(2)},${((H - 1 - ((p.e - minE) / span) * (H - 2))).toFixed(2)}`).join(" ");
 
   return (
-    <div>
-      <RouteMap track={points.map((p) => [p.lat, p.lon])} campsites={shown} preview={hover ? { lat: hover.lat, lon: hover.lon } : null} />
+    <div className="flex h-full min-h-0 w-full flex-col">
+      <div className="relative min-h-0 flex-1 bg-map"><RouteMap fill className="h-full" track={points.map((p) => [p.lat, p.lon])} campsites={shown} preview={hover ? { lat: hover.lat, lon: hover.lon } : null} /></div>
 
-      <div className="space-y-3 px-4 pt-3 pb-4">
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-muted">Tap or click the profile to drop a campsite · tap a marker to remove · drag to move</span>
+      <section aria-label="Elevation" className="flex-none space-y-2 border-t bg-panel px-4 pt-3 pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
+        <strong>Elevation</strong>
+        <span className="readout text-xs text-muted">{hover ? `${hover.d.toFixed(1)} mi · ${hover.e.toLocaleString()} ft` : selectedSite ? `Night ${selectedSite.night} · ${selectedSite.distanceMi.toFixed(1)} mi · ${selectedSite.eleFt?.toLocaleString() ?? "—"} ft` : ""}</span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {shown.map((site) => <Chip key={site.id} selected={selectedId === site.id} onClick={() => setSelectedId(site.id)}>Camp {site.night}</Chip>)}
         {shown.length > 0 && (
           <button
             onClick={() => confirm("Clear all campsites?") && start(async () => await clearCampsites(tripId))}
-            className="eyebrow hover:text-accent"
+            className="min-h-11 text-xs text-muted underline hover:text-accent"
           >
             clear campsites
           </button>
         )}
       </div>
 
+      <p className="text-xs text-muted">Click the profile to add a campsite</p>
       <div className="flex gap-3">
-        <div className="readout flex h-40 w-12 shrink-0 flex-col justify-between py-0.5 text-right text-xs text-muted">
+        <div className="readout flex h-[88px] sm:h-[140px] w-12 shrink-0 flex-col justify-between py-0.5 text-right text-xs text-muted">
           <span>{maxE.toLocaleString()}</span>
           <span>{minE.toLocaleString()}</span>
         </div>
@@ -145,7 +150,7 @@ export function RoutePanel({
           <div
             ref={boxRef}
             data-testid="elevation-profile"
-            className="relative h-40 w-full cursor-crosshair touch-none select-none"
+            className="relative h-[88px] sm:h-[140px] w-full cursor-crosshair touch-none select-none"
             onPointerDown={(e) => {
               if (e.pointerType === "touch") touchStart.current = { x: e.clientX, y: e.clientY };
             }}
@@ -156,8 +161,8 @@ export function RoutePanel({
             onClick={onClick}
           >
             <svg viewBox={`0 0 100 ${H}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full">
-              <polygon points={area} fill="var(--accent)" opacity={0.15} />
-              <polyline points={line} fill="none" stroke="var(--accent)" strokeWidth={0.8} vectorEffect="non-scaling-stroke" />
+              <polygon points={area} fill="var(--elevation)" />
+              <polyline points={line} fill="none" stroke="var(--route)" strokeWidth={0.8} vectorEffect="non-scaling-stroke" />
             </svg>
             {hover && (
               <>
@@ -205,7 +210,7 @@ export function RoutePanel({
                 }}
                 aria-label={`Night ${c.night} campsite`}
                 aria-pressed={selectedId === c.id}
-                className="absolute flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 cursor-grab items-center justify-center rounded-full border-2 border-ink bg-accent text-xs font-bold text-accentink active:cursor-grabbing"
+                className={`${selectedId === c.id ? "ring-2 ring-route ring-offset-2 ring-offset-panel" : ""} absolute flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 cursor-grab items-center justify-center rounded-full border-2 border-ink bg-accent text-xs font-bold text-accentink active:cursor-grabbing`}
                 style={{ left: `${leftPct(c.distanceMi)}%`, top: `${topPct(c.eleFt ?? minE)}%` }}
               >
                 {c.night}
@@ -226,7 +231,7 @@ export function RoutePanel({
           )}
         </div>
       </div>
-      </div>
+      </section>
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import "leaflet/dist/leaflet.css";
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, LayersControl, Polyline, CircleMarker, Tooltip } from "react-leaflet";
+import { MapContainer, TileLayer, LayersControl, Polyline, CircleMarker, Tooltip, useMap } from "react-leaflet";
 import type { LatLngBoundsExpression } from "leaflet";
 import { fetchCampsitePois, trackBbox, type CampPoi } from "@/lib/overpass";
 import { MAP_COLORS, isLoopTrack, groupByLocation } from "@/lib/map-style";
@@ -20,8 +20,12 @@ export default function RouteMap({
   track,
   campsites = [],
   preview = null,
+  className,
+  fill = false,
 }: {
   track: [number, number][];
+  className?: string;
+  fill?: boolean;
   campsites?: Site[];
   preview?: { lat: number; lon: number } | null;
 }) {
@@ -62,8 +66,9 @@ export default function RouteMap({
     [Math.max(...lats), Math.max(...lons)],
   ];
   return (
-    <MapContainer bounds={bounds} scrollWheelZoom={false} style={{ height: "20rem", width: "100%" }}>
-      <LayersControl position="topright">
+    <MapContainer bounds={bounds} scrollWheelZoom={false} className={className} style={{ height: fill ? "100%" : "20rem", width: "100%" }}>
+      <ResizeMap />
+      <LayersControl position={fill ? "bottomright" : "topright"}>
         <LayersControl.BaseLayer checked name="Topo">
           <TileLayer
             attribution="&copy; USGS The National Map"
@@ -101,7 +106,7 @@ export default function RouteMap({
           </LayersControl.Overlay>
         )}
       </LayersControl>
-      <Polyline positions={track} pathOptions={{ color: MAP_COLORS.route, weight: 4 }} />
+      <Polyline positions={track} pathOptions={{ color: "var(--route)", weight: 4 }} />
       {groupByLocation(campsites.filter((c) => c.lat != null && c.lon != null)).map((grp) => {
         const label = grp.map((c) => c.night).join("/");
         return (
@@ -109,10 +114,10 @@ export default function RouteMap({
             key={label}
             center={[grp[0].lat!, grp[0].lon!]}
             radius={9}
-            pathOptions={{ color: MAP_COLORS.campRing, weight: 2, fillColor: MAP_COLORS.camp, fillOpacity: 1 }}
+            pathOptions={{ color: "var(--accentink)", weight: 2, fillColor: "var(--accent)", fillOpacity: 1 }}
           >
             <Tooltip permanent direction="top" offset={[0, -6]}>
-              <span style={{ fontWeight: 700, color: MAP_COLORS.camp }}>{label}</span>
+              <span style={{ fontWeight: 700, color: "var(--accent)" }}>{label}</span>
             </Tooltip>
           </CircleMarker>
         );
@@ -159,9 +164,20 @@ export default function RouteMap({
         <CircleMarker
           center={[preview.lat, preview.lon]}
           radius={7}
-          pathOptions={{ color: MAP_COLORS.route, weight: 2, fillColor: MAP_COLORS.route, fillOpacity: 0.6 }}
+          pathOptions={{ color: "var(--route)", weight: 2, fillColor: "var(--route)", fillOpacity: 0.6 }}
         />
       )}
     </MapContainer>
   );
+}
+
+function ResizeMap() {
+  const map = useMap();
+  useEffect(() => {
+    const observer = new ResizeObserver(() => map.invalidateSize());
+    observer.observe(map.getContainer());
+    map.invalidateSize();
+    return () => observer.disconnect();
+  }, [map]);
+  return null;
 }

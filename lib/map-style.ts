@@ -4,12 +4,12 @@
 // loop rule here and it applies everywhere. Client-safe (no server deps).
 
 export const MAP_COLORS = {
-  route: "#c42e63",
+  route: "#d9622b",
   camp: "#1f7a70",
   campRing: "#1f2937",
-  start: "#2e7d32",
+  start: "#17382d",
   startRing: "#14532d",
-  end: "#b3261e",
+  end: "#17382d",
   endRing: "#7f1d1d",
   slate: "#374151",
 } as const;

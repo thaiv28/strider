@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { Card, Button } from "@/components/ui";
 import { uploadGpx, removeGpx, restoreGpx, reverseGpx, updateTrip } from "@/app/trips/actions";
-import { RoutePanel, type Campsite, type RoutePoint } from "./route-panel";
+import type { Campsite, RoutePoint } from "./route-panel";
 import { buildGpx, gpxFilename } from "@/lib/gpx-export";
 
 export type Gpx = {
@@ -48,10 +48,10 @@ export function GpxPanel({
     URL.revokeObjectURL(url);
   };
 
-  if (!gpx) {
+  if (!gpx?.points.length) {
     return (
       <div>
-        <div className="eyebrow">Route (GPX)</div>
+        <div className="eyebrow">Route</div>
         <Card className="mt-2 p-4">
           <form
             onSubmit={(e) => {
@@ -80,7 +80,7 @@ export function GpxPanel({
   return (
     <div>
       <div className="flex items-center justify-between">
-        <div className="eyebrow">Route (GPX)</div>
+        <div className="eyebrow">Route</div>
         <div className="-my-2 flex items-center gap-1">
           <button onClick={downloadGpx} disabled={!gpx.points.length} className="eyebrow px-2 py-2 hover:text-accent disabled:opacity-40">
             download
@@ -109,15 +109,7 @@ export function GpxPanel({
         </div>
       </div>
       <Card className="mt-2 overflow-hidden">
-        <RoutePanel
-          tripId={tripId}
-          points={gpx.points}
-          minFt={gpx.minEleFt}
-          maxFt={gpx.maxEleFt}
-          campsites={campsites}
-          pushUndo={pushUndo}
-        />
-        <div className="grid grid-cols-2 gap-4 border-t px-4 py-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 border-t px-4 py-3 sm:grid-cols-2">
           <Stat label="Distance" value={gpx.distanceMi != null ? `${gpx.distanceMi} mi` : "—"} />
           <Stat label="Elev gain" value={gpx.elevationGainFt != null ? `${gpx.elevationGainFt.toLocaleString()} ft` : "—"} />
           <Stat label="Low / high" value={gpx.minEleFt != null && gpx.maxEleFt != null ? `${gpx.minEleFt.toLocaleString()}–${gpx.maxEleFt.toLocaleString()} ft` : "—"} />
@@ -127,7 +119,7 @@ export function GpxPanel({
           />
         </div>
         {(gpx.distanceMi != null || gpx.elevationGainFt != null) && (
-          <div className="flex items-center gap-3 border-t px-4 py-2.5">
+          <div className="flex flex-wrap items-center gap-3 border-t px-4 py-2.5">
             <Button
               variant="outline"
               disabled={pending}

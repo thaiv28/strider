@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { Badge } from "@/components/ui";
-import { Contours } from "@/components/contours";
+import { PageHeader, PageBody } from "@/components/page-header";
+
 import { BaseBar, type CatSlice } from "@/components/gear/base-bar";
 import { RouteMapThumb } from "@/components/trip/route-map-thumb";
 
@@ -8,6 +8,7 @@ export type TripCard = {
   id: number;
   name: string;
   status: string;
+  updatedAt: Date | string;
   startDate: string | null;
   nights: number | null;
   region: string | null;
@@ -19,16 +20,6 @@ export type TripCard = {
 
 export type NextReady = { gear: boolean; meals: boolean; gpx: boolean };
 type Props = { trips: TripCard[]; baseG: number; byCategory: CatSlice[]; nextReady?: NextReady };
-
-const tone = (s: string) => (s === "completed" ? "current" : s === "planned" ? "wishlist" : "neutral");
-
-function ReadyChip({ ok, children }: { ok?: boolean; children: React.ReactNode }) {
-  return (
-    <span className={ok ? "text-accent" : "text-muted"}>
-      {ok ? "✓" : "✗"} {children}
-    </span>
-  );
-}
 
 function season(trips: TripCard[]) {
   const done = trips.filter((t) => t.status === "completed");
@@ -50,72 +41,47 @@ export function HomeView({ trips, baseG, byCategory, nextReady }: Props) {
     { label: "Nights out", value: s.nights.toString(), unit: "" },
   ];
 
+  const recent = [...trips].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime() || b.id - a.id).slice(0, 3);
+  const days = next?.startDate ? Math.max(0, Math.ceil((new Date(`${next.startDate}T00:00:00`).getTime() - Date.now()) / 86400000)) : null;
+  const where = (t: TripCard) => [t.region, t.startDate ?? "Date TBD"].filter(Boolean).join(" · ");
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 sm:px-8 sm:py-10">
-      <div className="relative overflow-hidden rounded-[var(--radius)] border bg-panel px-4 py-6 sm:px-6 sm:py-7">
-        <Contours className="pointer-events-none absolute -top-24 -right-16 h-80 w-80 text-cworn/20" />
-        <div className="eyebrow">◇ Season 2026</div>
-        <h1 className="font-display mt-1 text-3xl font-bold tracking-tight">Basecamp</h1>
-        <div className="relative mt-5 grid grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-4 sm:gap-x-10">
-          {stats.map((st) => (
-            <div key={st.label}>
-              <div className="eyebrow">{st.label}</div>
-              <div className="readout mt-1 text-3xl font-bold leading-none">
-                {st.value}
-                <span className="ml-1 text-base font-normal text-muted">{st.unit}</span>
-              </div>
+    <>
+      <PageHeader title="Basecamp">
+        <section aria-label="All-time stats" className="grid grid-cols-4 gap-2 pt-3">
+          {stats.map((st) => <div key={st.label}>
+            <div className="font-display text-[27px] font-bold leading-tight tabular-nums sm:text-[38px]">{st.value}<span className="ml-1 text-xs font-normal sm:text-[15px]">{st.unit}</span></div>
+            <div className="text-xs text-headermuted sm:text-sm">{st.label}</div>
+          </div>)}
+        </section>
+      </PageHeader>
+      <PageBody className="-mt-10 space-y-5 sm:-mt-12">
+        {next && <Link href={`/trips/${next.id}`} className="card flex flex-col overflow-hidden transition hover:border-accent/50 sm:flex-row">
+          {next.track && next.track.length > 1 && <RouteMapThumb track={next.track} className="h-36 w-full shrink-0 sm:h-auto sm:min-h-52 sm:w-2/5" />}
+          <div className="min-w-0 flex-1 p-4 sm:p-5">
+            <div className="text-sm font-bold text-signal">Next up{days !== null && ` · in ${days} days`}</div>
+            <h2 className="mt-1 font-display text-[26px] font-bold leading-tight">{next.name}</h2>
+            <div className="mt-1 text-sm text-muted">{where(next)}</div>
+            <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
+              {([{label: "Gear", ok: nextReady?.gear, needs: "Needs gear"}, {label: "Meals", ok: nextReady?.meals, needs: "Needs meals"}, {label: "Route", ok: nextReady?.gpx, needs: "Needs GPX"}]).map((r) => <div key={r.label}><div className="font-bold">{r.label}</div><div className={r.ok ? "text-muted" : "font-bold text-signal"}>{r.ok ? "Ready" : r.needs}</div></div>)}
             </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-5 space-y-5">
+          </div>
+        </Link>}
         <BaseBar baseG={baseG} byCategory={byCategory} />
-
-        {next && (
-          <Link href={`/trips/${next.id}`} className="block">
-            <div className="card p-5 transition hover:border-accent/50">
-              <div className="flex items-center justify-between">
-                <span className="eyebrow">◇ Next objective</span>
-                <Badge tone="wishlist">planned</Badge>
+        <section aria-label="Recent trips">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-display text-[22px] font-bold">Recent trips</h2>
+            <Link href="/trips" className="inline-flex min-h-11 items-center font-semibold text-signal">All trips</Link>
+          </div>
+          <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))]">
+            {recent.map((t) => <a key={t.id} href={`/trips/${t.id}`} className="card overflow-hidden transition hover:border-accent/50">
+              {t.track && t.track.length > 1 ? <RouteMapThumb track={t.track} className="h-28 w-full" /> : <div className="h-28 bg-map" aria-hidden="true" />}
+              <div className="p-3"><div className="font-bold">{t.name}</div><div className="mt-1 text-xs text-muted">{where(t)}</div>
+                <div className="mt-2 text-sm tabular-nums">{t.distanceMi || "—"} mi · {t.elevationFt ? `${(t.elevationFt / 1000).toFixed(1)}k ft` : "—"} · {t.nights ?? "—"} nights</div>
               </div>
-              <div className="mt-2 font-display text-2xl font-bold">{next.name}</div>
-              <div className="readout mt-1 text-sm text-muted">
-                {[next.region, next.areaType, next.startDate ?? "date TBD"].filter(Boolean).join(" · ")}
-              </div>
-              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                <ReadyChip ok={nextReady?.gear}>gear</ReadyChip>
-                <ReadyChip ok={nextReady?.meals}>meals</ReadyChip>
-                <ReadyChip ok={nextReady?.gpx}>gpx</ReadyChip>
-              </div>
-            </div>
-          </Link>
-        )}
-      </div>
-
-      <div className="mt-9 flex items-baseline justify-between">
-        <h2 className="font-display text-lg font-bold">Trips</h2>
-        <span className="eyebrow">{trips.length} logged</span>
-      </div>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {trips.map((t) => (
-          <Link key={t.id} href={`/trips/${t.id}`}>
-            <div className="card h-full overflow-hidden p-4 transition hover:border-accent/50">
-              <div className="flex items-start justify-between gap-2">
-                <span className="font-display font-semibold">{t.name}</span>
-                <Badge tone={tone(t.status)}>{t.status}</Badge>
-              </div>
-              <div className="eyebrow mt-1">{t.region ?? "—"}</div>
-              {t.track && t.track.length > 1 && <RouteMapThumb track={t.track} className="mt-3 h-28 w-full" />}
-              <div className="readout mt-3 flex gap-4 text-sm text-muted">
-                <span>{t.distanceMi || "—"} mi</span>
-                <span>{t.nights ?? "—"} nt</span>
-                <span>{t.elevationFt ? `${(t.elevationFt / 1000).toFixed(1)}k ft` : "—"}</span>
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
-    </div>
+            </a>)}
+          </div>
+        </section>
+      </PageBody>
+    </>
   );
 }
