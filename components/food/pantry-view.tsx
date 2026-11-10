@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Card, Button, Badge, Input, PageTabs, Field, IconButton } from "@/components/ui";
+import { Card, Button, Input, PageTabs, Field, IconButton } from "@/components/ui";
 import { PageHeader, PageBody } from "@/components/page-header";
 import { Trash2 } from "lucide-react";
 import { gToOz } from "@/lib/util";
-import { kcalPerOz } from "@/lib/food";
+import { kcalPerOz, VOLUME_ML } from "@/lib/food";
 import type { IngredientRow, MealRow } from "@/lib/pantry";
 import type { FoodHit } from "@/lib/food-search";
-import { createMeal, deleteIngredient, searchNutrition, addIngredientFromHit } from "@/app/food/actions";
+import { createMeal, deleteIngredient, addIngredientFromHit } from "@/app/food/actions";
 import { IngredientDialog } from "./ingredient-dialog";
+import { useFoodSearch, FoodSearchResults, FOOD_SEARCH_PLACEHOLDER, foodSearchKeys } from "./food-search";
 import { MealEditor } from "./meal-editor";
 
 type Tab = "meals" | "ingredients";
@@ -105,28 +106,11 @@ function MealList({ meals, selectedId, onOpen }: { meals: MealRow[]; selectedId?
   );
 }
 
-// Search USDA + Open Food Facts and add a result to the pantry on click.
+// Add a reference food, with packaged search available on request.
 function PublicSearch() {
   const [q, setQ] = useState("");
-  const [hits, setHits] = useState<FoodHit[]>([]);
-  const [searching, setSearching] = useState(false);
+  const search = useFoodSearch(q);
   const [, start] = useTransition();
-
-  useEffect(() => {
-    if (q.trim().length < 2) {
-      setHits([]);
-      return;
-    }
-    const h = setTimeout(async () => {
-      setSearching(true);
-      try {
-        setHits(await searchNutrition(q));
-      } finally {
-        setSearching(false);
-      }
-    }, 350);
-    return () => clearTimeout(h);
-  }, [q]);
 
   const add = (h: FoodHit) => {
     start(() => addIngredientFromHit(h));
@@ -136,26 +120,9 @@ function PublicSearch() {
   return (
     <Card className="p-4">
       <h2 className="text-[17px] font-bold">Add a food</h2>
-      <p className="mb-3 text-[13px] text-muted">Search USDA + Open Food Facts</p>
-      <Field label="Food search"><Input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. peanut butter, ramen, Clif bar" /></Field>
-      {(searching || hits.length > 0) && (
-        <div className="mt-2 max-h-72 overflow-y-auto divide-y divide-divider">
-          {searching && <div className="px-4 py-2 text-sm text-muted">Searching…</div>}
-          {hits.map((h) => (
-            <button key={`${h.source}-${h.sourceId}`} onClick={() => add(h)} className="flex w-full items-center justify-between gap-3 border-b px-4 py-2 text-left last:border-0 hover:bg-panel2/60">
-              <span className="min-w-0">
-                <span className="block break-words text-sm font-medium">{h.name}</span>
-                {h.detail && <span className="block break-words text-xs text-muted">{h.detail}</span>}
-              </span>
-              <span className="readout flex max-w-[48%] shrink-0 flex-wrap justify-end gap-2 text-xs text-muted">
-                {h.kcalPer100g != null && <span>{h.kcalPer100g} kcal/100g</span>}
-                {kcalPerOz(h.kcalPer100g) != null && <span>{kcalPerOz(h.kcalPer100g)!.toFixed(0)} cal/oz</span>}
-                <Badge tone={h.source === "usda" ? "base" : "wishlist"}>{h.source}</Badge>
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
+      <p className="mb-3 text-[13px] text-muted">USDA reference foods; packaged products on request</p>
+      <Field label="Food search"><Input type="search" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => foodSearchKeys(e, () => setQ(""))} placeholder={FOOD_SEARCH_PLACEHOLDER} /></Field>
+      <FoodSearchResults query={q} search={search} onPick={add} />
     </Card>
   );
 }
@@ -165,20 +132,20 @@ function IngredientList({ ingredients, onEdit, onDelete }: { ingredients: Ingred
   return (
     <>
       <Card className="overflow-hidden" aria-label="Your ingredients">
-        <div className="grid grid-cols-[minmax(0,1fr)_3.5rem_2.75rem_2.5rem_2.75rem] sm:grid-cols-[minmax(0,1fr)_5rem_5rem_4rem_2.75rem] items-center gap-x-1 border-b border-divider bg-panel2/60 px-2 py-2 sm:gap-x-2 sm:px-4">
-          {["Ingredient", "kcal/100g", "cal/oz", "g/mL", ""].map((h, i) => (
+        <div className="grid grid-cols-[minmax(0,1fr)_3.5rem_2.75rem_3rem_2.75rem] sm:grid-cols-[minmax(0,1fr)_5rem_5rem_4rem_2.75rem] items-center gap-x-1 border-b border-divider bg-panel2/60 px-2 py-2 sm:gap-x-2 sm:px-4">
+          {["Ingredient", "kcal/100g", "cal/oz", "g/tbsp", ""].map((h, i) => (
             <span key={h || i} className={`text-[11px] font-semibold text-muted sm:text-[13px] ${i > 0 && i < 4 ? "text-right" : ""}`}>{h}</span>
           ))}
         </div>
         {ingredients.map((i) => (
-          <div key={i.id} className="grid grid-cols-[minmax(0,1fr)_3.5rem_2.75rem_2.5rem_2.75rem] sm:grid-cols-[minmax(0,1fr)_5rem_5rem_4rem_2.75rem] items-center gap-x-1 border-b border-divider px-2 py-2 sm:gap-x-2 sm:px-4 last:border-0 hover:bg-panel2/40">
-            <button onClick={() => onEdit(i)} className="min-w-0 text-left">
+          <div key={i.id} className="grid grid-cols-[minmax(0,1fr)_3.5rem_2.75rem_3rem_2.75rem] sm:grid-cols-[minmax(0,1fr)_5rem_5rem_4rem_2.75rem] items-center gap-x-1 border-b border-divider px-2 py-2 sm:gap-x-2 sm:px-4 last:border-0 hover:bg-panel2/40">
+            <button data-food-source={i.source} data-food-source-id={i.sourceId} onClick={() => onEdit(i)} className="min-w-0 text-left">
               <span className="block break-words text-sm font-medium">{i.name}</span>
               {i.category && <span className="block break-words text-xs text-muted">{i.category}</span>}
             </button>
             <span className="readout text-right text-sm text-muted">{i.kcalPer100g != null ? Math.round(i.kcalPer100g) : "—"}</span>
             <span className="readout text-right text-sm text-muted">{kcalPerOz(i.kcalPer100g)?.toFixed(0) ?? "—"}</span>
-            <span className="readout text-right text-sm text-muted">{i.densityGMl ?? "—"}</span>
+            <span className="readout text-right text-sm text-muted">{i.densityGMl == null ? "—" : (i.densityGMl * VOLUME_ML.tbsp).toFixed(1)}</span>
             <IconButton onClick={() => confirm(`Delete "${i.name}"?`) && onDelete(i.id)} aria-label={`Delete ${i.name}`} className="text-signal"><Trash2 size={16} /></IconButton>
           </div>
         ))}

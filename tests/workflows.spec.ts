@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { authenticate, e2ePassword } from "./auth";
+import { densityFromServing, parseVolumeUnit } from "../lib/food";
 
 const baseURL =
   process.env.PLAYWRIGHT_BASE_URL ??
@@ -358,5 +359,166 @@ test("a trip can be planned, shared, exported, and deleted", async ({ browser, c
     await expect(page.getByText(updatedName, { exact: true })).toHaveCount(0);
   } finally {
     await deleteCreatedTrip();
+  }
+});
+
+test("volume labels and labeled serving densities are parsed without false matches", () => {
+  for (const label of ["slice", "large", "undetermined"]) {
+    expect(parseVolumeUnit(label)).toBeNull();
+  }
+  expect(parseVolumeUnit("tbsp")).toBe("tbsp");
+  expect(parseVolumeUnit("Tablespoons")).toBe("tbsp");
+  expect(parseVolumeUnit("fl oz")).toBe("floz");
+  expect(densityFromServing("2 Tbsp (32 g)", null)).toBeCloseTo(1.082, 3);
+  expect(densityFromServing("1 1/2 cup", 240)).toBeCloseTo(0.676, 3);
+  expect(densityFromServing("1tbsp (15g)", null)).toBeCloseTo(1.014, 3);
+});
+
+test("recipe volume amounts persist and ingredient edits update a completed trip", async ({ browser, page }, testInfo) => {
+  test.skip(!e2ePassword, "E2E_TEST_PASSWORD is required");
+  test.setTimeout(180_000);
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const ingredientName = `E2E verified food ${suffix}`;
+  const mealName = `E2E verified recipe ${suffix}`;
+  const tripName = `E2E verified volume ${suffix}`;
+  let tripUrl: string | null = null;
+  let createdReference = false;
+
+  try {
+    await authenticate(page);
+    await page.goto("/food");
+    await page.getByRole("tab", { name: "Ingredients", exact: true }).click();
+    await page.getByRole("button", { name: "Add ingredient", exact: true }).click();
+    await page.getByLabel("Name", { exact: true }).fill(ingredientName);
+    await page.getByLabel("kcal / 100g", { exact: true }).fill("800");
+    // Leave volume weight blank; the recipe asks for a measured weight.
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Add ingredient", exact: true })).toHaveCount(0);
+
+    await page.getByRole("tab", { name: "Meals", exact: true }).click();
+    await page.getByRole("button", { name: "Add meal", exact: true }).click();
+    await page.getByLabel("Meal name", { exact: true }).fill(mealName);
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
+    await page.getByPlaceholder("Search foods, e.g. olive oil, rolled oats").fill(ingredientName);
+    // Saved foods list first; the packaged-search row also repeats the query.
+    await page.getByRole("button").filter({ hasText: ingredientName }).first().click();
+    const ingredientLine = page.getByText(ingredientName, { exact: true }).locator("..");
+    await ingredientLine.getByRole("combobox").selectOption("tbsp");
+    await expect(ingredientLine.getByLabel("Measure weight grams")).toBeVisible();
+    await ingredientLine.getByLabel("Measure weight grams").fill("13.5");
+    await ingredientLine.getByRole("button", { name: "Set", exact: true }).click();
+    await expect(ingredientLine.getByLabel("Measure weight grams")).toHaveCount(0);
+    const amount = ingredientLine.getByLabel("Ingredient amount", { exact: true });
+    await amount.fill("2");
+    await ingredientLine.getByRole("combobox").selectOption("oz");
+    await expect(amount).toHaveValue("2");
+    await ingredientLine.getByRole("combobox").selectOption("g");
+    await expect(amount).toHaveValue("57");
+    await amount.fill("2");
+    await ingredientLine.getByRole("combobox").selectOption("tbsp");
+    await expect(amount).toHaveValue("2");
+    await expect(ingredientLine).toContainText("216 kcal");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
+    await page.reload();
+    await page.getByRole("button").filter({ hasText: mealName }).click();
+    await expect(ingredientLine.getByRole("spinbutton")).toHaveValue("2");
+    await expect(ingredientLine.getByRole("combobox")).toHaveValue("tbsp");
+
+    await page.goto("/trips");
+    page.once("dialog", (dialog) => dialog.accept(tripName));
+    await Promise.all([
+      page.waitForURL(/\/trips\/\d+$/),
+      page.getByRole("button", { name: "New trip", exact: true }).click(),
+    ]);
+    tripUrl = page.url();
+    await page.getByRole("button", { name: "Food", exact: true }).locator("visible=true").first().click();
+    await page.getByPlaceholder("Search foods, e.g. olive oil, rolled oats").first().fill(mealName);
+    await page.getByRole("button").filter({ hasText: mealName }).first().click();
+    const plannedMeal = page.getByRole("link", { name: mealName, exact: true }).locator("..");
+    await expect(plannedMeal).toContainText("216 kcal");
+    // Completed trips follow the same source edits as trips still being planned.
+    const status = page.getByRole("combobox").filter({ has: page.locator('option[value="idea"]') });
+    await Promise.all([
+      page.waitForResponse((response) => response.request().method() === "POST" && response.ok()),
+      status.selectOption("completed"),
+    ]);
+
+    await page.goto("/food");
+    await page.getByRole("tab", { name: "Ingredients", exact: true }).click();
+    await page.getByRole("button", { name: ingredientName, exact: true }).locator("visible=true").click();
+    await page.getByLabel("kcal / 100g", { exact: true }).fill("400");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.getByRole("heading", { name: ingredientName, exact: true })).toHaveCount(0);
+    await page.goto(tripUrl);
+    await page.getByRole("button", { name: "Food", exact: true }).locator("visible=true").first().click();
+    await expect(plannedMeal).toContainText("108 kcal");
+
+    // Preserve a preexisting pantry reference; remove only a food this test creates.
+    await page.goto("/food");
+    await page.getByRole("tab", { name: "Ingredients", exact: true }).click();
+    const existingReference = await page.locator('[data-food-source="usda"][data-food-source-id="171413"]').count() > 0;
+    await page.getByRole("tab", { name: "Meals", exact: true }).click();
+    await page.getByRole("button").filter({ hasText: mealName }).click();
+    await page.getByPlaceholder("Search foods, e.g. olive oil, rolled oats").fill("olive oil");
+    const reference = page.locator('[data-reference-id="171413"]');
+    await expect(reference).toContainText("1 tbsp = 13.5 g");
+    createdReference = !existingReference;
+    await reference.click();
+    await expect(page.locator("[data-meal-line]")).toHaveCount(2);
+    await expect(page.locator("[data-meal-line]").last().getByLabel("Ingredient amount", { exact: true })).toBeFocused();
+  } finally {
+    test.setTimeout(testInfo.timeout + 90_000);
+    // A fresh context keeps cleanup usable if an assertion closed the test page.
+    // Delete in foreign-key order: trip, then recipe, then its ingredient.
+    const cleanup = await browser.newContext();
+    const cleanupPage = await cleanup.newPage();
+    cleanupPage.setDefaultTimeout(15_000);
+    cleanupPage.setDefaultNavigationTimeout(20_000);
+    try {
+      await authenticate(cleanupPage);
+      await cleanupPage.goto(tripUrl ?? "/trips");
+      if (!tripUrl) {
+        const trip = cleanupPage.locator('a[href^="/trips/"]').filter({ hasText: tripName });
+        if (await trip.count()) await trip.click();
+      }
+      const more = cleanupPage.getByRole("button", { name: "More trip options", exact: true });
+      if (await more.isVisible().catch(() => false)) await more.click();
+      const deleteTrip = cleanupPage.getByRole("menuitem", { name: "Delete trip", exact: true });
+      if (await deleteTrip.isVisible().catch(() => false)) {
+        cleanupPage.once("dialog", (dialog) => dialog.accept());
+        await Promise.all([
+          cleanupPage.waitForURL((url) => url.pathname === "/trips"),
+          deleteTrip.click(),
+        ]);
+      }
+      await cleanupPage.goto("/food");
+      const meal = cleanupPage.getByRole("button").filter({ hasText: mealName });
+      if (await meal.count()) {
+        await meal.click();
+        cleanupPage.once("dialog", (dialog) => dialog.accept());
+        await cleanupPage.getByRole("button", { name: "Delete", exact: true }).click();
+        await expect(cleanupPage.getByLabel("Meal name", { exact: true })).toHaveCount(0);
+      }
+      await cleanupPage.getByRole("tab", { name: "Ingredients", exact: true }).click();
+      const ingredient = cleanupPage.getByRole("button", { name: ingredientName, exact: true }).locator("visible=true");
+      if (await ingredient.count()) {
+        const deleteIngredient = cleanupPage.getByRole("button", { name: `Delete ${ingredientName}`, exact: true });
+        cleanupPage.once("dialog", (dialog) => dialog.accept());
+        await deleteIngredient.click({ timeout: 15_000 });
+        await expect(ingredient).toHaveCount(0);
+      }
+      if (createdReference) {
+        const reference = cleanupPage.locator('[data-food-source="usda"][data-food-source-id="171413"]').locator("visible=true");
+        if (await reference.count()) {
+          cleanupPage.once("dialog", (dialog) => dialog.accept());
+          await reference.locator("..").getByRole("button", { name: /^Delete / }).click({ timeout: 15_000 });
+          await expect(reference).toHaveCount(0);
+        }
+      }
+    } finally {
+      await cleanup.close();
+    }
   }
 });

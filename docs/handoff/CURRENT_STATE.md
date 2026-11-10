@@ -1,6 +1,6 @@
 # Strider current state
 
-Last reviewed: 2026-09-29.
+Last reviewed: 2026-11-09.
 
 ## Deployed baseline
 
@@ -25,11 +25,16 @@ developer's local GitHub CLI session—is the durable publication path.
 - Gear inventory, category ordering, kits, loadouts with bulk selection and
   persistent user-defined order, wishlist replacements, and projected loadout weight.
 - Meal/ingredient management, nutrition lookup, trip food planning, and calorie
-  estimates.
+  estimates. Recipe amounts can be entered by weight or volume, retaining the
+  typed amount/unit. Ingredients default to bundled USDA reference foods supplying calories and
+  measured volume weight from one record. Volume conversion uses stored density;
+  users confirm a reference match or enter a measured weight when it is missing.
+  Packaged-product search is opt-in.
 - Trips start as ideas, can advance to planned or completed, and can have their
   dates cleared. The Trips page defaults to newest dates first, with undated trips
-  last. Trip creation/import, daily distance/elevation, gear/food snapshots,
-  campsites, packing lists, GPX upload (reversible: swapping start and end flips
+  last. Trip creation/import, daily distance/elevation, gear/food copies kept
+  current with library edits even on completed Trips, campsites, packing lists,
+  GPX upload (reversible: swapping start and end flips
   the elevation profile and re-measures campsites and days), permit upload, and
   printable trip sheets.
 - A trip's Weather tab shows per-day conditions and a separate Snow depth section:

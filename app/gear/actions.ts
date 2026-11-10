@@ -5,6 +5,7 @@ import { eq, and, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/src/db/index";
 import { getCurrentUserId, OTHER_CATEGORY_ID } from "@/lib/gear";
 import { ozToG } from "@/lib/util";
+import { propagateGearItem } from "@/lib/trip-propagation";
 import {
   requireOwnedCategory,
   requireOwnedGearItem,
@@ -119,8 +120,9 @@ export async function updateGear(id: number, fd: FormData) {
       })
       .where(eq(schema.gearItem.id, id));
     await writeComponents(tx, id, v.isKit, v.components);
+    await propagateGearItem(tx, id);
   });
-  revalidatePath("/gear");
+  revalidatePath("/", "layout");
 }
 
 export async function deleteGear(id: number) {

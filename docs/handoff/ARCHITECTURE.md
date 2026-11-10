@@ -85,11 +85,12 @@ See `docs/handoff/OPERATIONS.md` and `docs/adr/0001-single-instance-aws-runtime.
   of a wishlist item's assumed loadout membership). The Wishlist tab projects a
   chosen loadout's base weight *if purchased*, netting replaced items.
 - Trips: `trip` (+ per-trip overrides of a linked `trail`), `trip_day`,
-  `trip_gear` (snapshotted name/weight/category so completed trips never shift),
+  `trip_gear` (name/weight kept current by `lib/trip-propagation.ts`; category
+  and other selection choices stay per-Trip),
   `trip_campsite`, `trip_gpx` (raw + derived `points`), `trip_permit`
   (blob via a `bytea` `customType`), `trip_meal`, `trip_consumable`.
 - Food: `ingredient` (per-100g nutrition, density), `meal` + `meal_ingredient`
-  (snapshotted nutrition).
+  (copied nutrition/density kept current by `lib/trip-propagation.ts`).
 - `calendar_feed` (secret iCal URLs), `report_settings` (singleton template +
   packing default), `energy_params` (BMR + calorie-burn tunables).
 
