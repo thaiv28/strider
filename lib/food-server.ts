@@ -8,8 +8,8 @@ import { requireOwnedMeal } from "@/lib/authorization";
 const sRound = (v: number | null | undefined) => (v == null ? null : String(Math.round(v)));
 const s = (v: number | null | undefined) => (v == null ? null : String(v));
 
-// Save a public (FDC/OFF) hit to the pantry, deduped by (source, sourceId).
-// USDA density is fetched once. Returns the pantry row.
+// Save a food hit to the pantry, deduped by (source, sourceId).
+// Bundled references supply their own density; packaged USDA hits may need detail.
 export async function upsertIngredientFromHit(hit: FoodHit) {
   const userId = await getCurrentUserId();
   const [existing] = await db
@@ -19,7 +19,7 @@ export async function upsertIngredientFromHit(hit: FoodHit) {
     .limit(1);
   if (existing) return existing;
   let density = hit.densityGMl;
-  if (density == null && hit.source === "usda") density = await fetchFdcDensity(hit.sourceId);
+  if (density == null && hit.source === "usda" && !hit.reference) density = await fetchFdcDensity(hit.sourceId);
   const [row] = await db
     .insert(schema.ingredient)
     .values({
@@ -27,6 +27,8 @@ export async function upsertIngredientFromHit(hit: FoodHit) {
       name: hit.name,
       kcalPer100g: sRound(hit.kcalPer100g),
       densityGMl: s(density),
+      densitySource: density != null ? (hit.reference ? "usda" : "label") : null,
+      referenceName: hit.reference ? hit.referenceName : null,
       defaultServingG: hit.defaultServingG,
       source: hit.source,
       sourceId: hit.sourceId,

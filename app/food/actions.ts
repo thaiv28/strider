@@ -5,7 +5,10 @@ import { eq, max } from "drizzle-orm";
 import { db, schema } from "@/src/db/index";
 import { getCurrentUserId } from "@/lib/gear";
 import { searchFoods, fetchFdcDensity, type FoodHit } from "@/lib/food-search";
+import { searchReferenceFoods, matchReferenceFoods, getReferenceFood } from "@/lib/usda-reference";
 import { upsertIngredientFromHit } from "@/lib/food-server";
+import { isAmountUnit, VOLUME_ML } from "@/lib/food";
+import { propagateIngredient, propagateMeal, type Tx } from "@/lib/trip-propagation";
 import {
   requireOwnedIngredient,
   requireOwnedMeal,
@@ -16,13 +19,32 @@ const s = (v: number | null | undefined) => (v == null ? null : String(v));
 const sRound = (v: number | null | undefined) => (v == null ? null : String(Math.round(v)));
 
 function bump() {
-  revalidatePath("/food");
+  revalidatePath("/", "layout");
 }
 
 // ---- search (called from the client to populate the add-ingredient dialog) ----
 export async function searchNutrition(query: string): Promise<FoodHit[]> {
   await getCurrentUserId();
+  return searchReferenceFoods(query);
+}
+
+export async function searchPackagedFoods(query: string): Promise<FoodHit[]> {
+  await getCurrentUserId();
   return searchFoods(query);
+}
+export async function suggestReferenceFoods(name: string): Promise<FoodHit[]> {
+  await getCurrentUserId();
+  return matchReferenceFoods(name).filter((f) => f.densityGMl != null);
+}
+export async function linkIngredientDensity(ingredientId: number, fdcId: string) {
+  await requireOwnedIngredient(ingredientId);
+  const food = getReferenceFood(fdcId);
+  if (!food || food.densityGMl == null) throw new Error("Reference food with density required");
+  await db.transaction(async (tx) => {
+    await tx.update(schema.ingredient).set({ densityGMl: s(food.densityGMl), densitySource: "usda", referenceName: food.referenceName }).where(eq(schema.ingredient.id, ingredientId));
+    await propagateIngredient(tx, ingredientId);
+  });
+  bump();
 }
 
 // ---- ingredients ----
@@ -30,6 +52,8 @@ export type IngredientInput = {
   name: string;
   kcalPer100g: number | null;
   densityGMl: number | null;
+  densitySource: "usda" | "label" | "manual" | null;
+  referenceName: string | null;
   defaultServingG: number | null;
   category: string | null;
   source: string | null;
@@ -40,14 +64,16 @@ export type IngredientInput = {
 export async function createIngredient(v: IngredientInput) {
   const userId = await getCurrentUserId();
   if (!v.name.trim()) throw new Error("Name is required");
-  // For a USDA pick with no density yet, try the detail endpoint once.
+  // Only packaged USDA hits may need a detail lookup; bundled references are complete.
   let density = v.densityGMl;
-  if (density == null && v.source === "usda" && v.sourceId) density = await fetchFdcDensity(v.sourceId);
+  if (density == null && v.source === "usda" && v.sourceId && v.densitySource !== "usda" && !v.referenceName) density = await fetchFdcDensity(v.sourceId);
   await db.insert(schema.ingredient).values({
     userId,
     name: v.name.trim(),
     kcalPer100g: sRound(v.kcalPer100g),
     densityGMl: s(density),
+    densitySource: v.densitySource,
+    referenceName: v.referenceName,
     defaultServingG: v.defaultServingG,
     category: v.category,
     source: v.source ?? "manual",
@@ -59,17 +85,24 @@ export async function createIngredient(v: IngredientInput) {
 
 export async function updateIngredient(id: number, v: IngredientInput) {
   await requireOwnedIngredient(id);
-  await db
-    .update(schema.ingredient)
-    .set({
-      name: v.name.trim(),
-      kcalPer100g: sRound(v.kcalPer100g),
-      densityGMl: s(v.densityGMl),
-      defaultServingG: v.defaultServingG,
-      category: v.category,
-      notes: v.notes,
-    })
-    .where(eq(schema.ingredient.id, id));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(schema.ingredient)
+      .set({
+        name: v.name.trim(),
+        kcalPer100g: sRound(v.kcalPer100g),
+        densityGMl: s(v.densityGMl),
+        densitySource: v.densitySource,
+        referenceName: v.referenceName,
+        source: v.source,
+        sourceId: v.sourceId,
+        defaultServingG: v.defaultServingG,
+        category: v.category,
+        notes: v.notes,
+      })
+      .where(eq(schema.ingredient.id, id));
+    await propagateIngredient(tx, id);
+  });
   bump();
 }
 
@@ -102,7 +135,10 @@ export async function updateMeal(
   if ("isHot" in patch) set.isHot = patch.isHot;
   if ("waterMl" in patch) set.waterMl = patch.waterMl;
   if ("notes" in patch) set.notes = patch.notes;
-  if (Object.keys(set).length) await db.update(schema.meal).set(set).where(eq(schema.meal.id, id));
+  if (Object.keys(set).length) await db.transaction(async (tx) => {
+    await tx.update(schema.meal).set(set).where(eq(schema.meal.id, id));
+    await propagateMeal(tx, id);
+  });
   bump();
 }
 
@@ -118,14 +154,15 @@ export async function addIngredientFromHit(hit: FoodHit) {
 }
 
 async function insertMealLine(
+  tx: Tx,
   mealId: number,
   item: { ingredientId?: number | null; name: string; kcalPer100g: number | null; densityGMl: number | null; amountG: number },
 ) {
-  const [{ m } = { m: -1 }] = await db
+  const [{ m } = { m: -1 }] = await tx
     .select({ m: max(schema.mealIngredient.sortOrder) })
     .from(schema.mealIngredient)
     .where(eq(schema.mealIngredient.mealId, mealId));
-  await db.insert(schema.mealIngredient).values({
+  await tx.insert(schema.mealIngredient).values({
     mealId,
     ingredientId: item.ingredientId ?? null,
     snapshotName: item.name,
@@ -142,7 +179,10 @@ export async function addMealIngredient(mealId: number, ingredientId: number, am
   await requireOwnedIngredient(ingredientId, userId);
   const [ing] = await db.select().from(schema.ingredient).where(eq(schema.ingredient.id, ingredientId));
   if (!ing) throw new Error("Ingredient not found");
-  await insertMealLine(mealId, { ingredientId, name: ing.name, kcalPer100g: Number(ing.kcalPer100g) || null, densityGMl: ing.densityGMl != null ? Number(ing.densityGMl) : null, amountG });
+  await db.transaction(async (tx) => {
+    await insertMealLine(tx, mealId, { ingredientId, name: ing.name, kcalPer100g: ing.kcalPer100g != null ? Number(ing.kcalPer100g) : null, densityGMl: ing.densityGMl != null ? Number(ing.densityGMl) : null, amountG });
+    await propagateMeal(tx, mealId);
+  });
   bump();
 }
 
@@ -150,27 +190,57 @@ export async function addMealIngredient(mealId: number, ingredientId: number, am
 export async function addMealIngredientFromHit(mealId: number, hit: FoodHit, amountG?: number) {
   await requireOwnedMeal(mealId);
   const ing = await upsertIngredientFromHit(hit);
-  await insertMealLine(mealId, {
-    ingredientId: ing.id,
-    name: ing.name,
-    kcalPer100g: Number(ing.kcalPer100g) || null,
-    densityGMl: ing.densityGMl != null ? Number(ing.densityGMl) : null,
-    amountG: amountG ?? ing.defaultServingG ?? 50,
+  await db.transaction(async (tx) => {
+    await insertMealLine(tx, mealId, {
+      ingredientId: ing.id,
+      name: ing.name,
+      kcalPer100g: ing.kcalPer100g != null ? Number(ing.kcalPer100g) : null,
+      densityGMl: ing.densityGMl != null ? Number(ing.densityGMl) : null,
+      amountG: amountG ?? ing.defaultServingG ?? 50,
+    });
+    await propagateMeal(tx, mealId);
   });
   bump();
 }
 
-export async function updateMealIngredientAmount(id: number, amountG: number) {
+export async function updateMealIngredientAmount(
+  id: number,
+  amountG: number,
+  entered?: { amount: number; unit: string } | null,
+) {
   await requireOwnedMealIngredient(id);
-  await db
-    .update(schema.mealIngredient)
-    .set({ amountG: Math.max(0, Math.round(amountG)) })
-    .where(eq(schema.mealIngredient.id, id));
+  const valid = entered != null && isAmountUnit(entered.unit) && Number.isFinite(entered.amount) && entered.amount >= 0;
+  await db.transaction(async (tx) => {
+    const [line] = await tx.select({ mealId: schema.mealIngredient.mealId }).from(schema.mealIngredient).where(eq(schema.mealIngredient.id, id));
+    if (!line) throw new Error("Meal ingredient not found");
+    await tx.update(schema.mealIngredient).set({
+      amountG: Math.max(0, Math.round(amountG)),
+      enteredAmount: valid ? String(entered.amount) : null,
+      enteredUnit: valid ? entered.unit : null,
+    }).where(eq(schema.mealIngredient.id, id));
+    await propagateMeal(tx, line.mealId);
+  });
   bump();
 }
 
 export async function removeMealIngredient(id: number) {
   await requireOwnedMealIngredient(id);
-  await db.delete(schema.mealIngredient).where(eq(schema.mealIngredient.id, id));
+  await db.transaction(async (tx) => {
+    const [line] = await tx.select({ mealId: schema.mealIngredient.mealId }).from(schema.mealIngredient).where(eq(schema.mealIngredient.id, id));
+    if (!line) throw new Error("Meal ingredient not found");
+    await tx.delete(schema.mealIngredient).where(eq(schema.mealIngredient.id, id));
+    await propagateMeal(tx, line.mealId);
+  });
+  bump();
+}
+
+export async function setIngredientMeasure(ingredientId: number, unit: string, grams: number) {
+  await requireOwnedIngredient(ingredientId);
+  if (!Object.hasOwn(VOLUME_ML, unit) || !Number.isFinite(grams) || grams <= 0) throw new Error("A volume unit and positive weight are required");
+  const density = +(grams / VOLUME_ML[unit as keyof typeof VOLUME_ML]).toFixed(3);
+  await db.transaction(async (tx) => {
+    await tx.update(schema.ingredient).set({ densityGMl: String(density), densitySource: "manual", referenceName: null }).where(eq(schema.ingredient.id, ingredientId));
+    await propagateIngredient(tx, ingredientId);
+  });
   bump();
 }

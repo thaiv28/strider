@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Copy } from "lucide-react";
 import { Card, Input, Badge, Button, InfoBadge } from "@/components/ui";
 import { gToOz } from "@/lib/util";
-import { searchNutrition } from "@/app/food/actions";
+import { useFoodSearch, FoodSearchResults, FOOD_SEARCH_PLACEHOLDER, foodSearchKeys } from "@/components/food/food-search";
 import { addTripMeal, setTripMealQty, removeTripMeal, copyTripMealToAll } from "@/app/trips/actions";
 import type { FoodHit } from "@/lib/food-search";
 import type { TripFood, ShoppingItem } from "@/lib/trip";
@@ -258,53 +258,26 @@ function AddFood({
   onAdd: (entry: AddEntry) => void;
 }) {
   const [q, setQ] = useState("");
-  const [hits, setHits] = useState<FoodHit[]>([]);
-  const [searching, setSearching] = useState(false);
-
+  const search = useFoodSearch(q);
   const mealMatches = q.trim().length ? meals.filter((m) => m.name.toLowerCase().includes(q.toLowerCase())).slice(0, 5) : [];
   const ingMatches = q.trim().length ? ingredients.filter((i) => i.name.toLowerCase().includes(q.toLowerCase())).slice(0, 5) : [];
-
-  useEffect(() => {
-    if (q.trim().length < 2) {
-      setHits([]);
-      return;
-    }
-    let cancelled = false;
-    const h = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const r = await searchNutrition(q);
-        if (!cancelled) setHits(r);
-      } finally {
-        if (!cancelled) setSearching(false);
-      }
-    }, 350);
-    // Cancel a debounced/in-flight search so its results can't repopulate the
-    // dropdown after the query was cleared (e.g. right after picking a result).
-    return () => {
-      cancelled = true;
-      clearTimeout(h);
-    };
-  }, [q]);
 
   const pick = (entry: AddEntry) => {
     onAdd(entry);
     setQ("");
-    setHits([]);
   };
 
   return (
     <div className="mt-3">
       <div className="min-w-0 flex-1">
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="add a meal or food" />
-        {(mealMatches.length > 0 || ingMatches.length > 0 || searching || hits.length > 0) && (
-          <div className="mt-2 max-h-64 overflow-y-auto rounded-lg border">
+        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={FOOD_SEARCH_PLACEHOLDER} onKeyDown={(e) => foodSearchKeys(e, () => setQ(""))} />
+        <FoodSearchResults query={q} search={search} onPick={(h) => pick({ kind: "hit", hit: h, grams: h.defaultServingG ?? 50 })}>
             {mealMatches.map((m) => (
               <button key={`m${m.id}`} onClick={() => pick({ kind: "meal", mealId: m.id, servings: 1 })} className="flex w-full items-center justify-between gap-3 border-b px-3 py-2 text-left last:border-0 hover:bg-panel2/60">
                 <span className="truncate text-sm">{m.name}</span>
                 <span className="readout flex shrink-0 items-center gap-2 text-xs text-muted">
                   {Math.round(m.totalKcal / m.baseServings)} kcal/srv
-                  <Badge tone="wishlist">meal</Badge>
+                  <Badge tone="wishlist">meal · saved</Badge>
                 </span>
               </button>
             ))}
@@ -317,21 +290,7 @@ function AddFood({
                 </span>
               </button>
             ))}
-            {searching && <div className="px-3 py-2 text-sm text-muted">Searching…</div>}
-            {hits.map((h) => (
-              <button key={`${h.source}-${h.sourceId}`} onClick={() => pick({ kind: "hit", hit: h, grams: h.defaultServingG ?? 50 })} className="flex w-full items-center justify-between gap-3 border-b px-3 py-2 text-left last:border-0 hover:bg-panel2/60">
-                <span className="min-w-0">
-                  <span className="block truncate text-sm">{h.name}</span>
-                  {h.detail && <span className="block truncate text-xs text-muted">{h.detail}</span>}
-                </span>
-                <span className="readout flex shrink-0 items-center gap-2 text-xs text-muted">
-                  {h.kcalPer100g != null && <span>{h.kcalPer100g} kcal/100g</span>}
-                  <Badge tone={h.source === "usda" ? "base" : "wishlist"}>{h.source}</Badge>
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
+        </FoodSearchResults>
       </div>
     </div>
   );

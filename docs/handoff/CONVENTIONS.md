@@ -5,6 +5,8 @@ changes correct.
 
 ## Units & formatting
 - **Grams are canonical** everywhere in the DB and in logic. Never store oz/lb.
+- Recipe lines store canonical grams plus the amount and unit as typed.
+  Volume-entered lines recompute when an Ingredient's density changes.
 - Convert/display only at the edge via `lib/util.ts`: `gToOz`, `ozToG`,
   `fmtWeight` (oz under a lb, else `lb + oz`), `fmtOz`, `fmtLbs`, `fmtUsd`
   (cents → `$`). Prices are stored as **integer cents** (`price_cents`).
@@ -46,8 +48,13 @@ changes correct.
   sharing, deletion, and private Trip Report notes remain owner-only.
 - Uncategorized gear (`category_id IS NULL`) is surfaced as a synthetic **"Other"**
   group with id `-1`; `moveGear` maps `-1` back to a `null` category.
-- `trip_gear`/`trip_meal` snapshot name+weight at plan time so a completed trip's
-  totals never change when live gear is re-weighed or retired.
+- `lib/trip-propagation.ts` keeps copied gear names/weights, ingredient
+  names/nutrition/density, and recipe names/totals current across all Trips,
+  including completed Trips. Any new write to gear name/weight or
+  ingredient/recipe data must call it in the same transaction. Trip Gear
+  quantity, weight class, packed state, sort order, and category stay per-Trip;
+  Trip Meal servings and standalone-Ingredient grams stay per-Trip. Blank
+  library weights or kcal preserve copied values; density copies include null.
 - Weight classes: gear item `default_weight_class` (base/worn/consumable); per
   loadout and per trip a selection is only base/worn (`pack_class`). Consumables
   come from the meal plan + water/fuel rates, not gear selection.
@@ -126,3 +133,11 @@ stays light.
   runtime stages on that architecture so native dependencies match.
 - The runtime image installs production dependencies only. Do not reintroduce a
   runtime dependency on TypeScript-only configuration or development packages.
+
+## USDA reference data
+
+Regenerate the bundled index with `python3 scripts/build-usda-reference.py <usda-data-dir>`.
+The input directory contains the published SR Legacy and survey FNDDS CSV folders
+(two directory levels above each `food.csv`, alongside `food_portion.csv` and
+`food_nutrient.csv`). Review and commit `lib/usda-reference-data.json` with changes.
+Reference lookup uses this bundled data; packaged-product search is opt-in.

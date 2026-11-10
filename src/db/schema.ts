@@ -299,8 +299,8 @@ export const tripDay = pgTable("trip_day", {
   elevationGainFt: integer("elevation_gain_ft"),
 });
 
-// Per-trip gear selection. Name/weight/category are frozen at trip time so a
-// completed trip's totals never shift when live gear is re-weighed or retired.
+// Per-trip gear selection. Name/weight copies are kept current by
+// lib/trip-propagation.ts; category and other allocation choices stay per-trip.
 export const tripGear = pgTable(
   "trip_gear",
   {
@@ -323,7 +323,7 @@ export const tripGear = pgTable(
 );
 
 // Reusable food component with per-100g nutrition. density_g_ml (when known,
-// from API portion data or entered once) enables weight<->volume conversion.
+// from USDA reference data, a product label, or a user measurement) enables weight<->volume conversion.
 export const ingredient = pgTable("ingredient", {
   id: serial("id").primaryKey(),
   userId: integer("user_id")
@@ -332,6 +332,8 @@ export const ingredient = pgTable("ingredient", {
   name: text("name").notNull(),
   kcalPer100g: numeric("kcal_per_100g"),
   densityGMl: numeric("density_g_ml"),
+  densitySource: text("density_source").$type<"usda" | "label" | "manual">(),
+  referenceName: text("reference_name"),
   defaultServingG: integer("default_serving_g"),
   category: text("category"),
   source: text("source"), // 'usda' | 'off' | 'manual'
@@ -355,8 +357,8 @@ export const meal = pgTable("meal", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-// An ingredient line in a meal. Nutrition is snapshotted so editing the pantry
-// ingredient later never silently changes an existing recipe's totals.
+// An ingredient line in a meal. Name, nutrition and density copies are kept
+// current by lib/trip-propagation.ts; amounts belong to the recipe.
 export const mealIngredient = pgTable("meal_ingredient", {
   id: serial("id").primaryKey(),
   mealId: integer("meal_id")
@@ -366,12 +368,15 @@ export const mealIngredient = pgTable("meal_ingredient", {
   snapshotName: text("snapshot_name").notNull(),
   snapshotKcalPer100g: numeric("snapshot_kcal_per_100g"),
   snapshotDensityGMl: numeric("snapshot_density_g_ml"),
+  enteredAmount: numeric("entered_amount"), // whole recipe amount as typed at base_servings
+  enteredUnit: text("entered_unit"), // g, oz, or a VOLUME_ML key
   amountG: integer("amount_g").notNull(), // grams for the whole recipe at base_servings
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
 // A meal or standalone ingredient placed on a trip day. Exactly one of
-// meal_id / ingredient_id is set. Totals are snapshotted at plan time.
+// meal_id / ingredient_id is set. Name/totals copies are kept current by
+// lib/trip-propagation.ts; servings and standalone ingredient grams stay per-trip.
 export const tripMeal = pgTable("trip_meal", {
   id: serial("id").primaryKey(),
   tripId: integer("trip_id")

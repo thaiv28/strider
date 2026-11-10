@@ -1,6 +1,8 @@
-import { VOLUME_ML } from "@/lib/food";
+import { VOLUME_ML, parseVolumeUnit, densityFromServing } from "@/lib/food";
 
 export type FoodHit = {
+  reference?: boolean;
+  referenceName?: string | null;
   source: "usda" | "off";
   sourceId: string;
   name: string;
@@ -22,20 +24,15 @@ function fdcEnergy(nutrients: { nutrientName?: string; unitName?: string; value?
 }
 
 // Map an FDC portion to grams-per-mL when its measure is a volume we know.
-function fdcDensity(portions: { amount?: number; gramWeight?: number; modifier?: string; measureUnit?: { name?: string } }[]): number | null {
-  const alias: Record<string, keyof typeof VOLUME_ML> = {
-    cup: "cup", cups: "cup",
-    tablespoon: "tbsp", tbsp: "tbsp",
-    teaspoon: "tsp", tsp: "tsp",
-    milliliter: "ml", ml: "ml",
-    liter: "l", l: "l",
-    "fl oz": "floz", "fluid ounce": "floz",
-  };
+function fdcDensity(portions: { amount?: number; gramWeight?: number; modifier?: string; measureUnit?: { name?: string; abbreviation?: string } }[]): number | null {
   for (const p of portions) {
     if (!p.gramWeight || !p.amount) continue;
-    const label = (p.measureUnit?.name || p.modifier || "").toLowerCase();
-    const unit = Object.keys(alias).find((k) => label.includes(k));
-    if (unit) return +(p.gramWeight / (p.amount * VOLUME_ML[alias[unit]])).toFixed(3);
+    for (const label of [p.measureUnit?.name, p.measureUnit?.abbreviation, p.modifier]) {
+      const unit = parseVolumeUnit(label ?? "");
+      if (!unit) continue;
+      const density = +(p.gramWeight / (p.amount * VOLUME_ML[unit])).toFixed(3);
+      if (density >= 0.02 && density <= 2.5) return density;
+    }
   }
   return null;
 }
@@ -48,7 +45,8 @@ async function searchFdc(query: string): Promise<FoodHit[]> {
   if (!r.ok) return [];
   const j = await r.json();
   return (j.foods ?? []).map((f: Record<string, unknown>): FoodHit => {
-    const serving = f.servingSize && f.servingSizeUnit === "g" ? Math.round(Number(f.servingSize)) : null;
+    const grams = f.servingSize && /^(g|grm)$/i.test(String(f.servingSizeUnit)) ? Number(f.servingSize) : null;
+    const serving = grams == null ? null : Math.round(grams);
     return {
       source: "usda",
       sourceId: String(f.fdcId),
@@ -56,7 +54,7 @@ async function searchFdc(query: string): Promise<FoodHit[]> {
       detail: [f.brandOwner, f.dataType].filter(Boolean).join(" · ") || null,
       kcalPer100g: fdcEnergy((f.foodNutrients as never) ?? []),
       defaultServingG: serving,
-      densityGMl: null, // filled on add via fetchFdcDensity (needs the detail endpoint)
+      densityGMl: densityFromServing(f.householdServingFullText as string | undefined, grams),
     };
   });
 }
@@ -65,7 +63,7 @@ async function searchOff(query: string): Promise<FoodHit[]> {
   // Search-a-licious full-text endpoint; the legacy cgi/search.pl is throttled (503).
   const url =
     `https://search.openfoodfacts.org/search?q=${encodeURIComponent(query)}&page_size=10` +
-    `&fields=code,product_name,brands,nutriments,serving_quantity`;
+    `&fields=code,product_name,brands,nutriments,serving_quantity,serving_size`;
   const r = await fetch(url, { headers: { "User-Agent": "backpack-app/1.0 (personal trip planner)" } });
   if (!r.ok) return [];
   const j = await r.json();
@@ -82,7 +80,7 @@ async function searchOff(query: string): Promise<FoodHit[]> {
         detail: brands?.trim() || "Open Food Facts",
         kcalPer100g: Math.round(nut["energy-kcal_100g"]),
         defaultServingG: Number.isFinite(sq) && sq > 0 ? Math.round(sq) : null,
-        densityGMl: null,
+        densityGMl: densityFromServing(p.serving_size as string | undefined),
       };
     });
 }
@@ -101,5 +99,6 @@ export async function fetchFdcDensity(fdcId: string): Promise<number | null> {
   const r = await fetch(`${FDC}/food/${fdcId}?api_key=${key}`);
   if (!r.ok) return null;
   const j = await r.json();
-  return fdcDensity(j.foodPortions ?? []);
+  const grams = /^(g|grm)$/i.test(String(j.servingSizeUnit)) ? Number(j.servingSize) : null;
+  return fdcDensity(j.foodPortions ?? []) ?? densityFromServing(j.householdServingFullText, grams);
 }

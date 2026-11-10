@@ -10,6 +10,9 @@ export type IngredientRow = {
   defaultServingG: number | null;
   category: string | null;
   source: string | null;
+  sourceId: string | null;
+  densitySource: "usda" | "label" | "manual" | null;
+  referenceName: string | null;
   notes: string | null;
 };
 
@@ -19,6 +22,8 @@ export type MealIngredientRow = {
   name: string;
   kcalPer100g: number | null;
   densityGMl: number | null;
+  enteredAmount: number | null;
+  enteredUnit: string | null;
   amountG: number; // whole recipe at base servings
   sortOrder: number;
 };
@@ -50,6 +55,9 @@ export async function getIngredients(userId: number): Promise<IngredientRow[]> {
     defaultServingG: r.defaultServingG,
     category: r.category,
     source: r.source,
+    sourceId: r.sourceId,
+    densitySource: r.densitySource,
+    referenceName: r.referenceName,
     notes: r.notes,
   }));
 }
@@ -68,6 +76,8 @@ export async function getMeals(userId: number): Promise<MealRow[]> {
       snapshotName: schema.mealIngredient.snapshotName,
       snapshotKcalPer100g: schema.mealIngredient.snapshotKcalPer100g,
       snapshotDensityGMl: schema.mealIngredient.snapshotDensityGMl,
+      enteredAmount: schema.mealIngredient.enteredAmount,
+      enteredUnit: schema.mealIngredient.enteredUnit,
       amountG: schema.mealIngredient.amountG,
       sortOrder: schema.mealIngredient.sortOrder,
     })
@@ -78,12 +88,16 @@ export async function getMeals(userId: number): Promise<MealRow[]> {
 
   const byMeal = new Map<number, MealIngredientRow[]>();
   for (const it of items) {
+    const stored = num(it.snapshotDensityGMl);
+    const densityGMl = stored;
     const row: MealIngredientRow = {
       id: it.id,
       ingredientId: it.ingredientId,
       name: it.snapshotName,
       kcalPer100g: num(it.snapshotKcalPer100g),
-      densityGMl: num(it.snapshotDensityGMl),
+      densityGMl,
+      enteredAmount: num(it.enteredAmount),
+      enteredUnit: it.enteredUnit,
       amountG: it.amountG,
       sortOrder: it.sortOrder,
     };

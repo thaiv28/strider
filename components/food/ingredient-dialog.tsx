@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Button, Input, Badge, Field } from "@/components/ui";
+import { useState } from "react";
+import { Button, Input, Select, Field } from "@/components/ui";
 import { Sheet } from "@/components/sheet";
-import { searchNutrition, createIngredient, updateIngredient, type IngredientInput } from "@/app/food/actions";
+import { createIngredient, updateIngredient, type IngredientInput } from "@/app/food/actions";
 import type { FoodHit } from "@/lib/food-search";
 import type { IngredientRow } from "@/lib/pantry";
-import { kcalPerOz } from "@/lib/food";
+import { useFoodSearch, FoodSearchResults, FOOD_SEARCH_PLACEHOLDER, foodSearchKeys } from "./food-search";
+import { kcalPerOz, VOLUME_ML, type VolumeUnit } from "@/lib/food";
 
 export function IngredientDialog({ editing, onClose }: { editing: IngredientRow | null; onClose: () => void }) {
   const [form, setForm] = useState<IngredientInput>({
@@ -16,33 +17,21 @@ export function IngredientDialog({ editing, onClose }: { editing: IngredientRow 
     defaultServingG: editing?.defaultServingG ?? null,
     category: editing?.category ?? null,
     source: editing?.source ?? "manual",
-    sourceId: null,
+    sourceId: editing?.sourceId ?? null,
+    densitySource: editing?.densitySource ?? null,
+    referenceName: editing?.referenceName ?? null,
     notes: editing?.notes ?? null,
   });
   const set = (patch: Partial<IngredientInput>) => setForm((f) => ({ ...f, ...patch }));
 
+  const [measureUnit, setMeasureUnit] = useState<VolumeUnit>("tbsp");
+  const [measureText, setMeasureText] = useState<string | null>(null);
+
   const [q, setQ] = useState("");
-  const [hits, setHits] = useState<FoodHit[]>([]);
-  const [searching, setSearching] = useState(false);
+  const search = useFoodSearch(q);
 
-  useEffect(() => {
-    if (editing) return; // search only when adding new
-    if (q.trim().length < 2) {
-      setHits([]);
-      return;
-    }
-    const h = setTimeout(async () => {
-      setSearching(true);
-      try {
-        setHits(await searchNutrition(q));
-      } finally {
-        setSearching(false);
-      }
-    }, 350);
-    return () => clearTimeout(h);
-  }, [q, editing]);
-
-  const pick = (h: FoodHit) =>
+  const pick = (h: FoodHit) => {
+    setMeasureText(null);
     set({
       name: h.name,
       kcalPer100g: h.kcalPer100g,
@@ -50,7 +39,10 @@ export function IngredientDialog({ editing, onClose }: { editing: IngredientRow 
       defaultServingG: h.defaultServingG,
       source: h.source,
       sourceId: h.sourceId,
+      densitySource: h.reference ? "usda" : h.densityGMl != null ? "label" : null,
+      referenceName: h.referenceName ?? null,
     });
+  };
 
   const save = async () => {
     if (editing) await updateIngredient(editing.id, form);
@@ -64,28 +56,10 @@ export function IngredientDialog({ editing, onClose }: { editing: IngredientRow 
     <Sheet open onClose={onClose} title={editing ? `Edit ${editing.name}` : "Add ingredient"}>
         {!editing && (
           <div className="mt-4">
-            <Field label="Search USDA + Open Food Facts"><Input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. peanut butter, ramen, Clif bar" autoFocus /></Field>
-            {(searching || hits.length > 0) && (
-              <div className="mt-2 max-h-56 overflow-y-auto rounded-lg border">
-                {searching && <div className="px-3 py-2 text-sm text-muted">Searching…</div>}
-                {hits.map((h) => (
-                  <button
-                    key={`${h.source}-${h.sourceId}`}
-                    onClick={() => pick(h)}
-                    className="flex w-full items-center justify-between gap-3 border-b px-3 py-2 text-left last:border-0 hover:bg-panel2/60"
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-medium">{h.name}</span>
-                      {h.detail && <span className="block truncate text-xs text-muted">{h.detail}</span>}
-                    </span>
-                    <span className="readout flex max-w-[48%] shrink-0 flex-wrap justify-end gap-2 text-xs text-muted">
-                      {h.kcalPer100g != null && <span>{h.kcalPer100g} kcal/100g</span>}
-                      <Badge tone={h.source === "usda" ? "base" : "wishlist"}>{h.source}</Badge>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
+            <Field label="Search foods">
+              <Input type="search" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => foodSearchKeys(e, () => setQ(""))} placeholder={FOOD_SEARCH_PLACEHOLDER} autoFocus />
+            </Field>
+            <FoodSearchResults query={q} search={search} onPick={(h) => { pick(h); setQ(""); }} />
           </div>
         )}
 
@@ -93,17 +67,28 @@ export function IngredientDialog({ editing, onClose }: { editing: IngredientRow 
           <Field label="Name">
             <Input value={form.name} onChange={(e) => set({ name: e.target.value })} />
           </Field>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {form.referenceName && <p className="-mt-2 text-xs text-muted">USDA: {form.referenceName}</p>}
+          <div className="grid grid-cols-2 gap-3">
             <Field label="kcal / 100g">
               <Input type="number" step="1" value={form.kcalPer100g ?? ""} onChange={(e) => set({ kcalPer100g: numOrNull(e.target.value) })} />
-            </Field>
-            <Field label="Density (g/mL)">
-              <Input type="number" step="0.01" value={form.densityGMl ?? ""} onChange={(e) => set({ densityGMl: numOrNull(e.target.value) })} />
             </Field>
             <Field label="Serving (g)">
               <Input type="number" step="1" value={form.defaultServingG ?? ""} onChange={(e) => set({ defaultServingG: numOrNull(e.target.value) })} />
             </Field>
           </div>
+          <Field label="Weight by volume">
+            <span className="flex items-center gap-2">
+              <span>1</span>
+              <Select aria-label="Volume unit" value={measureUnit} onChange={(e) => { setMeasureUnit(e.target.value as VolumeUnit); setMeasureText(null); }}>
+                {["tsp", "tbsp", "floz", "cup"].map((u) => <option key={u} value={u}>{u}</option>)}
+              </Select>
+              <span>=</span>
+              <Input aria-label="Weight by volume grams" className="min-w-0 flex-1" type="number" min="0" step="0.1"
+                value={measureText ?? (form.densityGMl == null ? "" : (form.densityGMl * VOLUME_ML[measureUnit]).toFixed(1))}
+                onChange={(e) => { const text = e.target.value; setMeasureText(text); set({ densitySource: text.trim() === "" ? null : "manual", referenceName: null, densityGMl: text.trim() === "" ? null : +(Number(text) / VOLUME_ML[measureUnit]).toFixed(3) }); }} />
+              <span>g</span>
+            </span>
+          </Field>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Category (optional)">
               <Input value={form.category ?? ""} onChange={(e) => set({ category: e.target.value || null })} />
@@ -111,7 +96,7 @@ export function IngredientDialog({ editing, onClose }: { editing: IngredientRow 
             <div className="flex items-end">
               <span className="readout text-xs text-muted">
                 {kcalPerOz(form.kcalPer100g) != null ? `${kcalPerOz(form.kcalPer100g)!.toFixed(0)} cal/oz` : "cal/oz —"}
-                {form.densityGMl == null && " · no density → volume disabled"}
+                 {" · "}{form.densityGMl != null ? `≈ ${form.densityGMl} g/mL` : "Add a weight to measure by volume"}
               </span>
             </div>
           </div>

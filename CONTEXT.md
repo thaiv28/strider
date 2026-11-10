@@ -33,8 +33,7 @@ A reusable selection of Gear Items with a base-or-worn classification.
 _Avoid_: Pack, packing list
 
 **Trip**:
-An idea, planned, or completed backpacking outing with gear and food snapshots
-that freeze at completion.
+An idea, planned, or completed backpacking outing with gear and food copies.
 _Avoid_: Hike, expedition
 
 **Trail**:
@@ -42,7 +41,8 @@ A reusable destination or route that can be associated with multiple Trips.
 _Avoid_: Trip, route plan
 
 **Trip Gear**:
-The immutable-at-completion snapshot of Gear Items selected for a Trip.
+The Gear Items selected for a Trip, kept current with library edits, with per-Trip
+quantity, worn/packed choice, and category.
 _Avoid_: Loadout
 
 **Meal**:
@@ -50,11 +50,15 @@ A reusable recipe composed of Ingredients and measured in servings.
 _Avoid_: Food item
 
 **Ingredient**:
-A reusable food component with nutrition measured per 100 grams.
+A reusable food component with nutrition measured per 100 grams, normally from a USDA Reference Food.
 _Avoid_: Meal
 
+**USDA Reference Food**:
+A generic food from USDA's published reference data supplying an Ingredient's calories and measured volume weight.
+
 **Trip Meal**:
-A frozen Meal or Ingredient allocation for one day of a Trip.
+A Meal or Ingredient allocation for one day of a Trip, kept current with library
+edits, with per-Trip servings or grams.
 _Avoid_: Meal
 
 **Base Weight**:

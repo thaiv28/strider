@@ -17,10 +17,17 @@ import {
   addMealIngredientFromHit,
   updateMealIngredientAmount,
   removeMealIngredient,
-  searchNutrition,
+  suggestReferenceFoods,
+  linkIngredientDensity,
+  setIngredientMeasure,
 } from "@/app/food/actions";
 
+import { useFoodSearch, FoodSearchResults, FOOD_SEARCH_PLACEHOLDER, foodSearchKeys } from "./food-search";
+
 const MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack"];
+type EnteredAmount = { amount: number; unit: string };
+const storedEntered = (i: MealRow["items"][number]): EnteredAmount | null => i.enteredAmount != null && i.enteredUnit != null ? { amount: i.enteredAmount, unit: i.enteredUnit } : null;
+
 // Number field without the native up/down spinner.
 const NUM = "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
 
@@ -30,14 +37,21 @@ export function MealEditor({ meal, ingredients, onBack, exitRef, isNew = false }
 
   const [form, setForm] = useState({ name: meal.name, mealType: meal.mealType ?? "", baseServings: meal.baseServings, isHot: meal.isHot, waterMl: meal.waterMl });
   const [amounts, setAmounts] = useState<Record<number, number>>(() => Object.fromEntries(meal.items.map((i) => [i.id, i.amountG])));
+  const [entered, setEntered] = useState<Record<number, EnteredAmount | null>>(() => Object.fromEntries(meal.items.map((i) => [i.id, storedEntered(i)])));
+  const [resetKey, setResetKey] = useState(0);
   const [preview, setPreview] = useState(meal.baseServings);
   const [leaving, setLeaving] = useState(false);
 
   // Add/remove of ingredients happens server-side; merge in new rows while
   // keeping any in-progress local amount edits for surviving rows.
+  const previousIds = useRef(new Set(meal.items.map((i) => i.id)));
   const itemSig = meal.items.map((i) => i.id).join(",");
   useEffect(() => {
+    const added = meal.items.find((i) => !previousIds.current.has(i.id));
+    previousIds.current = new Set(meal.items.map((i) => i.id));
+    if (added) requestAnimationFrame(() => { const input = document.querySelector<HTMLInputElement>(`[data-meal-line="${added.id}"] input[aria-label="Ingredient amount"]`); input?.focus(); input?.select(); });
     setAmounts((prev) => Object.fromEntries(meal.items.map((i) => [i.id, prev[i.id] ?? i.amountG])));
+    setEntered((prev) => Object.fromEntries(meal.items.map((i) => [i.id, Object.prototype.hasOwnProperty.call(prev, i.id) ? prev[i.id] : storedEntered(i)])));
   }, [itemSig]);
 
   const base = form.baseServings || 1;
@@ -56,13 +70,14 @@ export function MealEditor({ meal, ingredients, onBack, exitRef, isNew = false }
     form.isHot !== meal.isHot ||
     (form.waterMl ?? null) !== (meal.waterMl ?? null);
   const amountsDirty = meal.items.some((i) => (amounts[i.id] ?? i.amountG) !== i.amountG);
-  const dirty = formDirty || amountsDirty;
+  const enteredDirty = (i: MealRow["items"][number]) => JSON.stringify(entered[i.id] ?? null) !== JSON.stringify(storedEntered(i));
+  const dirty = formDirty || amountsDirty || meal.items.some(enteredDirty);
 
   const persist = async () => {
     await updateMeal(meal.id, { name: form.name, baseServings: form.baseServings, mealType: form.mealType || null, isHot: form.isHot, waterMl: form.isHot ? form.waterMl : null });
     for (const i of meal.items) {
       const a = amounts[i.id];
-      if (a != null && a !== i.amountG) await updateMealIngredientAmount(i.id, a);
+      if (a != null && (a !== i.amountG || enteredDirty(i))) await updateMealIngredientAmount(i.id, a, entered[i.id]);
     }
   };
   const save = () => run(persist);
@@ -70,6 +85,8 @@ export function MealEditor({ meal, ingredients, onBack, exitRef, isNew = false }
   const discard = () => {
     setForm({ name: meal.name, mealType: meal.mealType ?? "", baseServings: meal.baseServings, isHot: meal.isHot, waterMl: meal.waterMl });
     setAmounts(Object.fromEntries(meal.items.map((i) => [i.id, i.amountG])));
+    setEntered(Object.fromEntries(meal.items.map((i) => [i.id, storedEntered(i)])));
+    setResetKey((k) => k + 1);
   };
 
   // A just-created meal with no ingredients is still provisional; if the user
@@ -169,12 +186,22 @@ export function MealEditor({ meal, ingredients, onBack, exitRef, isNew = false }
         <div className="mt-4 divide-y rounded-lg border">
           {items.length === 0 && <div className="px-4 py-3 text-sm text-muted">No ingredients yet.</div>}
           {items.map((it) => (
-            <div key={it.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-1.5 pr-1 pl-3 sm:flex-nowrap sm:pl-4">
-              <span className="min-w-0 flex-1 text-sm font-medium leading-snug break-words max-sm:basis-full">{it.name}</span>
+            <div key={it.id} data-meal-line={it.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-1.5 pr-1 pl-3 sm:pl-4">
+              <span className="min-w-0 flex-1 text-sm font-medium leading-snug break-words max-sm:basis-full sm:basis-0">{it.name}</span>
               <AmountControl
+                key={`${it.id}-${resetKey}`}
                 grams={Math.round(it.amountG * scale)}
                 density={it.densityGMl}
-                onChange={(displayG) => setAmounts((a) => ({ ...a, [it.id]: Math.max(0, Math.round(displayG / scale)) }))}
+                ingredientName={it.name}
+                onLinkReference={(fdcId) => { if (it.ingredientId != null) run(() => linkIngredientDensity(it.ingredientId!, fdcId)); }}
+                canSetDensity={it.ingredientId != null}
+                initialUnit={entered[it.id]?.unit ?? "g"}
+                displayAmount={entered[it.id] ? +(entered[it.id]!.amount * scale).toFixed(3) : null}
+                onSetMeasure={(unit, grams) => { if (it.ingredientId != null) run(() => setIngredientMeasure(it.ingredientId!, unit, grams)); }}
+                onChange={(displayG, value) => {
+                  setAmounts((a) => ({ ...a, [it.id]: Math.max(0, Math.round(displayG / scale)) }));
+                  setEntered((e) => ({ ...e, [it.id]: { amount: value.amount / scale, unit: value.unit } }));
+                }}
               />
               <span className="readout w-16 shrink-0 text-right text-xs text-muted max-sm:ml-auto">{kcalForGrams(it.kcalPer100g, Math.round(it.amountG * scale))} kcal</span>
               <IconButton aria-label={`Remove ${it.name}`} onClick={() => run(() => removeMealIngredient(it.id))} className="text-signal"><X size={16} /></IconButton>
@@ -212,64 +239,107 @@ export function MealEditor({ meal, ingredients, onBack, exitRef, isNew = false }
   );
 }
 
-// Controlled amount editor: a spinner-free number box plus a unit toggle.
-// Volume units are disabled until a density is known. Emits grams on change.
-function AmountControl({ grams, density, onChange }: { grams: number; density: number | null; onChange: (grams: number) => void }) {
-  const [unit, setUnit] = useState<"g" | "oz" | VolumeUnit>("g");
-  const toDisplay = (g: number): number => {
-    if (unit === "g") return g;
-    if (unit === "oz") return +gToOz(g).toFixed(2);
-    return +(volumeFromGrams(g, unit, density) ?? 0).toFixed(2);
+// Canonical grams and the entered quantity travel together, at the displayed scale.
+function AmountControl({ grams, density, ingredientName, onLinkReference, canSetDensity, initialUnit, displayAmount, onChange, onSetMeasure }: {
+  grams: number; density: number | null; ingredientName: string; onLinkReference: (fdcId: string) => void; canSetDensity: boolean;
+  initialUnit: string; displayAmount: number | null;
+  onChange: (grams: number, entered: EnteredAmount) => void;
+  onSetMeasure: (unit: VolumeUnit, grams: number) => void;
+}) {
+  const [unit, setUnit] = useState(initialUnit);
+  const isVolume = unit !== "g" && unit !== "oz";
+  const toDisplay = (g: number, u = unit): number => {
+    if (u === "g") return g;
+    if (u === "oz") return +gToOz(g).toFixed(2);
+    return +(volumeFromGrams(g, u as VolumeUnit, density) ?? 0).toFixed(2);
   };
-  const toGrams = (v: number): number => {
-    if (unit === "g") return Math.round(v);
-    if (unit === "oz") return ozToG(v);
-    return gramsFromVolume(v, unit, density) ?? Math.round(grams);
-  };
-  const [val, setVal] = useState<string>(String(toDisplay(grams)));
-  const emitted = useRef(grams);
+  const [val, setVal] = useState(String(displayAmount ?? toDisplay(grams)));
+  const typed = useRef(false);
+  const hasNumber = () => val.trim() !== "" && Number.isFinite(Number(val)) && Number(val) >= 0;
+  const pendingTyped = useRef(false);
+  const [suggestions, setSuggestions] = useState<FoodHit[]>([]);
+  useEffect(() => {
+    if (!isVolume || density != null || !canSetDensity) return;
+    let active = true;
+    void suggestReferenceFoods(ingredientName).then((rows) => { if (active) setSuggestions(rows.slice(0, 3)); }).catch(() => {});
+    return () => { active = false; };
+  }, [isVolume, density, canSetDensity, ingredientName]);
+  const [measure, setMeasure] = useState("");
+  const emitted = useRef({ grams, amount: displayAmount });
+  const previous = useRef({ grams, displayAmount, density });
 
-  // Switching units always reformats the current amount into the new unit.
-  const [lastUnit, setLastUnit] = useState(unit);
-  if (unit !== lastUnit) {
-    setLastUnit(unit);
-    emitted.current = grams;
-    setVal(String(toDisplay(grams)));
-  }
-  // Resync from grams only on an EXTERNAL change (e.g. serving-scale preview).
-  // The echo of our own edit round-trips through integer grams and would snap
-  // a typed "4" oz back to "3.99"; ignore it (tolerance covers scale rounding).
-  const [lastGrams, setLastGrams] = useState(grams);
-  if (grams !== lastGrams) {
-    setLastGrams(grams);
-    if (Math.abs(grams - emitted.current) > 1) setVal(String(toDisplay(grams)));
-  }
-
-  const onInput = (s: string) => {
-    setVal(s);
-    const n = Number(s);
-    if (s.trim() !== "" && Number.isFinite(n) && n >= 0) {
-      const g = toGrams(n);
-      emitted.current = g;
-      onChange(g);
+  useEffect(() => {
+    const prev = previous.current;
+    previous.current = { grams, displayAmount, density };
+    if (prev.density == null && density != null && isVolume) {
+      const keep = (pendingTyped.current || typed.current) && hasNumber();
+      const amount = keep ? Number(val) : toDisplay(grams);
+      const nextGrams = keep ? gramsFromVolume(amount, unit as VolumeUnit, density)! : grams;
+      pendingTyped.current = false;
+      setVal(String(amount));
+      emitted.current = { grams: nextGrams, amount };
+      onChange(nextGrams, { amount, unit });
+    } else if (grams !== prev.grams || displayAmount !== prev.displayAmount) {
+      // Only an external change (the serving preview) reformats the field; the
+      // echo of the user's own typing must not snap it to a rounded value.
+      const moved = displayAmount == null || emitted.current.amount == null
+        ? grams !== emitted.current.grams
+        : Math.abs(displayAmount - emitted.current.amount) > 0.002;
+      if (moved) {
+        setVal(String(displayAmount ?? toDisplay(grams)));
+        emitted.current = { grams, amount: displayAmount };
+      }
     }
+  });
+
+  const changeUnit = (next: string) => {
+    const preserve = typed.current && hasNumber();
+    const amount = preserve ? Number(val) : toDisplay(grams, next);
+    const nextGrams = preserve ? next === "g" ? Math.round(amount) : next === "oz" ? ozToG(amount) : gramsFromVolume(amount, next as VolumeUnit, density) ?? grams : grams;
+    typed.current = false;
+    pendingTyped.current = density == null && next !== "g" && next !== "oz" && preserve;
+    setUnit(next);
+    setVal(String(amount));
+    if (density == null && next !== "g" && next !== "oz") return;
+    emitted.current = { grams: nextGrams, amount };
+    onChange(nextGrams, { amount, unit: next });
+  };
+  const onInput = (text: string) => {
+    typed.current = true;
+    setVal(text);
+    const amount = Number(text);
+    if (text.trim() === "" || !Number.isFinite(amount) || amount < 0) return;
+    // Without a density these grams would be wrong; hold the number until one arrives.
+    if (isVolume && density == null) return;
+    const g = unit === "g" ? Math.round(amount) : unit === "oz" ? ozToG(amount) : gramsFromVolume(amount, unit as VolumeUnit, density) ?? grams;
+    emitted.current = { grams: g, amount };
+    onChange(g, { amount, unit });
   };
 
   return (
-    <span className="inline-flex items-center gap-1">
-      <Input aria-label="Ingredient amount" className={`!w-20 text-right ${NUM}`} type="number" min="0" step="0.1" value={val} onChange={(e) => onInput(e.target.value)} />
-      <Select aria-label="Amount unit" value={unit} onChange={(e) => setUnit(e.target.value as typeof unit)} className="!px-2 !py-1.5">
-        <option value="g">g</option>
-        <option value="oz">oz</option>
-        {Object.keys(VOLUME_ML).map((u) => (
-          <option key={u} value={u} disabled={density == null}>{u}</option>
-        ))}
-      </Select>
+    <span className="contents">
+      <span className="inline-flex items-center gap-1">
+        <Input aria-label="Ingredient amount" className={`!w-20 text-right ${NUM}`} type="number" min="0" step="0.1" value={val} onChange={(e) => onInput(e.target.value)} />
+        <Select aria-label="Ingredient amount unit" value={unit} onChange={(e) => changeUnit(e.target.value)} className="!px-2 !py-1.5">
+          <option value="g">g</option><option value="oz">oz</option>
+          {(Object.keys(VOLUME_ML) as VolumeUnit[]).map((u) => <option key={u} value={u} disabled={density == null && !canSetDensity}>{u}</option>)}
+        </Select>
+      </span>
+      {isVolume && density == null && canSetDensity && (
+        <span className="order-last flex basis-full flex-col gap-2 rounded border bg-panel2/40 p-2 text-xs text-muted">
+          {suggestions.length > 0 && <span>Pick the closest USDA food:</span>}
+          {suggestions.map((h) => <button type="button" key={h.sourceId} onClick={() => onLinkReference(h.sourceId)} className="min-h-11 rounded border bg-panel px-2 py-1.5 text-left text-ink break-words hover:border-accent/50 hover:text-accent sm:min-h-0">{h.referenceName} · 1 {unit} = {(h.densityGMl! * VOLUME_ML[unit as VolumeUnit]).toFixed(1)} g</button>)}
+          <span className="flex flex-wrap items-center gap-1"><span>or 1 {unit} =</span>
+          <Input aria-label="Measure weight grams" className="!w-20 min-w-0" type="number" min="0" step="0.1" value={measure} onChange={(e) => setMeasure(e.target.value)} />
+          <span>g</span>
+          <Button variant="outline" disabled={!Number.isFinite(Number(measure)) || Number(measure) <= 0} onClick={() => onSetMeasure(unit as VolumeUnit, Number(measure))}>Set</Button></span>
+        </span>
+      )}
     </span>
   );
 }
 
-// Searches your pantry (listed first) and the public APIs together.
+// Saved pantry foods precede bundled reference results.
 function AddIngredient({
   ingredients,
   onAddCustom,
@@ -280,32 +350,13 @@ function AddIngredient({
   onAddHit: (hit: FoodHit) => void;
 }) {
   const [q, setQ] = useState("");
-  const [hits, setHits] = useState<FoodHit[]>([]);
-  const [searching, setSearching] = useState(false);
-
+  const search = useFoodSearch(q);
   const custom = q.trim().length ? ingredients.filter((i) => i.name.toLowerCase().includes(q.toLowerCase())).slice(0, 6) : [];
-
-  useEffect(() => {
-    if (q.trim().length < 2) {
-      setHits([]);
-      return;
-    }
-    const h = setTimeout(async () => {
-      setSearching(true);
-      try {
-        setHits(await searchNutrition(q));
-      } finally {
-        setSearching(false);
-      }
-    }, 350);
-    return () => clearTimeout(h);
-  }, [q]);
 
   return (
     <div className="mt-4">
-      <Field label="Add ingredient"><Input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. rolled oats, peanut butter, Clif bar" /></Field>
-      {(custom.length > 0 || searching || hits.length > 0) && (
-        <div className="mt-2 max-h-64 overflow-y-auto rounded-lg border">
+      <Field label="Add ingredient"><Input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={FOOD_SEARCH_PLACEHOLDER} onKeyDown={(e) => foodSearchKeys(e, () => setQ(""))} /></Field>
+      <FoodSearchResults query={q} search={search} onPick={(h) => { onAddHit(h); setQ(""); }}>
           {custom.map((i) => (
             <button key={`c${i.id}`} onClick={() => { onAddCustom(i.id, i.defaultServingG ?? 50); setQ(""); }} className="flex w-full items-center justify-between gap-3 border-b px-3 py-2 text-left last:border-0 hover:bg-panel2/60">
               <span className="truncate text-sm">{i.name}</span>
@@ -315,21 +366,7 @@ function AddIngredient({
               </span>
             </button>
           ))}
-          {searching && <div className="px-3 py-2 text-sm text-muted">Searching…</div>}
-          {hits.map((h) => (
-            <button key={`${h.source}-${h.sourceId}`} onClick={() => { onAddHit(h); setQ(""); }} className="flex w-full items-center justify-between gap-3 border-b px-3 py-2 text-left last:border-0 hover:bg-panel2/60">
-              <span className="min-w-0">
-                <span className="block truncate text-sm">{h.name}</span>
-                {h.detail && <span className="block truncate text-xs text-muted">{h.detail}</span>}
-              </span>
-              <span className="readout flex max-w-[48%] shrink-0 flex-wrap justify-end gap-2 text-xs text-muted">
-                {h.kcalPer100g != null && <span>{h.kcalPer100g} kcal/100g</span>}
-                <Badge tone={h.source === "usda" ? "base" : "wishlist"}>{h.source}</Badge>
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
+      </FoodSearchResults>
     </div>
   );
 }
