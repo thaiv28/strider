@@ -6,7 +6,7 @@ import { Sheet } from "@/components/sheet";
 import { useUnsavedGuard } from "@/components/unsaved-changes";
 import { X } from "lucide-react";
 import { gToOz, ozToG } from "@/lib/util";
-import { kcalForGrams, kcalPerOz, gramsFromVolume, volumeFromGrams, VOLUME_ML, type VolumeUnit } from "@/lib/food";
+import { kcalForGrams, kcalPerOz, gramsFromVolume, volumeFromGrams, VOLUME_ML, type AmountUnit } from "@/lib/food";
 import { DEFAULT_COOK_WATER_ML } from "@/lib/fuel";
 import type { MealRow, IngredientRow } from "@/lib/pantry";
 import type { FoodHit } from "@/lib/food-search";
@@ -30,14 +30,17 @@ export function MealEditor({ meal, ingredients, onBack, exitRef, isNew = false }
 
   const [form, setForm] = useState({ name: meal.name, mealType: meal.mealType ?? "", baseServings: meal.baseServings, isHot: meal.isHot, waterMl: meal.waterMl });
   const [amounts, setAmounts] = useState<Record<number, number>>(() => Object.fromEntries(meal.items.map((i) => [i.id, i.amountG])));
+  const [units, setUnits] = useState<Record<number, AmountUnit>>(() => Object.fromEntries(meal.items.map((i) => [i.id, i.amountUnit])));
   const [preview, setPreview] = useState(meal.baseServings);
+  const [asWeight, setAsWeight] = useState(false);
   const [leaving, setLeaving] = useState(false);
 
   // Add/remove of ingredients happens server-side; merge in new rows while
-  // keeping any in-progress local amount edits for surviving rows.
+  // keeping any in-progress local amount and unit edits for surviving rows.
   const itemSig = meal.items.map((i) => i.id).join(",");
   useEffect(() => {
     setAmounts((prev) => Object.fromEntries(meal.items.map((i) => [i.id, prev[i.id] ?? i.amountG])));
+    setUnits((prev) => Object.fromEntries(meal.items.map((i) => [i.id, prev[i.id] ?? i.amountUnit])));
   }, [itemSig]);
 
   const base = form.baseServings || 1;
@@ -55,14 +58,14 @@ export function MealEditor({ meal, ingredients, onBack, exitRef, isNew = false }
     form.baseServings !== meal.baseServings ||
     form.isHot !== meal.isHot ||
     (form.waterMl ?? null) !== (meal.waterMl ?? null);
-  const amountsDirty = meal.items.some((i) => (amounts[i.id] ?? i.amountG) !== i.amountG);
-  const dirty = formDirty || amountsDirty;
+  const lineDirty = (i: MealRow["items"][number]) =>
+    (amounts[i.id] ?? i.amountG) !== i.amountG || (units[i.id] ?? i.amountUnit) !== i.amountUnit;
+  const dirty = formDirty || meal.items.some(lineDirty);
 
   const persist = async () => {
     await updateMeal(meal.id, { name: form.name, baseServings: form.baseServings, mealType: form.mealType || null, isHot: form.isHot, waterMl: form.isHot ? form.waterMl : null });
     for (const i of meal.items) {
-      const a = amounts[i.id];
-      if (a != null && a !== i.amountG) await updateMealIngredientAmount(i.id, a);
+      if (lineDirty(i)) await updateMealIngredientAmount(i.id, amounts[i.id] ?? i.amountG, units[i.id] ?? i.amountUnit);
     }
   };
   const save = () => run(persist);
@@ -70,6 +73,7 @@ export function MealEditor({ meal, ingredients, onBack, exitRef, isNew = false }
   const discard = () => {
     setForm({ name: meal.name, mealType: meal.mealType ?? "", baseServings: meal.baseServings, isHot: meal.isHot, waterMl: meal.waterMl });
     setAmounts(Object.fromEntries(meal.items.map((i) => [i.id, i.amountG])));
+    setUnits(Object.fromEntries(meal.items.map((i) => [i.id, i.amountUnit])));
   };
 
   // A just-created meal with no ingredients is still provisional; if the user
@@ -159,11 +163,25 @@ export function MealEditor({ meal, ingredients, onBack, exitRef, isNew = false }
           <Stat label="Efficiency">{calOz != null ? `${calOz.toFixed(0)} cal/oz` : "—"}</Stat>
         </div>
 
-        <div className="mt-3 flex items-center gap-2 whitespace-nowrap">
-          <label htmlFor={`meal-preview-${meal.id}`} className="text-[13px] font-semibold text-muted">Show amounts for</label>
-          <Input id={`meal-preview-${meal.id}`} className="!w-16 shrink-0" type="number" min="1" step="1" value={preview}
-            onChange={(e) => setPreview(Math.max(1, Number(e.target.value) || 1))} />
-          <span className="text-sm text-muted">servings</span>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+          <div className="flex items-center gap-2 whitespace-nowrap">
+            <label htmlFor={`meal-preview-${meal.id}`} className="text-[13px] font-semibold text-muted">Show amounts for</label>
+            <Input id={`meal-preview-${meal.id}`} className="!w-16 shrink-0" type="number" min="1" step="1" value={preview}
+              onChange={(e) => setPreview(Math.max(1, Number(e.target.value) || 1))} />
+            <span className="text-sm text-muted">servings</span>
+          </div>
+          <label className="flex min-h-11 cursor-pointer items-center gap-2.5 whitespace-nowrap text-[13px] font-semibold text-muted">
+            View as weight
+            <button
+              type="button"
+              role="switch"
+              aria-checked={asWeight}
+              onClick={() => setAsWeight((v) => !v)}
+              className={`relative inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${asWeight ? "bg-accent" : "bg-fieldborder"}`}
+            >
+              <span className={`absolute left-0.5 h-5 w-5 rounded-full bg-panel shadow-sm transition-transform ${asWeight ? "translate-x-4" : ""}`} />
+            </button>
+          </label>
         </div>
 
         <div className="mt-4 divide-y rounded-lg border">
@@ -174,6 +192,9 @@ export function MealEditor({ meal, ingredients, onBack, exitRef, isNew = false }
               <AmountControl
                 grams={Math.round(it.amountG * scale)}
                 density={it.densityGMl}
+                unit={units[it.id] ?? it.amountUnit}
+                asWeight={asWeight}
+                onUnitChange={(u) => setUnits((m) => ({ ...m, [it.id]: u }))}
                 onChange={(displayG) => setAmounts((a) => ({ ...a, [it.id]: Math.max(0, Math.round(displayG / scale)) }))}
               />
               <span className="readout w-16 shrink-0 text-right text-xs text-muted max-sm:ml-auto">{kcalForGrams(it.kcalPer100g, Math.round(it.amountG * scale))} kcal</span>
@@ -212,10 +233,19 @@ export function MealEditor({ meal, ingredients, onBack, exitRef, isNew = false }
   );
 }
 
-// Controlled amount editor: a spinner-free number box plus a unit toggle.
-// Volume units are disabled until a density is known. Emits grams on change.
-function AmountControl({ grams, density, onChange }: { grams: number; density: number | null; onChange: (grams: number) => void }) {
-  const [unit, setUnit] = useState<"g" | "oz" | VolumeUnit>("g");
+// Controlled amount editor: a spinner-free number box plus a unit picker.
+// `unit` is the line's saved entry unit; `asWeight` shows grams without
+// changing it. Volume units are disabled until a density is known. Emits grams.
+function AmountControl({ grams, density, unit: savedUnit, asWeight, onUnitChange, onChange }: {
+  grams: number;
+  density: number | null;
+  unit: AmountUnit;
+  asWeight: boolean;
+  onUnitChange: (unit: AmountUnit) => void;
+  onChange: (grams: number) => void;
+}) {
+  const isVolume = savedUnit !== "g" && savedUnit !== "oz";
+  const unit: AmountUnit = asWeight || (isVolume && density == null) ? "g" : savedUnit;
   const toDisplay = (g: number): number => {
     if (unit === "g") return g;
     if (unit === "oz") return +gToOz(g).toFixed(2);
@@ -258,13 +288,17 @@ function AmountControl({ grams, density, onChange }: { grams: number; density: n
   return (
     <span className="inline-flex items-center gap-1">
       <Input aria-label="Ingredient amount" className={`!w-20 text-right ${NUM}`} type="number" min="0" step="0.1" value={val} onChange={(e) => onInput(e.target.value)} />
-      <Select aria-label="Amount unit" value={unit} onChange={(e) => setUnit(e.target.value as typeof unit)} className="!px-2 !py-1.5">
-        <option value="g">g</option>
-        <option value="oz">oz</option>
-        {Object.keys(VOLUME_ML).map((u) => (
-          <option key={u} value={u} disabled={density == null}>{u}</option>
-        ))}
-      </Select>
+      {asWeight ? (
+        <span className="inline-flex min-h-11 w-[4.25rem] items-center px-2 text-sm text-muted">g</span>
+      ) : (
+        <Select aria-label="Amount unit" value={unit} onChange={(e) => onUnitChange(e.target.value as AmountUnit)} className="!w-[4.25rem] !px-2 !py-1.5">
+          <option value="g">g</option>
+          <option value="oz">oz</option>
+          {Object.keys(VOLUME_ML).map((u) => (
+            <option key={u} value={u} disabled={density == null}>{u}</option>
+          ))}
+        </Select>
+      )}
     </span>
   );
 }

@@ -6,6 +6,7 @@ import { db, schema } from "@/src/db/index";
 import { getCurrentUserId } from "@/lib/gear";
 import { searchFoods, fetchFdcDensity, type FoodHit } from "@/lib/food-search";
 import { upsertIngredientFromHit } from "@/lib/food-server";
+import { asAmountUnit } from "@/lib/food";
 import {
   requireOwnedIngredient,
   requireOwnedMeal,
@@ -160,11 +161,11 @@ export async function addMealIngredientFromHit(mealId: number, hit: FoodHit, amo
   bump();
 }
 
-export async function updateMealIngredientAmount(id: number, amountG: number) {
+export async function updateMealIngredientAmount(id: number, amountG: number, amountUnit?: string) {
   await requireOwnedMealIngredient(id);
   await db
     .update(schema.mealIngredient)
-    .set({ amountG: Math.max(0, Math.round(amountG)) })
+    .set({ amountG: Math.max(0, Math.round(amountG)), ...(amountUnit !== undefined && { amountUnit: asAmountUnit(amountUnit) }) })
     .where(eq(schema.mealIngredient.id, id));
   bump();
 }

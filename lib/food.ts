@@ -11,6 +11,11 @@ export const VOLUME_ML: Record<string, number> = {
 };
 export type VolumeUnit = keyof typeof VOLUME_ML;
 
+/** Unit an ingredient amount is entered and displayed in. Storage is always grams. */
+export type AmountUnit = "g" | "oz" | VolumeUnit;
+export const asAmountUnit = (u: string | null | undefined): AmountUnit =>
+  u === "g" || u === "oz" || (u != null && u in VOLUME_ML) ? u : "g";
+
 export const kcalPerOz = (kcalPer100g: number | null): number | null =>
   kcalPer100g == null ? null : (kcalPer100g / 100) * OZ_TO_G;
 

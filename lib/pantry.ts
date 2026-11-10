@@ -1,6 +1,6 @@
 import { eq, asc } from "drizzle-orm";
 import { db, schema } from "@/src/db/index";
-import { kcalForGrams, num } from "@/lib/food";
+import { kcalForGrams, num, asAmountUnit, type AmountUnit } from "@/lib/food";
 
 export type IngredientRow = {
   id: number;
@@ -20,6 +20,7 @@ export type MealIngredientRow = {
   kcalPer100g: number | null;
   densityGMl: number | null;
   amountG: number; // whole recipe at base servings
+  amountUnit: AmountUnit; // unit the amount was entered in; display only
   sortOrder: number;
 };
 
@@ -69,6 +70,7 @@ export async function getMeals(userId: number): Promise<MealRow[]> {
       snapshotKcalPer100g: schema.mealIngredient.snapshotKcalPer100g,
       snapshotDensityGMl: schema.mealIngredient.snapshotDensityGMl,
       amountG: schema.mealIngredient.amountG,
+      amountUnit: schema.mealIngredient.amountUnit,
       sortOrder: schema.mealIngredient.sortOrder,
     })
     .from(schema.mealIngredient)
@@ -85,6 +87,7 @@ export async function getMeals(userId: number): Promise<MealRow[]> {
       kcalPer100g: num(it.snapshotKcalPer100g),
       densityGMl: num(it.snapshotDensityGMl),
       amountG: it.amountG,
+      amountUnit: asAmountUnit(it.amountUnit),
       sortOrder: it.sortOrder,
     };
     if (!byMeal.has(it.mealId)) byMeal.set(it.mealId, []);

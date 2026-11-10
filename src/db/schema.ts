@@ -367,6 +367,9 @@ export const mealIngredient = pgTable("meal_ingredient", {
   snapshotKcalPer100g: numeric("snapshot_kcal_per_100g"),
   snapshotDensityGMl: numeric("snapshot_density_g_ml"),
   amountG: integer("amount_g").notNull(), // grams for the whole recipe at base_servings
+  // Unit the amount was entered in (g, oz, or a volume unit). Display only;
+  // amount_g stays canonical.
+  amountUnit: text("amount_unit").notNull().default("g"),
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
