@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Card, Button, Input, Select } from "@/components/ui";
+import { Button, Input, Select, Field, Textarea } from "@/components/ui";
+import { Sheet } from "@/components/sheet";
 import { displayOz, ozToG } from "@/lib/util";
 import type { GearRow, CategoryOption } from "@/lib/gear";
 
@@ -38,13 +39,7 @@ export function GearDialog({
   );
 
   return (
-    <div
-      className="fixed inset-0 z-[1100] flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <Card className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden p-5" onClick={(e) => e.stopPropagation()}>
-        <div className="eyebrow">◇ {editing ? "Edit entry" : "New entry"}</div>
-        <h2 className="font-display mt-1 text-lg font-bold">{editing ? editing.name : "Add gear"}</h2>
+    <Sheet open onClose={onClose} title={editing ? "Edit gear" : "Add gear"}>
         <form
           className="mt-4 flex min-h-0 flex-col"
           onSubmit={(e) => {
@@ -152,7 +147,7 @@ export function GearDialog({
             <Input name="productUrl" type="url" defaultValue={editing?.productUrl ?? ""} />
           </Field>
           <Field label="Notes (optional)">
-            <Input name="notes" defaultValue={editing?.notes ?? ""} />
+            <Textarea className="w-full" name="notes" defaultValue={editing?.notes ?? ""} />
           </Field>
           </div>
           <div className="flex justify-end gap-2 pt-3">
@@ -162,16 +157,6 @@ export function GearDialog({
             <Button type="submit">{editing ? "Save" : "Add"}</Button>
           </div>
         </form>
-      </Card>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="eyebrow mb-1 block">{label}</span>
-      {children}
-    </label>
+    </Sheet>
   );
 }

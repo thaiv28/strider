@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Card, Button } from "@/components/ui";
+import { Card, Button, IconButton } from "@/components/ui";
+import { PageHeader, PageBody } from "@/components/page-header";
 import { getCalendarData, type CalendarData } from "@/app/calendar/actions";
 import { updateTrip } from "@/app/trips/actions";
 import { addDays } from "@/lib/weather";
@@ -116,61 +117,28 @@ export function CalendarView({ initial }: { initial: CalendarData }) {
 
   return (
     <div className={pending ? "opacity-60 transition" : "transition"}>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <button onClick={() => shift(-1)} className="grid h-11 w-11 place-items-center rounded-md border bg-panel hover:bg-panel2 sm:h-auto sm:w-auto sm:p-1.5" aria-label="Previous month"><ChevronLeft size={16} /></button>
-          <button onClick={() => shift(1)} className="grid h-11 w-11 place-items-center rounded-md border bg-panel hover:bg-panel2 sm:h-auto sm:w-auto sm:p-1.5" aria-label="Next month"><ChevronRight size={16} /></button>
-          <h2 className="font-display ml-1 text-xl font-bold tracking-tight">{data.label}</h2>
-        </div>
-        <div className="flex items-center gap-3">
-          <Legend feeds={data.feeds} />
-          <Button variant="outline" onClick={jumpToday}>Today</Button>
-        </div>
-      </div>
-
-      {data.feeds.length === 0 && (
-        <p className="mt-3 text-sm text-muted">
-          No calendars connected yet — add a secret iCal address in{" "}
-          <Link href="/settings" className="text-accent hover:underline">Settings</Link>. Trips still show below.
-        </p>
-      )}
-
-      <div className="mt-4 space-y-3 sm:hidden">
-        {agenda.length === 0 && (
-          <Card className="px-4 py-8 text-center text-sm text-muted">No trips or calendar events this month.</Card>
-        )}
-        {agenda.map((day) => (
-          <Card key={day.iso} className="p-4">
-            <div className="flex items-baseline justify-between gap-3 border-b pb-2">
-              <span className="font-display font-semibold">
-                {new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${day.iso}T12:00:00Z`))}
-              </span>
-              {day.iso === today && <span className="eyebrow text-accent">Today</span>}
+      <PageHeader title="Calendar" actions={<div className="flex items-center gap-2">
+        <IconButton onClick={() => shift(-1)} className="border border-headerborder text-headerink! hover:bg-headeractive! hover:text-headerink!" aria-label="Previous month"><ChevronLeft size={18} /></IconButton>
+        <IconButton onClick={() => shift(1)} className="border border-headerborder text-headerink! hover:bg-headeractive! hover:text-headerink!" aria-label="Next month"><ChevronRight size={18} /></IconButton>
+        <Button variant="header" onClick={jumpToday}>Today</Button>
+      </div>}><p className="text-headermuted">{data.label}</p></PageHeader>
+      <PageBody className="space-y-3">
+        <Card className="overflow-hidden sm:hidden" aria-label={data.label}>
+          <div className="grid grid-cols-7 bg-panel2/50">{WD.map((day) => <div key={day} className="py-2 text-center text-xs font-semibold text-muted">{day}</div>)}</div>
+          {weeks.map((week, index) => <div key={index} className="relative border-t border-divider">
+            <div className="grid grid-cols-7">
+              {week.cells.map((cell) => <div key={cell.iso} className={`min-h-[46px] min-w-0 border-r border-divider py-1 text-center last:border-r-0 ${cell.inMonth ? "" : "bg-panel2/40 text-muted"}`}>
+                <span className={`readout mx-auto flex h-5 w-5 items-center justify-center text-xs ${cell.iso === today ? "rounded-full bg-accent font-bold text-accentink" : ""}`}>{cell.day}</span>
+                <div aria-hidden style={{ height: week.laneCount * 8 }} />
+                <div className="flex flex-wrap justify-center gap-1 px-1">{cell.events.map((event, i) => <span key={i} title={event.title} className="h-1.5 w-1.5 rounded-full" style={{ background: event.color }} />)}</div>
+              </div>)}
             </div>
-            <div className="mt-2 space-y-2">
-              {day.trips.map((trip) => (
-                <Link
-                  key={trip.id}
-                  href={`/trips/${trip.id}?from=calendar&y=${data.year}&m=${data.month}`}
-                  className="flex min-h-11 items-center gap-3 rounded-md bg-accent/10 px-3 py-2 text-sm font-medium text-accent"
-                >
-                  <span className="h-2.5 w-2.5 shrink-0 rounded-sm bg-accent" />
-                  <span className="min-w-0 break-words">{trip.name}</span>
-                </Link>
-              ))}
-              {day.events.map((event, index) => (
-                <div key={`${event.title}-${index}`} className="flex min-h-11 items-start gap-3 rounded-md bg-panel2/50 px-3 py-2 text-sm">
-                  <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: event.color }} />
-                  <span className="min-w-0 flex-1 leading-snug break-words">{event.title}</span>
-                  {event.time && <span className="readout shrink-0 text-xs text-muted">{event.time}</span>}
-                </div>
-              ))}
+            <div aria-hidden className="pointer-events-none absolute inset-x-0 top-[26px] grid grid-cols-7" style={{ gridAutoRows: "8px" }}>
+              {week.segs.map((seg) => <div key={seg.id} className={`h-1.5 bg-accent ${seg.continuesLeft ? "" : "ml-1 rounded-l"} ${seg.continuesRight ? "" : "mr-1 rounded-r"}`} style={{ gridColumn: `${seg.startCol + 1} / ${seg.endCol + 2}`, gridRow: seg.lane + 1 }} />)}
             </div>
-          </Card>
-        ))}
-      </div>
-
-      <Card className="mt-4 hidden overflow-hidden sm:block">
+          </div>)}
+        </Card>
+      <Card className="hidden overflow-hidden sm:block">
         <div className="grid grid-cols-7 border-b bg-panel2/50">
           {WD.map((d) => (
             <div key={d} className="eyebrow px-1 py-1.5 text-center sm:px-2">{d}</div>
@@ -191,23 +159,23 @@ export function CalendarView({ initial }: { initial: CalendarData }) {
                     setOverIso(null);
                   }}
                   className={[
-                    "min-h-16 border-r p-1 [&:nth-child(7n)]:border-r-0 sm:min-h-24 sm:p-1.5",
+                    "min-w-0 min-h-[88px] border-r border-divider p-1.5 [&:nth-child(7n)]:border-r-0 desk:min-h-[104px]",
                     c.inMonth ? "" : "bg-panel2/30 text-muted",
-                    c.conflict ? "bg-cworn/15" : "",
+
                     overIso === c.iso ? "ring-2 ring-inset ring-accent" : "",
                   ].join(" ")}
                 >
                   <div className="flex items-center justify-between">
                     <span className={`readout text-xs ${c.iso === today ? "flex h-5 w-5 items-center justify-center rounded-full bg-accent font-bold text-accentink" : "text-muted"}`}>{c.day}</span>
-                    {c.conflict && <span className="text-[0.65rem] text-cworn" title="Trip overlaps a calendar event">⚠</span>}
+                    {c.conflict && <span className="text-[0.65rem] text-signal" title="Trip overlaps a calendar event">⚠</span>}
                   </div>
                   <div aria-hidden style={{ height: week.laneCount * LANE_PX }} />
                   <div className="space-y-0.5">
                     {c.events.slice(0, 3).map((e, j) => (
-                      <div key={j} className="flex items-center gap-1 truncate text-[0.65rem]" title={`${e.time ? e.time + " · " : ""}${e.title} (${e.label})`}>
+                      <div key={j} className="flex items-center gap-1 truncate text-xs" style={{ color: e.color }} title={`${e.time ? e.time + " · " : ""}${e.title} (${e.label})`}>
                         <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: e.color }} />
                         {e.time && <span className="readout shrink-0 text-muted">{e.time}</span>}
-                        <span className="truncate">{e.title}</span>
+                        <span className="truncate">{e.title}{c.conflict ? " · conflict" : ""}</span>
                       </div>
                     ))}
                     {c.events.length > 3 && <div className="text-[0.6rem] text-muted">+{c.events.length - 3} more</div>}
@@ -241,13 +209,35 @@ export function CalendarView({ initial }: { initial: CalendarData }) {
           </div>
         ))}
       </Card>
+      <Legend feeds={data.feeds} />
+      {data.feeds.length === 0 && <p className="text-sm text-muted">No calendars connected yet — add a secret iCal address in <Link href="/settings" className="text-accent hover:underline">Settings</Link>. Trips still show below.</p>}
+      <Card className="divide-y divide-divider px-4 sm:hidden">
+        {agenda.length === 0 && <p className="py-6 text-sm text-muted">No trips or calendar events this month.</p>}
+        {agenda.map((day) => <div key={day.iso} className="flex gap-3 py-3">
+          <div className="w-14 shrink-0 text-[13px] font-semibold">
+            {new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${day.iso}T12:00:00Z`))}
+            {day.iso === today && <span className="block text-xs text-accent">Today</span>}
+          </div>
+          <div className="min-w-0 flex-1 space-y-3">
+            {day.trips.map((trip) => <Link key={trip.id} href={`/trips/${trip.id}?from=calendar&y=${data.year}&m=${data.month}`} className="block min-h-11 text-sm">
+              <span className="block font-semibold break-words">{trip.name}</span>
+              <span className="text-[13px] text-muted">Through {trip.endDay} · {daysBetween(trip.startDay, trip.endDay)} nights</span>
+            </Link>)}
+            {day.events.map((event, i) => <div key={i} className="text-sm">
+              <span className="block font-semibold break-words">{event.title}</span>
+              <span className={`text-[13px] ${day.conflict ? "font-bold text-signal" : "text-muted"}`}>{day.conflict ? "Conflicts with your trip" : [event.time, event.label].filter(Boolean).join(" · ")}</span>
+            </div>)}
+          </div>
+        </div>)}
+      </Card>
+      </PageBody>
     </div>
   );
 }
 
 function Legend({ feeds }: { feeds: { id: number; label: string; color: string }[] }) {
   return (
-    <div className="hidden flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted sm:flex">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1 text-xs text-muted">
       <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-accent" /> Trip</span>
       {feeds.map((f) => (
         <span key={f.id} className="flex items-center gap-1">

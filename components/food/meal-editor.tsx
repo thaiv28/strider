@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
-import { Card, Button, Input, Select, Badge, InfoBadge } from "@/components/ui";
+import { useEffect, useRef, useState, useTransition, type MutableRefObject } from "react";
+import { Card, Button, Input, Select, Badge, InfoBadge, Field, IconButton } from "@/components/ui";
+import { Sheet } from "@/components/sheet";
+import { useUnsavedGuard } from "@/components/unsaved-changes";
+import { X } from "lucide-react";
 import { gToOz, ozToG } from "@/lib/util";
 import { kcalForGrams, kcalPerOz, gramsFromVolume, volumeFromGrams, VOLUME_ML, type VolumeUnit } from "@/lib/food";
 import { DEFAULT_COOK_WATER_ML } from "@/lib/fuel";
@@ -21,7 +24,7 @@ const MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack"];
 // Number field without the native up/down spinner.
 const NUM = "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
 
-export function MealEditor({ meal, ingredients, onBack, isNew = false }: { meal: MealRow; ingredients: IngredientRow[]; onBack: () => void; isNew?: boolean }) {
+export function MealEditor({ meal, ingredients, onBack, exitRef, isNew = false }: { meal: MealRow; ingredients: IngredientRow[]; onBack: () => void; exitRef: MutableRefObject<((next: () => void) => void) | null>; isNew?: boolean }) {
   const [, start] = useTransition();
   const run = (fn: () => Promise<unknown>) => start(() => void fn());
 
@@ -55,14 +58,14 @@ export function MealEditor({ meal, ingredients, onBack, isNew = false }: { meal:
   const amountsDirty = meal.items.some((i) => (amounts[i.id] ?? i.amountG) !== i.amountG);
   const dirty = formDirty || amountsDirty;
 
-  const save = () =>
-    run(async () => {
-      await updateMeal(meal.id, { name: form.name, baseServings: form.baseServings, mealType: form.mealType || null, isHot: form.isHot, waterMl: form.isHot ? form.waterMl : null });
-      for (const i of meal.items) {
-        const a = amounts[i.id];
-        if (a != null && a !== i.amountG) await updateMealIngredientAmount(i.id, a);
-      }
-    });
+  const persist = async () => {
+    await updateMeal(meal.id, { name: form.name, baseServings: form.baseServings, mealType: form.mealType || null, isHot: form.isHot, waterMl: form.isHot ? form.waterMl : null });
+    for (const i of meal.items) {
+      const a = amounts[i.id];
+      if (a != null && a !== i.amountG) await updateMealIngredientAmount(i.id, a);
+    }
+  };
+  const save = () => run(persist);
 
   const discard = () => {
     setForm({ name: meal.name, mealType: meal.mealType ?? "", baseServings: meal.baseServings, isHot: meal.isHot, waterMl: meal.waterMl });
@@ -72,49 +75,63 @@ export function MealEditor({ meal, ingredients, onBack, isNew = false }: { meal:
   // A just-created meal with no ingredients is still provisional; if the user
   // leaves without saving any edit, remove it rather than keep an empty stub.
   const isBlankNew = isNew && meal.items.length === 0;
-  const abandon = () => run(async () => { await deleteMeal(meal.id); onBack(); });
+  const leaveAction = useRef(onBack);
+  const abandon = (next = onBack) => run(async () => { await deleteMeal(meal.id); next(); });
 
-  const tryBack = () => {
+  const tryBack = (next = onBack) => {
+    leaveAction.current = next;
     if (dirty) return setLeaving(true);
-    if (isBlankNew) return abandon();
-    onBack();
+    if (isBlankNew) return abandon(next);
+    next();
   };
 
-  // Clicking outside the card returns to the list (with the same dirty guard).
+  useEffect(() => {
+    exitRef.current = tryBack;
+    return () => { exitRef.current = null; };
+  });
+
+  // Leaving for another page (app navigation or closing the tab) would lose edits.
+  useUnsavedGuard(`meal-${meal.id}`, dirty, persist);
+
+  // Clicking empty space closes a clean editor. With unsaved edits nothing is
+  // lost by staying, so the click is ignored rather than prompting.
   const cardRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (leaving) return;
+    if (leaving || dirty) return;
     const h = (e: MouseEvent) => {
-      if (cardRef.current && !cardRef.current.contains(e.target as Node)) tryBack();
+      const target = e.target as Element;
+      if (target.closest("[data-food-navigation], a, button")) return;
+      if (cardRef.current && !cardRef.current.contains(target)) tryBack();
     };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   });
 
   return (
-    <div>
+    <div className="min-w-0">
       <div ref={cardRef}>
-      <button onClick={tryBack} className="eyebrow -my-2 py-2 hover:text-accent">← all meals</button>
+      <button onClick={() => tryBack()} className="mb-2 hidden min-h-11 items-center text-sm font-semibold text-accent sm:inline-flex desk:hidden">← Back to meals</button>
 
-      <Card className="mt-2 p-4 sm:p-5">
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="flex-1">
-            <span className="eyebrow mb-1 block">Meal name</span>
+      <Card className="p-4 sm:p-5">
+        <div className="mb-4 hidden items-start justify-between gap-2 desk:flex">
+          <h2 className="min-w-0 font-display text-2xl font-bold break-words">{form.name}</h2>
+          <IconButton aria-label="Close meal editor" onClick={() => tryBack()}><X size={20} /></IconButton>
+        </div>
+        <div className="grid grid-cols-2 items-end gap-3">
+          <Field className="min-w-0 col-span-2" label="Meal name">
             <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
-          </label>
-          <label>
-            <span className="eyebrow mb-1 block">Type</span>
+          </Field>
+          <Field label="Type">
             <Select value={form.mealType} onChange={(e) => setForm((f) => ({ ...f, mealType: e.target.value }))}>
               <option value="">—</option>
               {MEAL_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </Select>
-          </label>
-          <label className="w-28">
-            <span className="eyebrow mb-1 block">Recipe yields</span>
+          </Field>
+          <Field className="min-w-0 w-28" label="Recipe yields">
             <Input type="number" min="1" step="1" value={form.baseServings}
               onChange={(e) => setForm((f) => ({ ...f, baseServings: Math.max(1, Number(e.target.value) || 1) }))} />
-          </label>
-          <label className="flex items-center gap-2 pb-1.5 text-sm">
+          </Field>
+          <label className="flex min-h-11 items-center gap-2 text-sm">
             <input
               type="checkbox"
               checked={form.isHot}
@@ -129,23 +146,22 @@ export function MealEditor({ meal, ingredients, onBack, isNew = false }: { meal:
             <InfoBadge>Hot meals need a stove, so they drive the trip fuel calculation. Cold-soak, no-cook, and snacks stay off.</InfoBadge>
           </label>
           {form.isHot && (
-            <label className="w-28">
-              <span className="eyebrow mb-1 block">Cook water (mL)</span>
+            <Field className="min-w-0 w-28" label="Cook water (mL)">
               <Input className={NUM} type="number" min="0" step="10" placeholder={String(DEFAULT_COOK_WATER_ML)} value={form.waterMl ?? ""}
                 onChange={(e) => setForm((f) => ({ ...f, waterMl: e.target.value === "" ? null : Number(e.target.value) }))} />
-            </label>
+            </Field>
           )}
         </div>
 
-        <div className="mt-5 flex flex-wrap items-center gap-x-8 gap-y-2 rounded-lg border bg-panel2/40 px-4 py-3">
+        <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg border bg-panel2/40 px-4 py-3 sm:grid-cols-3">
           <Stat label="Recipe">{totalKcal.toLocaleString()} kcal · {gToOz(totalG).toFixed(1)} oz</Stat>
           <Stat label="Per serving">{perServingKcal.toLocaleString()} kcal · {gToOz(perServingG).toFixed(1)} oz</Stat>
           <Stat label="Efficiency">{calOz != null ? `${calOz.toFixed(0)} cal/oz` : "—"}</Stat>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="eyebrow">Show amounts for</span>
-          <Input className="w-16" type="number" min="1" step="1" value={preview}
+        <div className="mt-3 flex items-center gap-2 whitespace-nowrap">
+          <label htmlFor={`meal-preview-${meal.id}`} className="text-[13px] font-semibold text-muted">Show amounts for</label>
+          <Input id={`meal-preview-${meal.id}`} className="!w-16 shrink-0" type="number" min="1" step="1" value={preview}
             onChange={(e) => setPreview(Math.max(1, Number(e.target.value) || 1))} />
           <span className="text-sm text-muted">servings</span>
         </div>
@@ -153,15 +169,15 @@ export function MealEditor({ meal, ingredients, onBack, isNew = false }: { meal:
         <div className="mt-4 divide-y rounded-lg border">
           {items.length === 0 && <div className="px-4 py-3 text-sm text-muted">No ingredients yet.</div>}
           {items.map((it) => (
-            <div key={it.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-3 sm:flex-nowrap sm:px-4 sm:py-2.5">
-              <span className="min-w-0 basis-full text-sm font-medium leading-snug break-words sm:basis-auto sm:flex-1 sm:truncate">{it.name}</span>
-              <span className="readout w-20 text-right text-xs text-muted">{kcalForGrams(it.kcalPer100g, Math.round(it.amountG * scale))} kcal</span>
+            <div key={it.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-1.5 pr-1 pl-3 sm:flex-nowrap sm:pl-4">
+              <span className="min-w-0 flex-1 text-sm font-medium leading-snug break-words max-sm:basis-full">{it.name}</span>
               <AmountControl
                 grams={Math.round(it.amountG * scale)}
                 density={it.densityGMl}
                 onChange={(displayG) => setAmounts((a) => ({ ...a, [it.id]: Math.max(0, Math.round(displayG / scale)) }))}
               />
-              <button onClick={() => run(() => removeMealIngredient(it.id))} className="ml-auto grid h-11 w-11 place-items-center rounded text-muted hover:bg-accent/10 hover:text-accent sm:ml-0 sm:h-auto sm:w-auto" title="Remove">✕</button>
+              <span className="readout w-16 shrink-0 text-right text-xs text-muted max-sm:ml-auto">{kcalForGrams(it.kcalPer100g, Math.round(it.amountG * scale))} kcal</span>
+              <IconButton aria-label={`Remove ${it.name}`} onClick={() => run(() => removeMealIngredient(it.id))} className="text-signal"><X size={16} /></IconButton>
             </div>
           ))}
         </div>
@@ -174,29 +190,24 @@ export function MealEditor({ meal, ingredients, onBack, isNew = false }: { meal:
 
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
           <Button variant="danger" onClick={() => confirm(`Delete meal "${meal.name}"?`) && run(async () => { await deleteMeal(meal.id); onBack(); })}>
-            Delete meal
+            Delete
           </Button>
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-            <Button variant="outline" disabled={!dirty} onClick={discard}>Discard changes</Button>
+            <Button variant="outline" disabled={!dirty} onClick={discard}>Discard</Button>
             <Button disabled={!dirty} onClick={save}>Save</Button>
           </div>
         </div>
       </Card>
       </div>
 
-      {leaving && (
-        <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm" onClick={() => setLeaving(false)}>
-          <Card className="w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
-            <div className="font-display text-lg font-bold">Unsaved changes</div>
-            <p className="mt-1 text-sm text-muted">Save your changes to “{meal.name}” before leaving?</p>
-            <div className="mt-4 flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => setLeaving(false)}>Cancel</Button>
-              <Button variant="outline" onClick={() => { setLeaving(false); if (isBlankNew) return abandon(); discard(); onBack(); }}>Discard</Button>
-              <Button onClick={() => { save(); setLeaving(false); onBack(); }}>Save</Button>
-            </div>
-          </Card>
+      <Sheet open={leaving} onClose={() => setLeaving(false)} title="Unsaved changes">
+        <p className="mt-3 text-sm text-muted">Save your changes to “{meal.name}” before leaving?</p>
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
+          <Button variant="ghost" onClick={() => setLeaving(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => { setLeaving(false); if (isBlankNew) return abandon(leaveAction.current); discard(); leaveAction.current(); }}>Discard</Button>
+          <Button onClick={() => run(async () => { await persist(); setLeaving(false); leaveAction.current(); })}>Save</Button>
         </div>
-      )}
+      </Sheet>
     </div>
   );
 }
@@ -246,8 +257,8 @@ function AmountControl({ grams, density, onChange }: { grams: number; density: n
 
   return (
     <span className="inline-flex items-center gap-1">
-      <Input className={`w-20 text-right ${NUM}`} type="number" min="0" step="0.1" value={val} onChange={(e) => onInput(e.target.value)} />
-      <Select value={unit} onChange={(e) => setUnit(e.target.value as typeof unit)} className="!px-2 !py-1.5">
+      <Input aria-label="Ingredient amount" className={`!w-20 text-right ${NUM}`} type="number" min="0" step="0.1" value={val} onChange={(e) => onInput(e.target.value)} />
+      <Select aria-label="Amount unit" value={unit} onChange={(e) => setUnit(e.target.value as typeof unit)} className="!px-2 !py-1.5">
         <option value="g">g</option>
         <option value="oz">oz</option>
         {Object.keys(VOLUME_ML).map((u) => (
@@ -292,14 +303,13 @@ function AddIngredient({
 
   return (
     <div className="mt-4">
-      <span className="eyebrow mb-1 block">Add ingredient</span>
-      <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. rolled oats, peanut butter, Clif bar" />
+      <Field label="Add ingredient"><Input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. rolled oats, peanut butter, Clif bar" /></Field>
       {(custom.length > 0 || searching || hits.length > 0) && (
         <div className="mt-2 max-h-64 overflow-y-auto rounded-lg border">
           {custom.map((i) => (
             <button key={`c${i.id}`} onClick={() => { onAddCustom(i.id, i.defaultServingG ?? 50); setQ(""); }} className="flex w-full items-center justify-between gap-3 border-b px-3 py-2 text-left last:border-0 hover:bg-panel2/60">
               <span className="truncate text-sm">{i.name}</span>
-              <span className="readout flex shrink-0 items-center gap-2 text-xs text-muted">
+              <span className="readout flex max-w-[48%] shrink-0 flex-wrap justify-end gap-2 text-xs text-muted">
                 {i.kcalPer100g != null ? Math.round(i.kcalPer100g) : "—"} kcal/100g
                 <Badge tone="neutral">saved</Badge>
               </span>
@@ -312,7 +322,7 @@ function AddIngredient({
                 <span className="block truncate text-sm">{h.name}</span>
                 {h.detail && <span className="block truncate text-xs text-muted">{h.detail}</span>}
               </span>
-              <span className="readout flex shrink-0 items-center gap-2 text-xs text-muted">
+              <span className="readout flex max-w-[48%] shrink-0 flex-wrap justify-end gap-2 text-xs text-muted">
                 {h.kcalPer100g != null && <span>{h.kcalPer100g} kcal/100g</span>}
                 <Badge tone={h.source === "usda" ? "base" : "wishlist"}>{h.source}</Badge>
               </span>
@@ -327,7 +337,7 @@ function AddIngredient({
 function Stat({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="eyebrow">{label}</div>
+      <div className="text-[13px] font-semibold text-muted">{label}</div>
       <div className="readout text-sm">{children}</div>
     </div>
   );

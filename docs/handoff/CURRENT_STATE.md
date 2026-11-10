@@ -46,9 +46,12 @@ developer's local GitHub CLI session—is the durable publication path.
 - Public link previews use Strider artwork, and live shared-trip links include
   the Trip name and summary in their preview metadata.
 - Interactive route maps with topo/OSM layers and optional weather, snow, and
-  air-quality overlays.
+  air-quality overlays. On trip pages, a route card holding the map and elevation
+  profile sits above the sections at every width of 640px or more and can be
+  hidden per device; phones switch between the map and each section.
 - Calendar feeds and configurable report/energy settings.
-- Mobile navigation and responsive coverage at 360, 390, and 430 CSS pixels.
+- Light/Dark/System appearance setting, defaulting to light and saved per device.
+- Mobile navigation and responsive coverage at 360, 390, 430 and 720 CSS pixels.
 - Public, responsive Strider landing page at `/`; the authenticated dashboard is
   available at `/basecamp`.
 - Verified Google accounts can create isolated Strider workspaces. The configured

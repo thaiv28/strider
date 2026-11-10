@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { Sheet } from "@/components/sheet";
 import { Card, Button } from "@/components/ui";
 import { addDays, fetchDay, isFarFuture, type WxResult } from "@/lib/weather";
 import { getClimatology } from "@/app/weather/actions";
@@ -142,10 +143,7 @@ export function ReportPanel({
         </div>
       </Card>
 
-      {config && (
-        <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm" onClick={() => !busy && setConfig(false)}>
-          <Card className="w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
-            <div className="eyebrow">◇ Include in report</div>
+      <Sheet open={config} onClose={() => !busy && setConfig(false)} title="Include in report">
             {blocks.length === 0 ? (
               <p className="mt-3 text-sm text-muted">Your template has no toggleable sections — it&apos;ll generate as-is.</p>
             ) : (
@@ -162,9 +160,7 @@ export function ReportPanel({
               <Button variant="ghost" onClick={() => setConfig(false)} disabled={busy}>Cancel</Button>
               <Button onClick={generate} disabled={busy}>{busy ? "Generating…" : "Generate"}</Button>
             </div>
-          </Card>
-        </div>
-      )}
+      </Sheet>
 
       {out && <PreviewModal md={out.md} html={out.html} name={data.name} onClose={() => setOut(null)} />}
     </div>
@@ -206,12 +202,7 @@ function PreviewModal({ md, html, name, onClose }: { md: string; html: string; n
   };
 
   return (
-    <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm" onClick={onClose}>
-      <Card className="flex max-h-[85vh] w-full max-w-2xl flex-col p-5" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between">
-          <div className="eyebrow">◇ Report preview</div>
-          <button onClick={onClose} className="text-muted hover:text-accent">✕</button>
-        </div>
+    <Sheet open onClose={onClose} title="Report preview">
         <div
           className="report-preview mt-3 min-h-0 flex-1 overflow-y-auto rounded-lg border bg-panel2/30 px-4 py-3 text-sm"
           dangerouslySetInnerHTML={{ __html: html }}
@@ -220,7 +211,6 @@ function PreviewModal({ md, html, name, onClose }: { md: string; html: string; n
           <Button variant="outline" onClick={download}>Download .md</Button>
           <Button onClick={copy}>{copied ? "Copied!" : "Copy"}</Button>
         </div>
-      </Card>
-    </div>
+    </Sheet>
   );
 }

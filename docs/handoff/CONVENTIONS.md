@@ -53,10 +53,32 @@ changes correct.
   come from the meal plan + water/fuel rates, not gear selection.
 
 ## UI palette (Tailwind v4 tokens)
-Utility classes used across the app: `card`, `eyebrow`, `readout`,
-`text-ink`/`text-muted`, `bg-panel`/`bg-panel2`, `accent`/`accentink`, and the
-weight-class colors `text-cbase` / `text-ccons` / `text-cworn`. Category swatches
-come from `categoryColor()` in `lib/categories.ts`.
+
+Topo uses semantic Tailwind v4 color tokens: `canvas`, `panel`, `panel2`, `ink`,
+`muted`, `line`, `accent`, `accentink`, `cbase`, `ccons`, and `cworn`;
+`header`, `headerline`, `headerborder`, `headerink`, `headermuted`, `headeractive`,
+`headeractionink`; and `route`, `signal`, `map`, `contour`, `lake`, `elevation`,
+`divider`, and `fieldborder`. Use these through utilities such as `bg-panel`,
+`text-ink`, and `border-fieldborder`. Category swatches come from `categoryColor()`
+in `lib/categories.ts`. The `card`, `eyebrow`, and `readout` classes provide shared
+surface, label, and tabular-number styling. Instrument Sans and Bricolage Grotesque
+are self-hosted through Fontsource; builds need no font network access.
+
+Shared primitives in `components/ui.tsx` are `Card`, `InfoBadge`, `Badge`, `Button`,
+`PageTabs`, `Input`, `WornToggle`, `Select`, `Textarea`, `Field`, `Chip`, `IconButton`,
+and `SegmentedControl`. `PageHeader` and `PageBody` in `components/page-header.tsx`
+provide the contour header and overlapping content layout. `Sheet` in
+`components/sheet.tsx` uses a native dialog, appearing as a bottom sheet on phones
+and a centered dialog on larger screens.
+
+Breakpoints are phone below 640px, half-width from 640px to below 1100px, and full
+at `desk:` (1100px). App navigation moves from bottom navigation to header links
+at 640px (`sm:`).
+
+Theme preference is per-device in localStorage key `strider-theme`: Light, Dark,
+or System, defaulting to light. It resolves to `data-theme` on `<html>` before
+paint. Dark uses neutral charcoal tokens; dark tokens are screen-only so printing
+stays light.
 
 ## Working agreements
 - Iterate with `npm run dev` and the local health endpoint. Type-check with

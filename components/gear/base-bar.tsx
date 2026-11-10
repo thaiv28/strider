@@ -1,5 +1,7 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { fmtWeight, gToOz } from "@/lib/util";
 import { categoryColor } from "@/lib/categories";
@@ -9,7 +11,8 @@ export type CatSlice = { name: string; g: number; items: SliceItem[] };
 
 // Base weight only — consumables and worn gear are trip-specific and live on
 // the trip page, not in this generic number. Two views of the same breakdown.
-export function BaseBar({ baseG, byCategory }: { baseG: number; byCategory: CatSlice[] }) {
+export function BaseBar({ baseG, byCategory, loadoutControl, layout = "list" }: { baseG: number; byCategory: CatSlice[]; loadoutControl?: ReactNode; layout?: "list" | "inline" }) {
+  const [expanded, setExpanded] = useState(false);
   const [view, setView] = useState<"bar" | "pie">("bar");
   const [hover, setHover] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -19,34 +22,19 @@ export function BaseBar({ baseG, byCategory }: { baseG: number; byCategory: CatS
 
   return (
     <div className="card p-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="eyebrow">◇ Base weight</span>
-        <div className="flex overflow-hidden rounded-full border text-xs">
-          {(["bar", "pie"] as const).map((v) => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              className={`px-2.5 py-0.5 capitalize transition ${
-                view === v ? "bg-accent text-accentink" : "text-muted hover:text-ink"
-              }`}
-            >
-              {v}
-            </button>
-          ))}
+      {loadoutControl ?? <h2 className="text-sm font-bold">Base weight</h2>}
+      <button type="button" aria-label="Show base weight breakdown" aria-expanded={expanded} onClick={() => setExpanded(!expanded)} className="flex min-h-12 w-full items-center justify-between gap-2 text-left sm:hidden">
+        <span className="font-display text-[34px] font-bold tabular-nums">{fmtWeight(baseG)}{loadoutControl && <span className="ml-2 font-sans text-sm font-normal text-muted">base weight</span>}</span>
+        <ChevronDown className={`shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} />
+      </button>
+      <div className="hidden font-display text-[34px] font-bold tabular-nums sm:block">{fmtWeight(baseG)}{loadoutControl && <span className="ml-2 font-sans text-sm font-normal text-muted">base weight</span>}</div>
+      <div className={`${expanded ? "block" : "hidden"} sm:block`}>
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <span className="text-xs text-muted">{active ? `${active.name} · ${gToOz(active.g).toFixed(1)} oz` : "Base weight by category"}</span>
+          <div className="flex rounded-full border text-xs">
+            {(["bar", "pie"] as const).map((v) => <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)} className={`min-h-9 rounded-full px-3 capitalize ${view === v ? "bg-accent text-accentink" : "text-muted"}`}>{v}</button>)}
+          </div>
         </div>
-      </div>
-
-      <div className="mt-1.5 flex items-baseline gap-3">
-        <span className="readout text-4xl font-bold leading-none">{fmtWeight(baseG)}</span>
-        {active && (
-          <span className="readout flex items-center gap-1.5 text-sm text-muted">
-            <span className="h-2.5 w-2.5 rounded-sm" style={{ background: categoryColor(active.name) }} />
-            <span className="font-medium text-ink">{active.name}</span>
-            {gToOz(active.g).toFixed(1)} oz · {((active.g / baseG) * 100).toFixed(0)}%
-          </span>
-        )}
-      </div>
-
       {view === "bar" ? (
         <>
           <div className="relative mt-3 flex h-8 overflow-hidden rounded-full" role="group" aria-label="Base weight by category">
@@ -67,17 +55,18 @@ export function BaseBar({ baseG, byCategory }: { baseG: number; byCategory: CatS
               </button>
             ))}
           </div>
-          <Legend slices={slices} baseG={baseG} cols="sm:grid-cols-2 lg:grid-cols-3" hover={hover} setHover={setHover} onSelect={setSelected} />
+          <Legend slices={slices} baseG={baseG} inline={layout === "inline"} cols="grid-cols-1 sm:grid-cols-2 desk:grid-cols-1" hover={hover} setHover={setHover} onSelect={setSelected} />
         </>
       ) : (
         <div className="mt-3 flex flex-wrap items-center gap-4">
           <Donut slices={slices} baseG={baseG} hover={hover} setHover={setHover} active={active} onSelect={setSelected} />
           <div className="min-w-48 flex-1">
-            <Legend slices={slices} baseG={baseG} cols="grid-cols-1" pct hover={hover} setHover={setHover} onSelect={setSelected} />
+            <Legend slices={slices} baseG={baseG} inline={layout === "inline"} cols="grid-cols-1" pct hover={hover} setHover={setHover} onSelect={setSelected} />
           </div>
         </div>
       )}
 
+      </div>
       {open && <SectionModal slice={open} baseG={baseG} onClose={() => setSelected(null)} />}
     </div>
   );
@@ -182,6 +171,7 @@ function Legend({
   slices,
   baseG,
   cols,
+  inline = false,
   pct,
   hover,
   setHover,
@@ -190,13 +180,14 @@ function Legend({
   slices: CatSlice[];
   baseG: number;
   cols: string;
+  inline?: boolean;
   pct?: boolean;
   hover: string | null;
   setHover: (n: string | null) => void;
   onSelect: (n: string) => void;
 }) {
   return (
-    <div className={`mt-2 grid ${cols} gap-x-6 gap-y-0.5`}>
+    <div className={`mt-2 ${inline ? "flex flex-wrap" : `grid ${cols}`} gap-x-6 gap-y-0.5`}>
       {slices.map((s) => (
         <button
           type="button"
@@ -206,13 +197,13 @@ function Legend({
           onFocus={() => setHover(s.name)}
           onBlur={() => setHover(null)}
           onClick={() => onSelect(s.name)}
-          className={`flex min-h-11 w-full touch-manipulation items-center text-left gap-2 text-sm transition-opacity sm:min-h-7 ${
+          className={`flex min-h-11 ${inline ? "w-auto" : "w-full"} touch-manipulation items-center text-left gap-2 text-sm transition-opacity sm:min-h-7 ${
             hover && hover !== s.name ? "opacity-40" : "opacity-100"
           }`}
         >
           <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: categoryColor(s.name) }} />
           <span className={hover === s.name ? "font-semibold" : "font-medium"}>{s.name}</span>
-          <span className="readout ml-auto text-muted">
+          <span className={`readout ${inline ? "" : "ml-auto"} text-muted`}>
             {gToOz(s.g).toFixed(1)} oz{pct && ` · ${((s.g / baseG) * 100).toFixed(0)}%`}
           </span>
         </button>

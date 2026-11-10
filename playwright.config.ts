@@ -50,5 +50,10 @@ export default defineConfig({
       testMatch: /mobile\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], viewport: { width: 430, height: 932 } },
     },
+    {
+      name: "half-720",
+      testMatch: /mobile\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"], viewport: { width: 720, height: 900 } },
+    },
   ],
 });

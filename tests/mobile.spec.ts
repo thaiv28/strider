@@ -32,7 +32,7 @@ async function expectNoHorizontalOverflow(page: Page) {
 
 const pages = [
   { path: "/basecamp", heading: "Basecamp" },
-  { path: "/gear", heading: "Gear Library" },
+  { path: "/gear", heading: "Gear" },
   { path: "/food", heading: "Food" },
   { path: "/trips", heading: "Trips" },
   { path: "/calendar", heading: "Calendar" },
@@ -62,15 +62,9 @@ test("a trip detail page fits the phone viewport", async ({ page }) => {
   const href = await firstTrip.getAttribute("href");
   expect(href).toBeTruthy();
   await page.goto(href!);
-  await expect(page.getByText("Logistics", { exact: true }).first()).toBeVisible();
-  const tabStrip = page.getByRole("button", { name: "Logistics", exact: true }).locator("..");
-  await expect(tabStrip).toHaveCSS("position", "static");
-  await expect(tabStrip).toHaveCSS("overflow-y", "hidden");
-  const tabStripHeight = await tabStrip.evaluate((element) => ({
-    clientHeight: element.clientHeight,
-    scrollHeight: element.scrollHeight,
-  }));
-  expect(tabStripHeight.scrollHeight).toBeLessThanOrEqual(tabStripHeight.clientHeight + 1);
+  const logistics = page.getByRole("button", { name: "Logistics", exact: true });
+  await expect(logistics).toBeVisible();
+  if ((page.viewportSize()?.width ?? 0) < 640) await logistics.click();
   const dateInput = page.locator('input[type="date"]').first();
   if (await dateInput.count()) {
     const dateWidths = await dateInput.evaluate((element) => ({
@@ -86,10 +80,24 @@ test("a trip detail page fits the phone viewport", async ({ page }) => {
 });
 
 test("route maps stay below the mobile navigation", async ({ page }) => {
+  test.skip((page.viewportSize()?.width ?? 0) >= 640, "The bottom navigation is phone-only");
   await page.goto("/basecamp");
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   const bottomNavigationOwnsViewportEdge = await page.evaluate(() =>
     Boolean(document.elementFromPoint(window.innerWidth / 2, window.innerHeight - 20)?.closest('nav[aria-label="Primary navigation"]')),
   );
   expect(bottomNavigationOwnsViewportEdge).toBe(true);
+});
+
+test("theme defaults to light and persists", async ({ page }) => {
+  await page.goto("/settings");
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("data-theme", "light");
+  await page.getByRole("radio", { name: "Dark", exact: true }).click();
+  await expect(html).toHaveAttribute("data-theme", "dark");
+  await page.reload();
+  await expect(html).toHaveAttribute("data-theme", "dark");
+  await page.getByRole("radio", { name: "System", exact: true }).click();
+  await page.getByRole("radio", { name: "Light", exact: true }).click();
+  await expect(html).toHaveAttribute("data-theme", "light");
 });

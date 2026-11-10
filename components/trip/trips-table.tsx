@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Badge } from "@/components/ui";
-import { fmtLbs } from "@/lib/util";
+import { fmtLbs, fmtDateRange } from "@/lib/util";
 import type { TripSummary } from "@/lib/trip";
 
 const tone = (s: string) => (s === "completed" ? "current" : s === "planned" ? "wishlist" : "neutral");
@@ -79,21 +79,22 @@ export function TripsTable({ trips }: { trips: TripSummary[] }) {
               <Badge tone={tone(t.status)}>{t.status}</Badge>
             </div>
             <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
-              <span className="readout">{fmtDate(t.startDate)}</span>
+              <span className="readout">{fmtDateRange(t.startDate, t.nights) ?? "No dates"}</span>
               {t.region && <span>{t.region}</span>}
             </div>
-            <div className="readout mt-3 grid grid-cols-4 gap-2 border-t pt-3 text-center text-xs text-muted">
-              <MobileMetric label="Nights" value={dash(t.nights)} />
-              <MobileMetric label="Miles" value={dash(t.distanceMi)} />
-              <MobileMetric label="Base" value={wt(t.baseG)} />
-              <MobileMetric label="Skin" value={wt(t.skinOutG)} />
-            </div>
+            {t.status === "idea" && !t.distanceMi && !t.elevationFt && t.nights == null ? <p className="mt-3 border-t pt-3 text-xs text-muted">Idea · no route yet</p> : <div className="readout mt-3 flex flex-wrap justify-around gap-3 border-t pt-3 text-center text-xs text-muted">
+              {t.nights != null && <MobileMetric label="Nights" value={dash(t.nights)} />}
+              {t.distanceMi != null && <MobileMetric label="Miles" value={dash(t.distanceMi)} />}
+              {t.elevationFt != null && <MobileMetric label="Gain ft" value={dash(t.elevationFt)} />}
+              {t.baseG > 0 && <MobileMetric label="Base" value={wt(t.baseG)} />}
+              {t.skinOutG > 0 && <MobileMetric label="Skin" value={wt(t.skinOutG)} />}
+            </div>}
           </Link>
         ))}
       </div>
 
-      <div className="card hidden overflow-hidden sm:block">
-        <div className={`${GRID} border-b bg-panel2/60 px-4 py-2`}>
+      <div className="card hidden overflow-hidden rounded-2xl bg-panel sm:block">
+        <div className={`${GRID} border-b bg-panel px-4 py-3`}>
           {COLS.map((c) => (
             <button
               key={c.key}

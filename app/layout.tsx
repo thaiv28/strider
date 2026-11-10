@@ -1,6 +1,9 @@
 import type { Metadata, Viewport } from "next";
+import "@fontsource-variable/instrument-sans";
+import "@fontsource-variable/bricolage-grotesque/wght.css";
 import "./globals.css";
-import { fontVars } from "./fonts";
+import { ThemeProvider } from "@/components/theme-provider";
+import { THEME_SCRIPT } from "@/lib/theme";
 import { Shell } from "@/components/shell";
 import { UnsavedChangesProvider } from "@/components/unsaved-changes";
 import { auth } from "@/auth";
@@ -31,11 +34,16 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const signedIn = Boolean((await auth())?.user?.id);
   return (
-    <html lang="en" className={fontVars}>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body>
-        <UnsavedChangesProvider>
-          <Shell signedIn={signedIn}>{children}</Shell>
-        </UnsavedChangesProvider>
+        <ThemeProvider>
+          <UnsavedChangesProvider>
+            <Shell signedIn={signedIn}>{children}</Shell>
+          </UnsavedChangesProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

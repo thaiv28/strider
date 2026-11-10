@@ -127,7 +127,7 @@ function WeatherRow({
           {note && <span className="ml-1 text-xs font-normal text-muted">· {note}</span>}
         </div>
         <div className="readout text-xs text-muted">{pretty(date)}</div>
-        <div className="readout truncate text-[0.65rem] text-muted">
+        <div className="readout truncate text-xs text-muted">
           {lat != null && lon != null ? `${lat.toFixed(3)}, ${lon.toFixed(3)}` : "—"}
         </div>
       </div>
@@ -152,7 +152,7 @@ function WeatherRow({
           </div>
           <div className="col-start-2 row-start-1 ml-auto shrink-0 text-right sm:col-auto sm:row-auto">
             <div className="eyebrow">typical</div>
-            <div className="readout text-[0.65rem] text-muted">{climo.years}-yr avg</div>
+            <div className="readout text-xs text-muted">{climo.years}-yr avg</div>
           </div>
         </>
       ) : !d ? (

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, Button, Input, Badge } from "@/components/ui";
+import { Button, Input, Badge, Field } from "@/components/ui";
+import { Sheet } from "@/components/sheet";
 import { searchNutrition, createIngredient, updateIngredient, type IngredientInput } from "@/app/food/actions";
 import type { FoodHit } from "@/lib/food-search";
 import type { IngredientRow } from "@/lib/pantry";
@@ -60,15 +61,10 @@ export function IngredientDialog({ editing, onClose }: { editing: IngredientRow 
   const numOrNull = (v: string) => (v.trim() === "" ? null : Number(v));
 
   return (
-    <div className="fixed inset-0 z-[1100] flex items-start justify-center overflow-y-auto bg-ink/40 p-4 py-10 backdrop-blur-sm" onClick={onClose}>
-      <Card className="w-full max-w-lg p-5" onClick={(e) => e.stopPropagation()}>
-        <div className="eyebrow">◇ {editing ? "Edit ingredient" : "New ingredient"}</div>
-        <h2 className="font-display mt-1 text-lg font-bold">{editing ? editing.name : "Add ingredient"}</h2>
-
+    <Sheet open onClose={onClose} title={editing ? `Edit ${editing.name}` : "Add ingredient"}>
         {!editing && (
           <div className="mt-4">
-            <span className="eyebrow mb-1 block">Search USDA + Open Food Facts</span>
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. peanut butter, ramen, Clif bar" autoFocus />
+            <Field label="Search USDA + Open Food Facts"><Input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. peanut butter, ramen, Clif bar" autoFocus /></Field>
             {(searching || hits.length > 0) && (
               <div className="mt-2 max-h-56 overflow-y-auto rounded-lg border">
                 {searching && <div className="px-3 py-2 text-sm text-muted">Searching…</div>}
@@ -82,7 +78,7 @@ export function IngredientDialog({ editing, onClose }: { editing: IngredientRow 
                       <span className="block truncate text-sm font-medium">{h.name}</span>
                       {h.detail && <span className="block truncate text-xs text-muted">{h.detail}</span>}
                     </span>
-                    <span className="readout flex shrink-0 items-center gap-2 text-xs text-muted">
+                    <span className="readout flex max-w-[48%] shrink-0 flex-wrap justify-end gap-2 text-xs text-muted">
                       {h.kcalPer100g != null && <span>{h.kcalPer100g} kcal/100g</span>}
                       <Badge tone={h.source === "usda" ? "base" : "wishlist"}>{h.source}</Badge>
                     </span>
@@ -125,16 +121,6 @@ export function IngredientDialog({ editing, onClose }: { editing: IngredientRow 
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={save} disabled={!form.name.trim()}>{editing ? "Save" : "Add"}</Button>
         </div>
-      </Card>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="eyebrow mb-1 block">{label}</span>
-      {children}
-    </label>
+    </Sheet>
   );
 }

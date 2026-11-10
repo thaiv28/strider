@@ -75,6 +75,8 @@ export default async function SharedTripPage({ params }: { params: Promise<{ tok
 
   return (
     <SharedTripView
+      signedIn={!!visitorId}
+      gpx={view.gpx ? { points: view.gpx.points, minEleFt: view.gpx.minEleFt, maxEleFt: view.gpx.maxEleFt } : null}
       trip={{
         name: view.trip.name,
         status: view.trip.status,

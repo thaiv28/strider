@@ -60,7 +60,7 @@ export function PermitCard({ tripId, permit }: { tripId: number; permit: PermitM
         </button>
       )}
 
-      {err && <p className="mt-2 text-xs text-red-500">{err}</p>}
+      {err && <p className="mt-2 text-xs text-signal">{err}</p>}
 
       <input
         ref={inputRef}

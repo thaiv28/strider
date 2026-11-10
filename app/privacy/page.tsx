@@ -1,3 +1,4 @@
+import { ContourBand } from "@/components/contour-band";
 import Link from "next/link";
 
 export const metadata = {
@@ -45,32 +46,32 @@ const sections = [
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-[#f4f0e7] text-[#292520]">
-      <header className="border-b border-black/10 bg-[#101713] text-[#f4f1e8]">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-5 py-5 sm:px-8">
-          <Link href="/" className="font-display text-lg font-bold tracking-[0.16em]">STRIDER</Link>
-          <Link href="/login" className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium transition hover:bg-white/15">Log in</Link>
+    <div className="min-h-screen bg-canvas text-ink">
+      <header className="relative overflow-hidden bg-header text-headerink">
+        <ContourBand />
+        <div className="relative mx-auto flex max-w-4xl items-center justify-between px-5 py-5 sm:px-8">
+          <Link href="/" className="font-display text-[22px] font-bold">Strider</Link>
+          <Link href="/login" className="inline-flex min-h-11 items-center rounded-xl bg-headerink px-4 text-sm font-semibold text-headeractionink hover:opacity-90">Log in</Link>
         </div>
+        <div className="relative mx-auto max-w-4xl px-5 pb-12 pt-5 sm:px-8"><p className="mb-2 text-sm text-headermuted">Legal</p><h1 className="font-display text-4xl font-bold">Privacy Policy</h1></div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-5 py-14 sm:px-8 sm:py-20">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#397461]">Legal</p>
-        <h1 className="font-display mt-3 text-4xl font-bold tracking-tight sm:text-6xl">Privacy Policy</h1>
-        <p className="mt-4 text-sm text-[#717268]">Last updated September 22, 2026</p>
-        <p className="mt-8 max-w-3xl text-lg leading-relaxed text-[#565850]">Strider is a backpacking-planning service. This policy explains what information Strider collects, why it is used, and the choices available to you.</p>
+      <main className="card relative mx-auto -mt-5 mb-12 max-w-4xl px-5 py-6 sm:px-8">
+        <p className="mt-4 text-sm text-muted">Last updated September 22, 2026</p>
+        <p className="mt-8 max-w-3xl text-lg leading-relaxed text-muted">Strider is a backpacking-planning service. This policy explains what information Strider collects, why it is used, and the choices available to you.</p>
 
-        <div className="mt-12 divide-y divide-black/10 border-y border-black/10">
+        <div className="mt-12 divide-y divide-line border-y border-line">
           {sections.map((section) => (
             <section key={section.title} className="grid gap-4 py-8 sm:grid-cols-[0.8fr_1.7fr] sm:gap-10">
               <h2 className="font-display text-2xl font-bold">{section.title}</h2>
-              <div className="space-y-4 leading-relaxed text-[#565850]">{section.body}</div>
+              <div className="space-y-4 leading-relaxed text-muted">{section.body}</div>
             </section>
           ))}
         </div>
 
-        <section className="mt-12 rounded-2xl bg-[#142019] p-7 text-[#f4f1e8] sm:p-9">
+        <section className="mt-12 rounded-2xl bg-panel2 p-7 text-ink sm:p-9">
           <h2 className="font-display text-2xl font-bold">Questions or requests</h2>
-          <p className="mt-3 leading-relaxed text-white/70">Contact Strider using the user-support email displayed on the Google sign-in and authorization screen. Include the Google email associated with your account so the request can be verified.</p>
+          <p className="mt-3 leading-relaxed text-muted">Contact Strider using the user-support email displayed on the Google sign-in and authorization screen. Include the Google email associated with your account so the request can be verified.</p>
         </section>
       </main>
     </div>

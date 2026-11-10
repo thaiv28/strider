@@ -2,12 +2,18 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Trash2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { Card, Badge, Button, Input, Select, InfoBadge } from "@/components/ui";
-import { fmtWeight, fmtOz, fmtLbs, ozToG } from "@/lib/util";
+import { Card, Button, Input, Select, InfoBadge, Chip, Field, Textarea } from "@/components/ui";
+import { fmtWeight, fmtLbs, ozToG, fmtDateRange } from "@/lib/util";
 import { TripGearList } from "./trip-gear-list";
-import { GpxPanel, type Gpx } from "./gpx-panel";
+import { ContourBand } from "@/components/contour-band";
+import { Sheet } from "@/components/sheet";
+import { RoutePanel, tripLayout, TripSectionBar, ElevationSparkline } from "./route-panel";
+import { RouteMapThumb } from "./route-map-thumb";
+import { RouteActions, type Gpx } from "./route-actions";
+import { TripBand } from "./trip-band";
+import { OptionsMenu } from "./options-menu";
 import { WeatherPanel } from "./weather-panel";
 import { TripFoodPanel, ShoppingList, type MealOpt, type IngOpt } from "./trip-food-panel";
 import { fuelPlan, GAS_PER_LITER_G, CANISTERS } from "@/lib/fuel";
@@ -62,7 +68,7 @@ type Trip = {
 type LibItem = { id: number; name: string; category: string | null; weightG: number | null; quantity: number; defaultWeightClass: "base" | "worn" | "consumable" };
 type Weights = { baseG: number; wornG: number; foodG: number; waterG: number; fuelG: number; consumableG: number; packG: number; skinOutG: number };
 
-const tone = (s: string) => (s === "completed" ? "current" : s === "planned" ? "wishlist" : "neutral");
+const sections = [["logistics", "Logistics"], ["planning", "Planning"], ["gear", "Gear"], ["food", "Food"], ["weather", "Weather"], ["report", "Report"]] as const;
 
 export function TripView(props: {
   isOwner: boolean;
@@ -101,7 +107,7 @@ export function TripView(props: {
 }) {
   const { trip, weights, groups, days } = props;
   const router = useRouter();
-  const [pending, start] = useTransition();
+  const [, start] = useTransition();
   const [startDate, setStartDate] = useState(trip.startDate ?? "");
   const dateSaveQueue = useRef(Promise.resolve());
   const saveDate = (value: string | null) => {
@@ -117,6 +123,18 @@ export function TripView(props: {
   };
   const [picker, setPicker] = useState(false);
   type Tab = "logistics" | "planning" | "gear" | "food" | "weather" | "report";
+  const hasRoute = !!props.gpx?.points.length;
+  const [phoneView, setPhoneView] = useState<"map" | Tab>(hasRoute ? "map" : "logistics");
+  const [isPhone, setIsPhone] = useState(false);
+  const [minimized, setMinimized] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 639px)");
+    const sync = () => setIsPhone(media.matches);
+    sync(); media.addEventListener("change", sync);
+    setMinimized(localStorage.getItem("strider-route-minimized") === "true");
+    return () => media.removeEventListener("change", sync);
+  }, []);
+  const toggleRoute = (value: boolean) => { setMinimized(value); localStorage.setItem("strider-route-minimized", String(value)); };
   const [tab, setTab] = useState<Tab>("logistics");
   const [generateReportRequest, setGenerateReportRequest] = useState(0);
   const tabKey = `bp_tripTab_${trip.id}`;
@@ -126,8 +144,10 @@ export function TripView(props: {
   }, [tabKey]);
   const pickTab = (k: Tab) => {
     setTab(k);
+    setPhoneView(k);
     localStorage.setItem(tabKey, k);
   };
+  const activeTab = isPhone ? (phoneView === "map" ? (hasRoute ? tab : "logistics") : phoneView) : tab;
   const generateReport = () => {
     pickTab("report");
     setGenerateReportRequest((n) => n + 1);
@@ -202,71 +222,42 @@ export function TripView(props: {
   }, [doUndo]);
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6 sm:px-8 sm:py-8">
-      <Link href={props.backHref} className="eyebrow -my-2 inline-block py-2 hover:text-accent">
-        ← {props.backLabel}
-      </Link>
-
-      <div className="mt-3 flex flex-wrap items-center gap-3">
-        <input
-          aria-label="Trip name"
-          defaultValue={trip.name}
-          onBlur={(e) => e.target.value.trim() && save({ name: e.target.value.trim() })}
-          className="font-display min-w-0 flex-1 bg-transparent text-3xl font-bold tracking-tight outline-none"
-        />
-        <Select
-          value={trip.status}
-          onChange={(e) => save({ status: e.target.value as Trip["status"] })}
-        >
-          <option value="idea">idea</option>
-          <option value="planned">planned</option>
-          <option value="completed">completed</option>
-        </Select>
-        {props.isOwner && <ShareMenu tripId={trip.id} initialToken={trip.shareToken} initialEditToken={trip.editToken} onGenerateReport={generateReport} />}
-        {props.isOwner && <Button variant="danger" onClick={del} aria-label="Delete trip" title="Delete trip">
-          <Trash2 size={16} />
-        </Button>}
-      </div>
-      <div className="readout mt-1 text-sm text-muted">
-        {[props.region, props.areaType, trip.startDate ?? "date TBD"].filter(Boolean).join(" · ")}
-        {pending && <span className="ml-2">· saving…</span>}
-      </div>
-
-      <div className="mt-5">
-        <StrataBar weights={weights} />
-      </div>
-
-      <div className="mt-5 flex gap-1 overflow-x-auto overflow-y-hidden border-b">
-        {([
-          ["logistics", "Logistics"],
-          ["planning", "Planning"],
-          ["gear", "Gear"],
-          ["food", "Food"],
-          ["weather", "Weather"],
-          ["report", "Report"],
-        ] as const).map(([k, label]) => (
-          <button
-            key={k}
-            onClick={() => pickTab(k)}
-            className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition ${
-              tab === k ? "border-accent text-ink" : "border-transparent text-muted hover:text-ink"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <div className="relative mt-4">
-        {/* Sticky TOC lives in the left gutter so it never narrows the content. */}
-        <div className="absolute inset-y-0 right-full mr-6 hidden xl:block">
-          <SectionNav tab={tab} groups={groups} />
+    <div className={tripLayout.frame}>
+      <header className={`${phoneView === "logistics" ? "hidden" : "block"} relative z-[1100] min-h-[72px] shrink-0 bg-header text-headerink sm:hidden`}>
+        <div className="pointer-events-none absolute inset-0 overflow-hidden"><ContourBand /></div>
+        <div className="relative flex min-h-[72px] items-center gap-2 px-3">
+          <Link href={props.backHref} aria-label="Back to Trips" className="grid h-11 w-11 shrink-0 place-items-center"><ArrowLeft size={21} /></Link>
+          <div className="min-w-0 flex-1"><div className="truncate font-display text-[21px] font-bold">{trip.name}</div><div className="truncate text-xs text-headermuted">{props.effectiveDistance ?? "—"} mi · {props.effectiveElevation?.toLocaleString() ?? "—"} ft · {trip.nights ?? "—"} nights · {fmtDateRange(trip.startDate, trip.nights) ?? "No dates"}</div></div>
+          {props.isOwner && <div className="shrink-0 text-ink"><ShareMenu icon tripId={trip.id} initialToken={trip.shareToken} initialEditToken={trip.editToken} onGenerateReport={generateReport} /></div>}
         </div>
-        {tab === "logistics" && (
-          <div className="space-y-6">
-            <Card id="overview" className="scroll-mt-24 grid min-w-0 grid-cols-1 gap-4 overflow-hidden p-4 sm:grid-cols-2">
-              <div className="min-w-0 max-w-full">
-                <label htmlFor="trip-start-date" className="eyebrow mb-1 block">Start date</label>
+      </header>
+      <TripBand name={trip.name} onName={(name) => save({ name })} region={props.region} startDate={trip.startDate} nights={trip.nights} status={trip.status} distance={props.effectiveDistance} gain={props.effectiveElevation} packG={weights.packG} skinOutG={weights.skinOutG} backHref={props.backHref} backLabel={props.backLabel} phoneVisible={phoneView === "logistics"} actions={<>
+        <Select aria-label="Trip status" value={trip.status} onChange={(e) => save({ status: e.target.value as Trip["status"] })} className="!border-headerborder !bg-transparent !text-headerink [&>option]:bg-panel [&>option]:text-ink">
+          <option value="idea">Idea</option><option value="planned">Planned</option><option value="completed">Completed</option>
+        </Select>
+        {props.isOwner && <><ShareMenu tripId={trip.id} initialToken={trip.shareToken} initialEditToken={trip.editToken} onGenerateReport={generateReport} /><OptionsMenu label="More trip options" header><button role="menuitem" onClick={del}>Delete trip</button></OptionsMenu></>}
+      </>} />
+      <div className={tripLayout.split}>
+        {hasRoute && props.gpx && <aside aria-label="Route map and elevation" className={tripLayout.map(phoneView)}>
+          <div className={`${minimized && !isPhone ? "hidden" : "flex"} relative h-full min-h-0 flex-1 flex-col overflow-hidden bg-panel sm:rounded-[18px] sm:shadow-[0_8px_28px_rgba(23,56,45,0.16)]`}>
+            <RoutePanel startDate={startDate || null} nights={trip.nights} tripId={trip.id} points={props.gpx.points} minFt={props.gpx.minEleFt} maxFt={props.gpx.maxEleFt} campsites={props.campsites} pushUndo={pushUndo} mapActions={<>
+              <Button className="w-24 !bg-white px-0 !text-[#18261f] shadow max-sm:!hidden" onClick={() => toggleRoute(true)}>Hide map</Button>
+              <RouteActions tripId={trip.id} tripName={trip.name} gpx={props.gpx} pushUndo={pushUndo} current={{ distanceMi: trip.distanceMi, elevationGainFt: trip.elevationGainFt, lat: trip.lat, lon: trip.lon }} campsites={props.campsites} />
+            </>} />
+          </div>
+          {minimized && !isPhone && <Card className="flex items-center gap-3 p-3"><RouteMapThumb track={props.gpx.track} className="h-14 w-20 shrink-0" /><ElevationSparkline points={props.gpx.points} /><span className="text-sm text-muted">{(props.gpx.minEleFt ?? Math.min(...props.gpx.points.map((p) => p.e))).toLocaleString()} to {(props.gpx.maxEleFt ?? Math.max(...props.gpx.points.map((p) => p.e))).toLocaleString()} ft</span><Button variant="outline" className="ml-auto" onClick={() => toggleRoute(false)}>Show map and elevation</Button></Card>}
+        </aside>}
+        {!hasRoute && <div className={`${phoneView === "logistics" ? "block" : "hidden"} relative mx-auto w-full max-w-[1136px] px-4 pt-4 sm:-mt-16 sm:block sm:px-6 sm:pt-0`}><RouteActions tripId={trip.id} tripName={trip.name} gpx={props.gpx} pushUndo={pushUndo} current={{ distanceMi: trip.distanceMi, elevationGainFt: trip.elevationGainFt, lat: trip.lat, lon: trip.lon }} campsites={props.campsites} /></div>}
+        <div className={tripLayout.content(hasRoute, phoneView)}>
+          <div className="hidden flex-wrap gap-1.5 sm:flex">{sections.map(([key, label]) => <Chip key={key} selected={activeTab === key} onClick={() => pickTab(key)}>{label}</Chip>)}</div>
+          <div className="relative mt-3 min-w-0">
+        {activeTab === "logistics" && (
+          <div className="grid items-start gap-3.5 desk:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+            <Card id="overview" className="min-w-0 p-4">
+              <h2 className="text-[17px] font-bold">Details</h2>
+              <div className="mt-2.5 grid min-w-0 grid-cols-2 gap-x-3 gap-y-2.5">
+              <div className="relative min-w-0 max-w-full">
+                <label htmlFor="trip-start-date" className="mb-1 block text-[13px] font-semibold text-muted">Start date</label>
                 <div className="flex min-w-0 items-center gap-2">
                   <Input
                     id="trip-start-date"
@@ -286,30 +277,13 @@ export function TripView(props: {
                         saveDate(null);
                       }}
                       aria-label="Clear start date"
-                      className="shrink-0 text-sm text-muted underline underline-offset-2 hover:text-ink"
+                      className="absolute right-0 top-0 text-[13px] text-muted underline underline-offset-2 hover:text-ink"
                     >
-                      Clear date
+                      Clear
                     </button>
                   )}
                 </div>
               </div>
-              <Field label="Nights">
-                <div className="rounded-[calc(var(--radius)*0.6)] border bg-panel2/40 px-3 py-1.5 text-sm text-muted">
-                  {trip.nights ?? "—"}
-                </div>
-              </Field>
-              <Field label="Region">
-                <Input defaultValue={props.region ?? ""} onBlur={(e) => save({ region: e.target.value || null })} />
-              </Field>
-              <Field label="Area type">
-                <Input defaultValue={props.areaType ?? ""} onBlur={(e) => save({ areaType: e.target.value || null })} />
-              </Field>
-              <Field label="Distance (mi)">
-                <Input key={`d-${props.effectiveDistance ?? ""}`} type="number" step="0.1" defaultValue={props.effectiveDistance ?? ""} onBlur={(e) => save({ distanceMi: e.target.value || null })} />
-              </Field>
-              <Field label="Elevation gain (ft)">
-                <Input key={`e-${props.effectiveElevation ?? ""}`} type="number" defaultValue={props.effectiveElevation ?? ""} onBlur={(e) => save({ elevationGainFt: e.target.value === "" ? null : Number(e.target.value) })} />
-              </Field>
               <Field label="Party size (people)">
                 <Input
                   key={`party-${trip.partySize}`}
@@ -323,50 +297,52 @@ export function TripView(props: {
                   }}
                 />
               </Field>
+              <Field label="Region">
+                <Input defaultValue={props.region ?? ""} onBlur={(e) => save({ region: e.target.value || null })} />
+              </Field>
+              <Field label="Area type">
+                <Input defaultValue={props.areaType ?? ""} onBlur={(e) => save({ areaType: e.target.value || null })} />
+              </Field>
+              <Field label="Distance (mi)">
+                <Input key={`d-${props.effectiveDistance ?? ""}`} type="number" step="0.1" defaultValue={props.effectiveDistance ?? ""} onBlur={(e) => save({ distanceMi: e.target.value || null })} />
+              </Field>
+              <Field label="Elevation gain (ft)">
+                <Input key={`e-${props.effectiveElevation ?? ""}`} type="number" defaultValue={props.effectiveElevation ?? ""} onBlur={(e) => save({ elevationGainFt: e.target.value === "" ? null : Number(e.target.value) })} />
+              </Field>
+              </div>
             </Card>
 
-            <div id="by-day" className="scroll-mt-24">
+            <Card id="by-day" className="scroll-mt-24 p-4">
               <div className="flex items-center justify-between">
-                <div className="eyebrow">By day</div>
-                <Button variant="outline" onClick={() => start(async () => await addTripDay(trip.id))}>+ Add day</Button>
+                <h2 className="text-[17px] font-bold">By day</h2>
+                <button className="min-h-9 px-2.5 text-sm font-semibold text-signal" onClick={() => start(async () => await addTripDay(trip.id))}>Add day</button>
               </div>
-              <Card className="mt-2 overflow-hidden">
-                {dayRows.length === 0 && <div className="px-4 py-3 text-sm text-muted">No days yet. Add a day, or drop campsites on the route below.</div>}
+              <div className="mt-2 overflow-hidden">
+                {dayRows.length === 0 && <div className="px-4 py-3 text-sm text-muted">No days yet. Add a day, or drop campsites on the route.</div>}
                 {dayRows.map((d) => {
                   const auto = autoMap.get(d.dayNumber);
                   const dist = d.distanceMi ?? "";
                   const gain = d.elevationGainFt ?? "";
                   return (
-                    <div key={d.id} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-b px-3 py-3 last:border-0 sm:grid-cols-[3rem_minmax(0,1fr)_minmax(0,1fr)_7rem_1.5rem] sm:gap-x-3 sm:px-4 sm:py-2">
-                      <span className="readout col-start-1 row-start-1 text-sm text-muted sm:col-auto sm:row-auto">Day {d.dayNumber}</span>
-                      <div className="col-span-3 row-start-2 grid grid-cols-2 gap-2 sm:contents">
+                    <div key={d.id} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-b py-2 last:border-0">
+                      <span className="readout col-start-1 row-start-1 text-sm text-muted">Day {d.dayNumber}</span>
+                      <div className="col-start-2 row-start-1 grid grid-cols-2 gap-2">
                         <Input key={`d${d.id}-${dist}`} aria-label={`Day ${d.dayNumber} distance in miles`} type="number" step="0.1" placeholder="mi" defaultValue={dist} onBlur={(e) => start(async () => await upsertTripDay(trip.id, d.dayNumber, { distanceMi: e.target.value || null }))} />
                         <Input key={`e${d.id}-${gain}`} aria-label={`Day ${d.dayNumber} elevation gain in feet`} type="number" placeholder="ft gain" defaultValue={gain} onBlur={(e) => start(async () => await upsertTripDay(trip.id, d.dayNumber, { elevationGainFt: e.target.value === "" ? null : Number(e.target.value) }))} />
                       </div>
-                      <span className="readout col-start-2 row-start-1 truncate text-right text-xs text-muted sm:col-auto sm:row-auto sm:text-left">
+                      <span className="readout col-start-2 row-start-2 truncate text-right text-xs text-muted">
                         {auto?.lat != null && auto?.lon != null ? `${auto.lat.toFixed(3)}, ${auto.lon.toFixed(3)}` : ""}
                       </span>
-                      <button onClick={() => start(async () => await deleteTripDay(trip.id, d.id))} aria-label={`Delete day ${d.dayNumber}`} className="col-start-3 row-start-1 grid h-11 w-11 place-items-center justify-self-end rounded text-muted hover:bg-accent/10 hover:text-accent sm:col-auto sm:row-auto sm:h-auto sm:w-auto" title="Delete day">✕</button>
+                      <button onClick={() => start(async () => await deleteTripDay(trip.id, d.id))} aria-label={`Delete day ${d.dayNumber}`} className="col-start-3 row-start-1 grid h-11 w-11 place-items-center justify-self-end rounded text-muted hover:bg-accent/10 hover:text-accent" title="Delete day">✕</button>
                     </div>
                   );
                 })}
-              </Card>
-            </div>
-
-            <div id="route" className="scroll-mt-24">
-              <GpxPanel
-                tripId={trip.id}
-                tripName={trip.name}
-                gpx={props.gpx}
-                pushUndo={pushUndo}
-                current={{ distanceMi: trip.distanceMi, elevationGainFt: trip.elevationGainFt, lat: trip.lat, lon: trip.lon }}
-                campsites={props.campsites}
-              />
-            </div>
+              </div>
+            </Card>
           </div>
         )}
 
-        {tab === "planning" && (
+        {activeTab === "planning" && (
           <div className="space-y-6">
             <div id="plan-details" className="scroll-mt-24 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <LineBox label="Trailhead" defaultValue={trip.trailhead} onSave={(v) => save({ trailhead: v })} />
@@ -383,10 +359,10 @@ export function TripView(props: {
           </div>
         )}
 
-        {tab === "gear" && (
+        {activeTab === "gear" && (
           <div>
-            <div className="flex items-center justify-between gap-2">
-              <span className="readout text-sm text-muted">{props.packedCount}/{props.gearCount} packed</span>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="readout text-sm text-muted">{props.packedCount}/{props.gearCount} packed · Base {fmtLbs(weights.baseG)} · Consumable {fmtLbs(weights.consumableG)} · Worn {fmtLbs(weights.wornG)}</span>
               {props.gearCount > 0 && (
                 <div className="flex items-center gap-2">
                   <Button variant="ghost" onClick={() => confirm("Remove all gear from this trip?") && start(async () => await clearTripGear(trip.id))}>
@@ -413,11 +389,11 @@ export function TripView(props: {
           </div>
         )}
 
-        {tab === "food" && (
+        {activeTab === "food" && (
           <div className="space-y-6">
             <div id="water-fuel" className="scroll-mt-24">
-              <div className="eyebrow">Water &amp; fuel</div>
-              <Card className="mt-2 grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
+              <Card className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
+                <h2 className="text-[17px] font-bold sm:col-span-2">Water &amp; fuel</h2>
                 {([
                   ["Water", "waterGPerDay", trip.waterGPerDay],
                   ["Fuel", "fuelGPerDay", trip.fuelGPerDay],
@@ -464,7 +440,7 @@ export function TripView(props: {
           </div>
         )}
 
-        {tab === "weather" && (
+        {activeTab === "weather" && (
           <WeatherPanel
             lat={props.lat}
             lon={props.lon}
@@ -479,7 +455,7 @@ export function TripView(props: {
           />
         )}
 
-        {tab === "report" && (
+        {activeTab === "report" && (
           <div className="space-y-6">
             <div id="report" className="scroll-mt-24">
               <ReportPanel tripId={trip.id} data={props.report} template={props.reportTemplate} packingList={props.tripPackingList} generateRequest={generateReportRequest} />
@@ -491,8 +467,11 @@ export function TripView(props: {
         )}
       </div>
 
+        </div>
+      </div>
+      <TripSectionBar sections={sections} hasRoute={hasRoute} value={phoneView} onChange={(key) => key === "map" ? setPhoneView("map") : pickTab(key)} />
       {toast && (
-        <div className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full border bg-panel px-4 py-2 text-sm shadow-lg">
+        <div className="fixed bottom-24 sm:bottom-4 left-1/2 z-[2100] flex -translate-x-1/2 items-center gap-3 rounded-full border bg-panel px-4 py-2 text-sm shadow-lg">
           <span>{toast}</span>
           {undo.length > 0 && (
             <button onClick={doUndo} className="font-medium text-accent">
@@ -531,7 +510,7 @@ function FuelCalculator({
   return (
     <div>
       <div className="flex items-center gap-1.5">
-        <span className="eyebrow">Fuel calculator</span>
+        <h2 className="text-[17px] font-bold">Fuel calculator</h2>
         <InfoBadge>
           Sums the cook water of every planned hot meal (× party size) and burns{" "}
           {GAS_PER_LITER_G} g of gas per liter on a Soto WindMaster in average
@@ -580,102 +559,6 @@ function Metric({ label, value, sub }: { label: string; value: string; sub?: str
   );
 }
 
-const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-
-// Left-rail contents for the current tab; each entry scrolls to a section id.
-// Hidden below lg. Gear entries are the trip's gear categories.
-function SectionNav({ tab, groups }: { tab: string; groups: { category: string }[] }) {
-  const items =
-    tab === "logistics"
-      ? [
-          { id: "overview", label: "Overview" },
-          { id: "by-day", label: "By day" },
-          { id: "route", label: "Route & GPX" },
-        ]
-      : tab === "planning"
-      ? [
-          { id: "plan-details", label: "Details" },
-          { id: "permit", label: "Permit" },
-          { id: "plan-notes", label: "Planning notes" },
-        ]
-      : tab === "gear"
-      ? groups.map((g) => ({ id: `gear-${slugify(g.category)}`, label: g.category }))
-      : tab === "food"
-      ? [
-          { id: "water-fuel", label: "Water & fuel" },
-          { id: "meals", label: "Meals by day" },
-          { id: "fuel-calc", label: "Fuel calculator" },
-          { id: "shopping", label: "Grocery list" },
-        ]
-      : tab === "weather"
-      ? [
-          { id: "weather", label: "Weather" },
-          { id: "snow", label: "Snow depth" },
-        ]
-      : tab === "report"
-      ? [
-          { id: "report", label: "Report" },
-          { id: "report-notes", label: "Private notes" },
-        ]
-      : [];
-  if (items.length === 0) return null;
-  const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-  return (
-    <nav className="w-40">
-      <div className="sticky top-6 space-y-0.5">
-        <div className="eyebrow mb-2">On this tab</div>
-        {items.map((it) => (
-          <button
-            key={it.id}
-            onClick={() => jump(it.id)}
-            className="block w-full truncate rounded px-2 py-1 text-left text-sm text-muted transition hover:bg-panel2/60 hover:text-ink"
-          >
-            {it.label}
-          </button>
-        ))}
-      </div>
-    </nav>
-  );
-}
-
-function StrataBar({ weights }: { weights: Weights }) {
-  const strata = [
-    { label: "Base", g: weights.baseG, color: "var(--cbase)" },
-    { label: "Consumables", g: weights.consumableG, color: "var(--ccons)" },
-    { label: "Worn", g: weights.wornG, color: "var(--cworn)" },
-  ];
-  const total = weights.skinOutG || 1;
-  return (
-    <Card className="mt-5 p-5">
-      <div className="grid grid-cols-3 gap-4">
-        <Readout label="Base" g={weights.baseG} />
-        <Readout label="Pack" g={weights.packG} />
-        <Readout label="Skin-out" g={weights.skinOutG} />
-      </div>
-      <div className="mt-4 flex h-3 overflow-hidden rounded-full border">
-        {strata.map((s) => (s.g > 0 ? <div key={s.label} style={{ width: `${(s.g / total) * 100}%`, background: s.color }} title={`${s.label}: ${fmtWeight(s.g)}`} /> : null))}
-      </div>
-      <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1.5 text-sm sm:grid-cols-3">
-        {strata.map((s) => (
-          <div key={s.label} className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-sm" style={{ background: s.color }} />
-            <span className="font-medium">{s.label}</span>
-            <span className="readout ml-auto text-muted">{fmtOz(s.g)}</span>
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
-function Readout({ label, g }: { label: string; g: number }) {
-  return (
-    <div>
-      <div className="eyebrow">{label}</div>
-      <div className="readout mt-1 text-3xl font-bold leading-none">{fmtLbs(g)}</div>
-    </div>
-  );
-}
 
 function SeedPanel({ tripId, loadouts, onSeed }: { tripId: number; loadouts: LoadoutLite[]; onSeed: (loadoutId: number) => void }) {
   const [sel, setSel] = useState<number | "">(loadouts[0]?.id ?? "");
@@ -698,9 +581,7 @@ function GearPicker({ library, onPick, onClose }: { library: LibItem[]; onPick: 
   const [q, setQ] = useState("");
   const shown = library.filter((i) => q === "" || i.name.toLowerCase().includes(q.toLowerCase()) || (i.category ?? "").toLowerCase().includes(q.toLowerCase()));
   return (
-    <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm" onClick={onClose}>
-      <Card className="flex max-h-[80vh] w-full max-w-md flex-col p-5" onClick={(e) => e.stopPropagation()}>
-        <div className="eyebrow">◇ Add gear</div>
+    <Sheet open onClose={onClose} title="Add gear">
         <Input autoFocus placeholder="Search library…" value={q} onChange={(e) => setQ(e.target.value)} className="mt-2" />
         <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
           {shown.map((i) => (
@@ -714,29 +595,20 @@ function GearPicker({ library, onPick, onClose }: { library: LibItem[]; onPick: 
         <div className="mt-3 flex justify-end">
           <Button variant="outline" onClick={onClose}>Done</Button>
         </div>
-      </Card>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block min-w-0 max-w-full">
-      <span className="eyebrow mb-1 block">{label}</span>
-      {children}
-    </label>
+    </Sheet>
   );
 }
 
 function LineBox({ label, defaultValue, onSave }: { label: string; defaultValue: string | null; onSave: (v: string | null) => void }) {
   return (
     <Card className="p-4">
-      <div className="eyebrow">{label}</div>
-      <textarea
+      <h2 className="text-[17px] font-bold">{label}</h2>
+      <Textarea
         defaultValue={defaultValue ?? ""}
         onBlur={(e) => onSave(e.target.value.trim() || null)}
         rows={3}
-        className="mt-2 w-full resize-y rounded-md border bg-panel2 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent/25"
+        aria-label={label}
+        className="mt-2 w-full max-w-2xl resize-y rounded-md border bg-panel2 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent/25"
       />
     </Card>
   );
@@ -745,12 +617,13 @@ function LineBox({ label, defaultValue, onSave }: { label: string; defaultValue:
 function NoteCard({ label, defaultValue, onSave, rows = 6 }: { label: string; defaultValue: string | null; onSave: (v: string | null) => void; rows?: number }) {
   return (
     <Card className="p-4">
-      <div className="eyebrow">{label}</div>
-      <textarea
+      <h2 className="text-[17px] font-bold">{label}</h2>
+      <Textarea
         defaultValue={defaultValue ?? ""}
         onBlur={(e) => onSave(e.target.value || null)}
         rows={rows}
-        className="mt-2 w-full resize-y rounded-md border bg-panel2 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent/25"
+        aria-label={label}
+        className="mt-2 w-full max-w-2xl resize-y rounded-md border bg-panel2 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent/25"
       />
     </Card>
   );

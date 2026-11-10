@@ -60,8 +60,8 @@ See `docs/handoff/OPERATIONS.md` and `docs/adr/0001-single-instance-aws-runtime.
 | Route | Purpose |
 |---|---|
 | `/` | public Strider landing page |
-| `/basecamp` | **Basecamp** — authenticated dashboard: next objective, base-weight bar, quick stats |
-| `/trips` · `/trips/[id]` | trip list + full trip view (route map, days, gear, food, permit) |
+| `/basecamp` | **Basecamp** — authenticated dashboard: all-time stats, next trip, base weight, recent trips |
+| `/trips` · `/trips/[id]` | trip list + trip view (trip band, route card with map and elevation, then sections for logistics, planning, gear, food, weather, report) |
 | `/trips/[id]/print` | printable trip sheet (USGS topo map, per-day distance/gain, permit) |
 | `/trips/[id]/permit` | GET handler returning the stored permit blob inline |
 | `/share/trips/[token]` | unauthenticated live, view-only trip plan (private notes omitted) |
@@ -107,8 +107,10 @@ trip-plan prompt), `palette*.ts`, `util.ts` (unit + currency formatters).
 ## Maps
 
 Leaflet with a `LayersControl`: **USGS Topo** base (default; US-only,
-`{z}/{y}/{x}`, maxNativeZoom ~16) + OSM; overlays for RainViewer radar, NASA GIBS
-MODIS snow cover, and WAQI air quality (needs `NEXT_PUBLIC_WAQI_TOKEN`). The
+`{z}/{y}/{x}`, maxNativeZoom ~16) + OSM; overlays for NOAA quality-controlled MRMS radar,
+WPC precipitation forecast matched to the trip's dates within NOAA's seven-day
+range (`lib/forecast-window.ts`), and NOHRSC snow depth (all WMS, US only), NASA GIBS MODIS NDSI snow cover (global), and WAQI air quality (needs
+`NEXT_PUBLIC_WAQI_TOKEN`). The
 print sheet uses the USGS ArcGIS `/export` endpoint to composite one static image
 for the bbox, then overlays the track + numbered campsites as SVG.
 

@@ -89,7 +89,7 @@ export function SnowPanel({ lat, lon, startDate, days }: { lat: number | null; l
                   </div>
                   <div className="w-20 shrink-0 text-right">
                     {day && <div className="eyebrow">{BASIS[day.kind]}</div>}
-                    {day?.kind === "typical" && <div className="readout text-[0.65rem] text-muted">{day.years}-yr avg</div>}
+                    {day?.kind === "typical" && <div className="readout text-xs text-muted">{day.years}-yr avg</div>}
                   </div>
                   <Depth inches={day === undefined ? undefined : day?.inches ?? null} className="w-16 shrink-0 text-lg" />
                 </div>

@@ -1,3 +1,4 @@
+import { PageHeader, PageBody } from "@/components/page-header";
 import { getCurrentUserId } from "@/lib/gear";
 import { getTripsSummary } from "@/lib/trip";
 import { LogbookView } from "@/components/trip/logbook-view";
@@ -30,21 +31,9 @@ export default async function TripsPage({ searchParams }: { searchParams: Promis
   });
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6 sm:px-8 sm:py-10">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="eyebrow">◇ Logbook</div>
-          <h1 className="font-display mt-1 text-3xl font-bold tracking-tight">Trips</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <PlanWithAI />
-          <NewTripButton />
-        </div>
-      </div>
-
-      <div className="mt-6">
-        <LogbookView trips={trips} shared={shared} initialSection={section === "shared" ? "shared" : "mine"} />
-      </div>
-    </div>
+    <>
+      <PageHeader title="Trips" actions={<div className="flex items-center gap-2"><PlanWithAI /><NewTripButton /></div>} />
+      <PageBody><LogbookView trips={trips} shared={shared} initialSection={section === "shared" ? "shared" : "mine"} /></PageBody>
+    </>
   );
 }

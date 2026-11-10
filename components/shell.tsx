@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
-import { Backpack, CalendarDays, Home, LogOut, Map, Settings, Utensils } from "lucide-react";
+import { Backpack, CalendarDays, Home, Map, Settings, Utensils } from "lucide-react";
 import { cn } from "@/lib/util";
 import { useUnsaved } from "@/components/unsaved-changes";
-import { logout } from "@/app/login/actions";
+import { ContourBand } from "@/components/contour-band";
 
 const NAV = [
   { href: "/basecamp", label: "Basecamp", icon: Home },
@@ -20,6 +20,7 @@ const MOBILE_NAV = [...NAV, { href: "/calendar", label: "Calendar", icon: Calend
 export function Shell({ children, signedIn }: { children: React.ReactNode; signedIn: boolean }) {
   const path = usePathname();
   const { requestNavigate } = useUnsaved();
+  const tripDetail = /^\/trips\/\d+$/.test(path) || (signedIn && path.startsWith("/share/trips/"));
   const sharedTrip = path.startsWith("/share/trips/");
   const tripsHref = sharedTrip ? "/trips?section=shared" : "/trips";
   const isActive = (href: string) => path.startsWith(href) || (href === "/trips" && sharedTrip);
@@ -48,87 +49,44 @@ export function Shell({ children, signedIn }: { children: React.ReactNode; signe
     requestNavigate(dest);
   };
   return (
-    <div className="min-h-screen pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
-      <header data-noprint className="sticky top-0 z-50 border-b-2 border-double bg-panel/95 backdrop-blur md:static md:bg-panel">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 md:hidden">
-          <Link href="/basecamp" onClick={onNav("/basecamp")} className="font-display text-xl font-bold tracking-tight leading-none">
-            STRIDER
+    <div className={cn("min-h-screen pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:pb-0", tripDetail && "max-sm:pb-0")}>
+      <header data-noprint className="relative overflow-hidden bg-header text-headerink">
+        <ContourBand />
+        <div className={cn("relative flex min-h-14 items-center justify-between px-4 sm:hidden", tripDetail && "max-sm:hidden")}>
+          <Link href="/basecamp" onClick={onNav("/basecamp")} className="font-display text-xl font-bold text-headerink">
+            Strider
           </Link>
-          <div className="flex items-center gap-1">
-            <Link href="/settings" onClick={onNav("/settings")} aria-label="Settings" className="grid h-11 w-11 place-items-center rounded-md text-muted hover:bg-panel2 hover:text-ink">
-              <Settings size={20} />
-            </Link>
-            <form action={logout}>
-              <button type="submit" aria-label="Log out" className="grid h-11 w-11 place-items-center rounded-md text-muted hover:bg-panel2 hover:text-ink">
-                <LogOut size={20} />
-              </button>
-            </form>
-          </div>
+          <Link href="/settings" onClick={onNav("/settings")} aria-label="Settings" aria-current={isActive("/settings") ? "page" : undefined} className="grid h-11 w-11 place-items-center rounded-xl -mr-2">
+            <Settings size={21} />
+          </Link>
         </div>
-        <div className="mx-auto hidden max-w-6xl items-center justify-between gap-3 px-8 py-3 md:flex">
-          <Link href="/basecamp" onClick={onNav("/basecamp")} className="shrink-0 font-display text-lg font-bold tracking-tight leading-none sm:text-xl">
-            STRIDER
+        <div className="relative mx-auto hidden min-h-16 max-w-[1136px] flex-wrap items-center gap-x-7 gap-y-1 px-6 sm:flex">
+          <Link href="/basecamp" onClick={onNav("/basecamp")} className="font-display text-[22px] font-bold">
+            Strider
           </Link>
-          <nav className="flex min-w-0 items-center gap-2.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-6 sm:overflow-visible">
-            {NAV.map((l) => (
-              <Link
-                key={l.href}
-                href={l.href === "/trips" ? tripsHref : l.href}
-                onClick={onNav(l.href)}
-                className={cn(
-                  "shrink-0 font-display text-xs font-semibold tracking-wide uppercase transition sm:text-sm",
-                  isActive(l.href) ? "text-accent" : "text-muted hover:text-ink",
-                )}
-              >
-                {l.label}
+          <nav aria-label="Primary navigation" className="flex flex-wrap gap-1">
+            {[...MOBILE_NAV, { href: "/settings", label: "Settings" }].map((item) => (
+              <Link key={item.href} href={item.href === "/trips" ? tripsHref : item.href} onClick={onNav(item.href)}
+                aria-current={isActive(item.href) ? "page" : undefined}
+                className={cn("inline-flex min-h-11 items-center rounded-[10px] px-3 text-[15px]",
+                  isActive(item.href) ? "bg-headeractive font-bold text-white" : "font-medium text-headermuted hover:text-headerink")}>
+                {item.label}
               </Link>
             ))}
           </nav>
-          <div className="flex shrink-0 items-center gap-4">
-            <Link
-              href="/calendar"
-              onClick={onNav("/calendar")}
-              aria-label="Calendar"
-              className={cn("transition", isActive("/calendar") ? "text-accent" : "text-muted hover:text-ink")}
-            >
-              <CalendarDays size={18} />
-            </Link>
-            <Link
-              href="/settings"
-              onClick={onNav("/settings")}
-              aria-label="Settings"
-              className={cn("transition", isActive("/settings") ? "text-accent" : "text-muted hover:text-ink")}
-            >
-              <Settings size={18} />
-            </Link>
-            <form action={logout}>
-              <button type="submit" aria-label="Log out" className="text-muted transition hover:text-ink">
-                <LogOut size={18} />
-              </button>
-            </form>
-          </div>
         </div>
       </header>
       {sharedTrip ? children : <main>{children}</main>}
-      <nav
-        data-noprint
-        aria-label="Primary navigation"
-        className="fixed inset-x-0 bottom-0 z-[2000] grid grid-cols-5 border-t bg-panel/95 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(0,0,0,0.08)] backdrop-blur md:hidden"
-      >
+      <nav data-noprint aria-label="Primary navigation"
+        className={cn("fixed inset-x-0 bottom-0 z-[2000] grid grid-cols-5 border-t border-line bg-panel px-1 pb-[env(safe-area-inset-bottom)] sm:hidden", tripDetail && "max-sm:hidden")}>
         {MOBILE_NAV.map((item) => {
           const Icon = item.icon;
           return (
-            <Link
-              key={item.href}
-              href={item.href === "/trips" ? tripsHref : item.href}
-              onClick={onNav(item.href)}
+            <Link key={item.href} href={item.href === "/trips" ? tripsHref : item.href} onClick={onNav(item.href)}
               aria-current={isActive(item.href) ? "page" : undefined}
-              className={cn(
-                "flex min-h-16 flex-col items-center justify-center gap-1 rounded-md px-1 font-sans text-[0.65rem] font-semibold",
-                isActive(item.href) ? "text-accent" : "text-muted",
-              )}
-            >
-              <Icon size={20} />
+              className={cn("flex min-h-[58px] flex-col items-center justify-center gap-[3px] text-xs",
+                isActive(item.href) ? "font-bold text-accent" : "font-medium text-muted")}>
+              <Icon size={23} />
               <span>{item.label}</span>
             </Link>
           );

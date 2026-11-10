@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { DndContext, MouseSensor, TouchSensor, KeyboardSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Input, Select, Button, PageTabs } from "@/components/ui";
+import { Input, Select, Button, PageTabs, Card } from "@/components/ui";
+import { PageHeader, PageBody } from "@/components/page-header";
+import { Sheet } from "@/components/sheet";
 import { BaseBar } from "./base-bar";
 import { GearList } from "./gear-list";
 import { GearDialog } from "./gear-dialog";
@@ -53,6 +55,10 @@ export function GearFrame({
   const [status, setStatus] = useState<StatusFilter>("current");
   const [tab, setTab] = useState<Tab>("inventory");
   const [dialog, setDialog] = useState<{ editing: GearRow | null } | null>(null);
+  const [more, setMore] = useState(false);
+  const [manager, setManager] = useState(false);
+  const [reorder, setReorder] = useState(false);
+  const [phoneOptions, setPhoneOptions] = useState(false);
   const [pending, start] = useTransition();
 
   const memberSig = JSON.stringify(membership);
@@ -157,91 +163,28 @@ export function GearFrame({
     });
   };
 
+  const options = <>
+    <label className="flex items-center gap-2 text-sm text-muted">Show <Select aria-label="Show gear" value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)}><option value="current">Current</option><option value="retired">Retired</option><option value="all">All</option></Select></label>
+    {isLoadout && <><Button variant="ghost" disabled={pending} onClick={() => setAllMembers(true)}>Select all</Button><Button variant="ghost" disabled={pending} onClick={() => setAllMembers(false)}>Deselect all</Button></>}
+    <Button variant="ghost" onClick={() => { setPhoneOptions(false); setManager(true); }}>Manage loadouts</Button>
+  </>;
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 sm:px-8 sm:py-10">
-      <div className="flex flex-wrap items-end justify-between gap-3 sm:gap-4">
-        <div>
-          <div className="eyebrow">◇ Inventory</div>
-          <h1 className="font-display mt-1 text-3xl font-bold tracking-tight">Gear Library</h1>
+    <>
+      <PageHeader title="Gear" actions={<Button variant="header" onClick={() => setDialog({ editing: null })}>Add gear</Button>}>
+        <PageTabs tone="header" label="Gear sections" tabs={[{ value: "inventory", label: "Inventory" }, { value: "wishlist", label: "Wishlist", count: wishlist.length || undefined }]} value={tab} onChange={setTab} />
+      </PageHeader>
+      <PageBody>
+      {tab === "inventory" ? <div className="grid min-w-0 gap-5 desk:grid-cols-[minmax(0,1fr)_340px]">
+        <aside className="min-w-0 desk:order-2"><BaseBar baseG={agg.baseG} byCategory={agg.byCategory} loadoutControl={<select aria-label="Loadout" value={selected} onChange={(e) => setSelected(e.target.value === "all" ? "all" : Number(e.target.value))} className="min-h-11 max-w-full border-0 bg-transparent font-bold text-ink"><option value="all">All gear</option>{loadouts.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select>} /></aside>
+        <div className="min-w-0 space-y-3">
+          <div className="flex items-center gap-2"><Input type="search" aria-label="Search gear" placeholder="Search gear" value={q} onChange={(e) => setQ(e.target.value)} /><Button variant="outline" aria-expanded={more || phoneOptions} onClick={() => { if (window.matchMedia("(min-width: 640px)").matches) setMore(!more); else setPhoneOptions(true); }}>More</Button>{reorder && <Button variant="outline" className="sm:hidden" onClick={() => setReorder(false)}>Done</Button>}</div>
+          {more && <Card className="hidden flex-wrap items-center gap-2 p-3 sm:flex">{options}</Card>}
+          {pending && <span role="status" className="text-xs text-muted">Saving…</span>}
+          <GearList groups={shownGroups} onEdit={(r) => setDialog({ editing: r })} onDelete={remove} onMove={(itemId, toCategoryId, orderedIds) => start(async () => { await moveGear(itemId, toCategoryId, orderedIds); })} loadoutMode={isLoadout} memberMap={memberMap} onToggleMember={toggleMember} reorder={reorder} />
         </div>
-        <Button onClick={() => setDialog({ editing: null })}>
-          {tab === "wishlist" ? "+ Add item" : "+ Add gear"}
-        </Button>
-      </div>
-
-      <PageTabs
-        label="Gear sections"
-        tabs={[{ value: "inventory", label: "Inventory" }, { value: "wishlist", label: "Wishlist", count: wishlist.length || undefined }]}
-        value={tab}
-        onChange={setTab}
-        className="mt-6"
-      />
-
-      {tab === "inventory" ? (
-        <>
-          <LoadoutBar
-            loadouts={loadouts}
-            selected={selected}
-            onSelect={setSelected}
-            onCreate={(name) => start(async () => setSelected(await createLoadout(name)))}
-            onRename={(id, name) => start(async () => await renameLoadout(id, name))}
-            onDelete={(id) => start(async () => await deleteLoadout(id))}
-            onSetDefault={(id) => start(async () => await setDefaultLoadout(id))}
-            onReorder={(ids) => start(async () => await reorderLoadouts(ids))}
-            pending={pending}
-          />
-
-          <div className="mt-4">
-            <BaseBar baseG={agg.baseG} byCategory={agg.byCategory} />
-          </div>
-
-          <div className="mt-8 flex flex-wrap items-center gap-2">
-            <Input placeholder="Search gear…" value={q} onChange={(e) => setQ(e.target.value)} className="max-w-xs" />
-            <Select value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)}>
-              <option value="current">Current</option>
-              <option value="retired">Retired</option>
-              <option value="all">All</option>
-            </Select>
-            {isLoadout && (
-              <span className="flex gap-2">
-                <Button variant="outline" disabled={pending} onClick={() => setAllMembers(true)}>Select all</Button>
-                <Button variant="outline" disabled={pending} onClick={() => setAllMembers(false)}>Deselect all</Button>
-              </span>
-            )}
-            {pending && <span className="eyebrow">saving…</span>}
-          </div>
-
-          <div className="mt-4">
-            <GearList
-              groups={shownGroups}
-              onEdit={(r) => setDialog({ editing: r })}
-              onDelete={remove}
-              onMove={(itemId, toCategoryId, orderedIds) =>
-                start(async () => {
-                  await moveGear(itemId, toCategoryId, orderedIds);
-                })
-              }
-              loadoutMode={isLoadout}
-              memberMap={memberMap}
-              onToggleMember={toggleMember}
-            />
-          </div>
-        </>
-      ) : (
-        <WishlistFrame
-          wishlist={wishlist}
-          groups={groups}
-          loadouts={loadouts}
-          membership={member}
-          overrides={overrides}
-          pending={pending}
-          onEdit={(r) => setDialog({ editing: r })}
-          onDelete={remove}
-          onSetReplaces={(id, ids) => start(async () => await setWishlistReplacements(id, ids))}
-          onSetWishlistLoadout={setWishInLoadout}
-        />
-      )}
-
+      </div> : <WishlistFrame wishlist={wishlist} groups={groups} loadouts={loadouts} membership={member} overrides={overrides} pending={pending} onEdit={(r) => setDialog({ editing: r })} onDelete={remove} onSetReplaces={(id, ids) => start(async () => await setWishlistReplacements(id, ids))} onSetWishlistLoadout={setWishInLoadout} />}
+      <Sheet open={phoneOptions} onClose={() => setPhoneOptions(false)} title="Gear options"><div className="mt-4 flex flex-col items-start gap-2 [&>button]:justify-start [&>button]:px-0">{options}<Button variant="ghost" onClick={() => { setReorder(true); setPhoneOptions(false); }}>Reorder gear</Button></div></Sheet>
+      <LoadoutBar open={manager} onClose={() => setManager(false)} loadouts={loadouts} onCreate={(name) => start(async () => setSelected(await createLoadout(name)))} onRename={(id, name) => start(async () => await renameLoadout(id, name))} onDelete={(id) => start(async () => await deleteLoadout(id))} onSetDefault={(id) => start(async () => await setDefaultLoadout(id))} onReorder={(ids) => start(async () => await reorderLoadouts(ids))} pending={pending} />
       {dialog && (
         <GearDialog
           editing={dialog.editing}
@@ -256,16 +199,17 @@ export function GearFrame({
           }
         />
       )}
-    </div>
+      </PageBody>
+    </>
   );
 }
 
 function LoadoutBar({
-  loadouts, selected, onSelect, onCreate, onRename, onDelete, onSetDefault, onReorder, pending,
+  loadouts, open, onClose, onCreate, onRename, onDelete, onSetDefault, onReorder, pending,
 }: {
   loadouts: LoadoutLite[];
-  selected: Sel;
-  onSelect: (s: Sel) => void;
+  open: boolean;
+  onClose: () => void;
   onCreate: (name: string) => void;
   onRename: (id: number, name: string) => void;
   onDelete: (id: number) => void;
@@ -273,7 +217,6 @@ function LoadoutBar({
   onReorder: (ids: number[]) => void;
   pending: boolean;
 }) {
-  const [open, setOpen] = useState(false);
   const [ordered, setOrdered] = useState(loadouts);
   const loadoutSignature = JSON.stringify(loadouts);
   useEffect(() => setOrdered(loadouts), [loadoutSignature]);
@@ -292,27 +235,8 @@ function LoadoutBar({
     if (!over || active.id === over.id) return;
     move(ordered.findIndex((l) => l.id === active.id), ordered.findIndex((l) => l.id === over.id));
   };
-  const chip = (active: boolean) =>
-    `rounded-full border px-3 py-1 text-sm transition ${active ? "border-accent bg-accent text-accentink" : "text-muted hover:text-ink"}`;
   return (
-    <>
-      <div className="mt-6 flex flex-wrap items-center gap-2">
-        <span className="eyebrow mr-1">Loadout</span>
-        <button onClick={() => onSelect("all")} className={chip(selected === "all")}>All gear</button>
-        {loadouts.map((l) => (
-          <button key={l.id} onClick={() => onSelect(l.id)} className={chip(selected === l.id)}>
-            {l.isDefault && "★ "}{l.name}
-          </button>
-        ))}
-        <Button variant="outline" onClick={() => setOpen(true)} aria-label="Manage loadouts">Manage loadouts</Button>
-      </div>
-      {open && (
-        <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm" onClick={() => setOpen(false)}>
-          <div role="dialog" aria-modal="true" aria-labelledby="loadout-manager-title" className="card flex max-h-[85vh] w-full max-w-md flex-col p-5" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between gap-3">
-              <h2 id="loadout-manager-title" className="font-display text-lg font-bold">Manage loadouts</h2>
-              <button onClick={() => setOpen(false)} className="min-h-11 min-w-11 text-muted" aria-label="Close loadout manager">✕</button>
-            </div>
+    <Sheet open={open} onClose={onClose} title="Manage loadouts">
             <p className="mb-3 text-sm text-muted">Drag a handle to reorder, or use the move buttons.</p>
             <div className="min-h-0 overflow-y-auto">
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
@@ -329,12 +253,9 @@ function LoadoutBar({
             </div>
             <div className="mt-4 flex justify-between gap-2 border-t pt-4">
               <Button disabled={pending} onClick={() => { const name = prompt("New loadout name:"); if (name?.trim()) onCreate(name); }}>+ Add loadout</Button>
-              <Button variant="outline" onClick={() => setOpen(false)}>Done</Button>
+              <Button variant="outline" onClick={onClose}>Done</Button>
             </div>
-          </div>
-        </div>
-      )}
-    </>
+    </Sheet>
   );
 }
 

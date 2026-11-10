@@ -1,3 +1,4 @@
+import { ContourBand } from "@/components/contour-band";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { loginForE2e, loginWithGoogle } from "./actions";
@@ -14,11 +15,14 @@ export default async function LoginPage({
   const returnTo = callbackUrl?.startsWith("/") && !callbackUrl.startsWith("//") && !callbackUrl.includes("\\") ? callbackUrl : "/basecamp";
   if (await auth()) redirect(returnTo);
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center px-4 py-12">
-      <Link href="/" className="font-display text-lg font-bold tracking-[0.16em]">STRIDER</Link>
-      <section className="card mt-6 w-full max-w-sm p-6 text-center sm:p-8">
-        <h1 className="text-xl font-semibold">Sign in to Strider</h1>
-        <p className="mt-2 text-sm text-muted">Use your Google account to continue.</p>
+    <main className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-header px-4 py-12">
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true"><ContourBand />
+        <svg viewBox="0 0 1280 800" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 h-full w-full"><path d="M120 680C260 560 360 640 500 520S700 300 860 340 1060 300 1180 150" fill="none" stroke="var(--route)" strokeWidth="4" strokeLinecap="round" /></svg>
+      </div>
+      <section className="card relative w-full max-w-[400px] p-7 shadow-xl">
+        <div className="text-sm font-semibold text-muted">Your trail workspace</div>
+        <h1 className="mt-1 font-display text-[40px] font-bold leading-tight">Strider</h1>
+        <p className="mt-2 text-sm text-muted">Sign in to plan trips, gear, food and trail logistics in your private workspace.</p>
         <form action={loginWithGoogle} className="mt-6">
           <input type="hidden" name="callbackUrl" value={returnTo} />
           <button
@@ -44,11 +48,11 @@ export default async function LoginPage({
             <button className="rounded-md border px-4 py-2 font-semibold" type="submit">Test sign in</button>
           </form>
         ) : null}
+        <p className="mt-6 text-xs text-muted">
+          New here? Signing in creates your private workspace.{" "}
+          <Link href="/privacy" className="inline-flex min-h-11 items-center underline hover:text-ink">Privacy</Link>
+        </p>
       </section>
-      <p className="mt-6 text-xs text-muted">
-        New here? Signing in creates your private workspace.{" "}
-        <Link href="/privacy" className="underline hover:text-ink">Privacy</Link>
-      </p>
     </main>
   );
 }

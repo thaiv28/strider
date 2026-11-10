@@ -63,7 +63,7 @@ export function UnsavedChangesProvider({ children }: { children: React.ReactNode
       {pending && (
         <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm" onClick={() => !saving && setPending(null)}>
           <Card className="w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
-            <div className="eyebrow">◇ Unsaved changes</div>
+            <div className="eyebrow">Unsaved changes</div>
             <p className="mt-1 text-sm text-muted">You have unsaved changes. Save them before leaving?</p>
             <div className="mt-4 flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setPending(null)} disabled={saving}>Stay</Button>
