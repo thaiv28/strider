@@ -215,7 +215,7 @@ function WishRow({
   </>;
   return (
     <div className={`relative flex items-center gap-2 border-b px-3 py-2 last:border-0 sm:px-4 ${loadoutId !== null && !active ? "opacity-55" : ""}`}>
-      {loadoutId !== null && <label className="grid min-h-11 w-7 shrink-0 place-items-center"><input type="checkbox" checked={active} onChange={(e) => onSetWishlistLoadout(r.id, loadoutId, e.target.checked)} aria-label={`Try ${r.name} in this loadout`} className="h-5 w-5 accent-[var(--accent)]" /></label>}
+      {loadoutId !== null && <label className="grid min-h-11 w-7 shrink-0 place-items-center"><input type="checkbox" checked={active} onChange={(e) => onSetWishlistLoadout(r.id, loadoutId, e.target.checked)} aria-label={`Try ${r.name} in this loadout`} className="h-5 w-5 accent-accent" /></label>}
       <button className="min-h-11 min-w-0 flex-1 text-left" onClick={() => { if (window.matchMedia("(min-width: 640px)").matches) onEdit(r); else setSheet(true); }}>
         <span className="block truncate font-semibold">{r.name}{r.quantity > 1 && ` ×${r.quantity}`}</span>
         <span className="block truncate text-xs text-muted">{r.replaces.length ? `Replaces ${r.replaces.map((id) => targetById.get(id)?.name ?? "unknown").join(", ")}` : "New item"}</span>

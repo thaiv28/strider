@@ -157,7 +157,7 @@ export function MealEditor({ meal, ingredients, onBack, exitRef, isNew = false }
                 isHot: e.target.checked,
                 waterMl: e.target.checked ? (f.waterMl ?? DEFAULT_COOK_WATER_ML) : f.waterMl,
               }))}
-              className="h-4 w-4 accent-[var(--accent)]"
+              className="h-4 w-4 accent-accent"
             />
             Hot meal
             <InfoBadge>Hot meals need a stove, so they drive the trip fuel calculation. Cold-soak, no-cook, and snacks stay off.</InfoBadge>

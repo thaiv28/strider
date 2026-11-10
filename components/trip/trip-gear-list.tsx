@@ -165,7 +165,7 @@ function Row({ r, onPacked, onQty, onClass, onRemove }: { r: TripGearRow } & Omi
         checked={r.packed}
         onChange={(e) => onPacked(r.id, e.target.checked)}
         aria-label={`Packed: ${r.name}`}
-        className="h-4 w-4 accent-[var(--accent)]"
+        className="h-4 w-4 accent-accent"
       />
       <span className={`line-clamp-2 leading-snug sm:block sm:truncate ${r.packed ? "text-muted line-through" : "font-medium"}`}>{r.name}</span>
       <input

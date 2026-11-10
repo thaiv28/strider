@@ -55,7 +55,7 @@ export function GearDialog({
           </Field>
 
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={isKit} onChange={(e) => setIsKit(e.target.checked)} className="h-4 w-4 accent-[var(--accent)]" />
+            <input type="checkbox" checked={isKit} onChange={(e) => setIsKit(e.target.checked)} className="h-4 w-4 accent-accent" />
             This is a kit (holds a list of items; weight is the sum of its contents)
           </label>
 

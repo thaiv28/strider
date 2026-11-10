@@ -56,6 +56,7 @@ the user id and all trip, gear, meal, and settings relationships.
 ## Verification
 
 ```bash
+npm run check:design  # Topo token guard (see DESIGN.md)
 npx tsc --noEmit       # type safety
 npm run build          # production Next.js build
 npm run test:mobile    # responsive layout checks at three phone widths
