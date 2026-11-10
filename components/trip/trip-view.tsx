@@ -240,7 +240,7 @@ export function TripView(props: {
       <div className={tripLayout.split}>
         {hasRoute && props.gpx && <aside aria-label="Route map and elevation" className={tripLayout.map(phoneView)}>
           <div className={`${minimized && !isPhone ? "hidden" : "flex"} relative h-full min-h-0 flex-1 flex-col overflow-hidden bg-panel sm:rounded-[18px] sm:shadow-[0_8px_28px_rgba(23,56,45,0.16)]`}>
-            <RoutePanel tripId={trip.id} points={props.gpx.points} minFt={props.gpx.minEleFt} maxFt={props.gpx.maxEleFt} campsites={props.campsites} pushUndo={pushUndo} mapActions={<>
+            <RoutePanel startDate={startDate || null} nights={trip.nights} tripId={trip.id} points={props.gpx.points} minFt={props.gpx.minEleFt} maxFt={props.gpx.maxEleFt} campsites={props.campsites} pushUndo={pushUndo} mapActions={<>
               <Button className="w-24 !bg-white px-0 !text-[#18261f] shadow max-sm:!hidden" onClick={() => toggleRoute(true)}>Hide map</Button>
               <RouteActions tripId={trip.id} tripName={trip.name} gpx={props.gpx} pushUndo={pushUndo} current={{ distanceMi: trip.distanceMi, elevationGainFt: trip.elevationGainFt, lat: trip.lat, lon: trip.lon }} campsites={props.campsites} />
             </>} />

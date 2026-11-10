@@ -107,8 +107,10 @@ trip-plan prompt), `palette*.ts`, `util.ts` (unit + currency formatters).
 ## Maps
 
 Leaflet with a `LayersControl`: **USGS Topo** base (default; US-only,
-`{z}/{y}/{x}`, maxNativeZoom ~16) + OSM; overlays for RainViewer radar, NASA GIBS
-MODIS snow cover, and WAQI air quality (needs `NEXT_PUBLIC_WAQI_TOKEN`). The
+`{z}/{y}/{x}`, maxNativeZoom ~16) + OSM; overlays for NOAA quality-controlled MRMS radar,
+WPC precipitation forecast matched to the trip's dates within NOAA's seven-day
+range (`lib/forecast-window.ts`), and NOHRSC snow depth (all WMS, US only), NASA GIBS MODIS NDSI snow cover (global), and WAQI air quality (needs
+`NEXT_PUBLIC_WAQI_TOKEN`). The
 print sheet uses the USGS ArcGIS `/export` endpoint to composite one static image
 for the bbox, then overlays the track + numbered campsites as SVG.
 

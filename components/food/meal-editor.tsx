@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition, type MutableRefObject } from "react";
 import { Card, Button, Input, Select, Badge, InfoBadge, Field, IconButton } from "@/components/ui";
 import { Sheet } from "@/components/sheet";
+import { useUnsavedGuard } from "@/components/unsaved-changes";
 import { X } from "lucide-react";
 import { gToOz, ozToG } from "@/lib/util";
 import { kcalForGrams, kcalPerOz, gramsFromVolume, volumeFromGrams, VOLUME_ML, type VolumeUnit } from "@/lib/food";
@@ -89,13 +90,18 @@ export function MealEditor({ meal, ingredients, onBack, exitRef, isNew = false }
     return () => { exitRef.current = null; };
   });
 
-  // Clicking outside the card returns to the list (with the same dirty guard).
+  // Leaving for another page (app navigation or closing the tab) would lose edits.
+  useUnsavedGuard(`meal-${meal.id}`, dirty, persist);
+
+  // Clicking empty space closes a clean editor. With unsaved edits nothing is
+  // lost by staying, so the click is ignored rather than prompting.
   const cardRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (leaving) return;
+    if (leaving || dirty) return;
     const h = (e: MouseEvent) => {
-      if ((e.target as Element).closest("[data-food-navigation]")) return;
-      if (cardRef.current && !cardRef.current.contains(e.target as Node)) tryBack();
+      const target = e.target as Element;
+      if (target.closest("[data-food-navigation], a, button")) return;
+      if (cardRef.current && !cardRef.current.contains(target)) tryBack();
     };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
@@ -147,7 +153,7 @@ export function MealEditor({ meal, ingredients, onBack, exitRef, isNew = false }
           )}
         </div>
 
-        <div className="mt-5 flex flex-wrap items-center gap-x-8 gap-y-2 rounded-lg border bg-panel2/40 px-4 py-3">
+        <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg border bg-panel2/40 px-4 py-3 sm:grid-cols-3">
           <Stat label="Recipe">{totalKcal.toLocaleString()} kcal · {gToOz(totalG).toFixed(1)} oz</Stat>
           <Stat label="Per serving">{perServingKcal.toLocaleString()} kcal · {gToOz(perServingG).toFixed(1)} oz</Stat>
           <Stat label="Efficiency">{calOz != null ? `${calOz.toFixed(0)} cal/oz` : "—"}</Stat>
@@ -163,15 +169,15 @@ export function MealEditor({ meal, ingredients, onBack, exitRef, isNew = false }
         <div className="mt-4 divide-y rounded-lg border">
           {items.length === 0 && <div className="px-4 py-3 text-sm text-muted">No ingredients yet.</div>}
           {items.map((it) => (
-            <div key={it.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-3 sm:px-4 sm:py-2.5">
-              <span className="min-w-0 basis-full text-sm font-medium leading-snug break-words">{it.name}</span>
-              <span className="readout w-20 text-right text-xs text-muted">{kcalForGrams(it.kcalPer100g, Math.round(it.amountG * scale))} kcal</span>
+            <div key={it.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-1.5 pr-1 pl-3 sm:flex-nowrap sm:pl-4">
+              <span className="min-w-0 flex-1 text-sm font-medium leading-snug break-words max-sm:basis-full">{it.name}</span>
               <AmountControl
                 grams={Math.round(it.amountG * scale)}
                 density={it.densityGMl}
                 onChange={(displayG) => setAmounts((a) => ({ ...a, [it.id]: Math.max(0, Math.round(displayG / scale)) }))}
               />
-              <IconButton aria-label={`Remove ${it.name}`} onClick={() => run(() => removeMealIngredient(it.id))} className="ml-auto text-signal"><X size={16} /></IconButton>
+              <span className="readout w-16 shrink-0 text-right text-xs text-muted max-sm:ml-auto">{kcalForGrams(it.kcalPer100g, Math.round(it.amountG * scale))} kcal</span>
+              <IconButton aria-label={`Remove ${it.name}`} onClick={() => run(() => removeMealIngredient(it.id))} className="text-signal"><X size={16} /></IconButton>
             </div>
           ))}
         </div>
@@ -251,7 +257,7 @@ function AmountControl({ grams, density, onChange }: { grams: number; density: n
 
   return (
     <span className="inline-flex items-center gap-1">
-      <Input aria-label="Ingredient amount" className={`w-20 text-right ${NUM}`} type="number" min="0" step="0.1" value={val} onChange={(e) => onInput(e.target.value)} />
+      <Input aria-label="Ingredient amount" className={`!w-20 text-right ${NUM}`} type="number" min="0" step="0.1" value={val} onChange={(e) => onInput(e.target.value)} />
       <Select aria-label="Amount unit" value={unit} onChange={(e) => setUnit(e.target.value as typeof unit)} className="!px-2 !py-1.5">
         <option value="g">g</option>
         <option value="oz">oz</option>

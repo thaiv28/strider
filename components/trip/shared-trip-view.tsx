@@ -91,7 +91,7 @@ export function SharedTripView(props: Props) {
       <div className={tripLayout.split}>
         {hasRoute && props.gpx && <aside aria-label="Route map and elevation" className={tripLayout.map(phoneView)}>
           <div className={`${minimized && !isPhone ? "hidden" : "flex"} relative h-full min-h-0 flex-1 flex-col overflow-hidden bg-panel sm:rounded-[18px] sm:shadow-[0_8px_28px_rgba(23,56,45,0.16)]`}>
-            <RoutePanel readOnly points={props.gpx.points} minFt={props.gpx.minEleFt} maxFt={props.gpx.maxEleFt} campsites={props.campsites} mapActions={<Button className="w-24 !bg-white px-0 !text-[#18261f] shadow max-sm:!hidden" onClick={() => toggleRoute(true)}>Hide map</Button>} />
+            <RoutePanel readOnly startDate={trip.startDate} nights={trip.nights} points={props.gpx.points} minFt={props.gpx.minEleFt} maxFt={props.gpx.maxEleFt} campsites={props.campsites} mapActions={<Button className="w-24 !bg-white px-0 !text-[#18261f] shadow max-sm:!hidden" onClick={() => toggleRoute(true)}>Hide map</Button>} />
           </div>
           {minimized && !isPhone && <Card className="flex items-center gap-3 p-3"><RouteMapThumb track={props.track} className="h-14 w-20 shrink-0" /><ElevationSparkline points={props.gpx.points} /><span className="text-sm text-muted">{(props.gpx.minEleFt ?? Math.min(...props.gpx.points.map((p) => p.e))).toLocaleString()} to {(props.gpx.maxEleFt ?? Math.max(...props.gpx.points.map((p) => p.e))).toLocaleString()} ft</span><Button variant="outline" className="ml-auto" onClick={() => toggleRoute(false)}>Show map and elevation</Button></Card>}
         </aside>}

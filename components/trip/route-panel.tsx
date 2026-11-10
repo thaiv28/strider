@@ -24,8 +24,12 @@ export function RoutePanel({
   campsites,
   pushUndo,
   mapActions,
+  startDate,
+  nights,
 }: {
   mapActions?: ReactNode;
+  startDate?: string | null;
+  nights?: number | null;
   readOnly?: boolean;
   tripId?: number;
   points: RoutePoint[];
@@ -41,6 +45,8 @@ export function RoutePanel({
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const suppressClick = useRef(false);
+  const pressX = useRef(0);
+  const dragged = useRef(false);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const touchClick = useRef<{ x: number; y: number; at: number } | null>(null);
 
@@ -69,7 +75,11 @@ export function RoutePanel({
   const onMove = (e: React.PointerEvent) => {
     const p = nearest(fracFromEvent(e) * maxD);
     setHover(p);
-    if (drag) setLocal((cs) => cs.map((c) => (c.id === drag.id ? { ...c, distanceMi: p.d, lat: p.lat, lon: p.lon, eleFt: p.e } : c)));
+    if (!drag) return;
+    // A press only becomes a drag once the pointer really travels; smaller wobble is a click.
+    if (!dragged.current && Math.abs(e.clientX - pressX.current) < 5) return;
+    dragged.current = true;
+    setLocal((cs) => cs.map((c) => (c.id === drag.id ? { ...c, distanceMi: p.d, lat: p.lat, lon: p.lon, eleFt: p.e } : c)));
   };
   const addAt = (p: RoutePoint) => {
     if (readOnly || tripId == null) return;
@@ -104,6 +114,11 @@ export function RoutePanel({
     const { id, prev } = drag;
     setDrag(null);
     touchStart.current = null;
+    if (!dragged.current) {
+      setSelectedId(id);
+      suppressClick.current = true;
+      return;
+    }
     if (p.d === prev.distanceMi) return;
     suppressClick.current = true;
     start(async () => await moveCampsite(id, tripId, { distanceMi: p.d, lat: p.lat, lon: p.lon, eleFt: p.e }));
@@ -129,7 +144,7 @@ export function RoutePanel({
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
       <div className={`relative isolate z-0 min-h-0 flex-1 bg-map sm:h-[380px] sm:flex-none ${readOnly ? "sm:[&_.leaflet-top.leaflet-right]:!right-[104px]" : "[&_.leaflet-top.leaflet-right]:!right-[52px] sm:[&_.leaflet-top.leaflet-right]:!right-[156px]"} [&_.leaflet-top.leaflet-right]:!top-3 [&_.leaflet-top.leaflet-right]:mr-3 [&_.leaflet-control-layers]:!m-0 [&_.leaflet-control-layers]:!rounded-xl [&_.leaflet-control-layers-toggle]:!h-11 [&_.leaflet-control-layers-toggle]:!w-11`}>
-        <RouteMap fill className="h-full" track={points.map((p) => [p.lat, p.lon])} campsites={shown} preview={hover ? { lat: hover.lat, lon: hover.lon } : null} />
+        <RouteMap fill className="h-full" startDate={startDate} nights={nights} track={points.map((p) => [p.lat, p.lon])} campsites={shown} preview={hover ? { lat: hover.lat, lon: hover.lon } : null} />
         <div className="absolute right-3 top-3 z-[1000] flex gap-2">{mapActions}</div>
       </div>
       <section aria-label="Elevation" className="flex-none border-t bg-panel px-4 pt-2.5 pb-3">
@@ -177,6 +192,8 @@ export function RoutePanel({
                     setSelectedId(c.id);
                     return;
                   }
+                  pressX.current = e.clientX;
+                  dragged.current = false;
                   setDrag({ id: c.id, prev: c });
                   setHover({ d: c.distanceMi, lat: c.lat ?? 0, lon: c.lon ?? 0, e: c.eleFt ?? 0 });
                 }}
