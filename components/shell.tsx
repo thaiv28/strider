@@ -61,11 +61,12 @@ export function Shell({ children, signedIn }: { children: React.ReactNode; signe
           </Link>
         </div>
         <div className="relative mx-auto hidden min-h-16 max-w-[1136px] flex-wrap items-center gap-x-7 gap-y-1 px-6 sm:flex">
-          <Link href="/basecamp" onClick={onNav("/basecamp")} className="font-display text-[22px] font-bold">
+          <Link href="/basecamp" onClick={onNav("/basecamp")} aria-current={isActive("/basecamp") ? "page" : undefined} className="font-display text-[22px] font-bold">
             Strider
           </Link>
           <nav aria-label="Primary navigation" className="flex flex-wrap gap-1">
-            {[...MOBILE_NAV, { href: "/settings", label: "Settings" }].map((item) => (
+            {/* The Strider wordmark is the way home on desktop, so Basecamp isn't repeated here. */}
+            {[...MOBILE_NAV.filter((item) => item.href !== "/basecamp"), { href: "/settings", label: "Settings" }].map((item) => (
               <Link key={item.href} href={item.href === "/trips" ? tripsHref : item.href} onClick={onNav(item.href)}
                 aria-current={isActive(item.href) ? "page" : undefined}
                 className={cn("inline-flex min-h-11 items-center rounded-[10px] px-3 text-[15px]",

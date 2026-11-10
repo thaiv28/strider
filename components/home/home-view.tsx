@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { fmtDateRange } from "@/lib/util";
+import { cn, fmtDateRange } from "@/lib/util";
 import { PageHeader, PageBody } from "@/components/page-header";
 
 import { BaseBar, type CatSlice } from "@/components/gear/base-bar";
@@ -42,7 +42,12 @@ export function HomeView({ trips, baseG, byCategory, nextReady }: Props) {
     { label: "Nights out", value: s.nights.toString(), unit: "" },
   ];
 
-  const recent = [...trips].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime() || b.id - a.id).slice(0, 3);
+  // Recent trips are the latest completed ones; the planned "Next up" card already covers what's ahead.
+  // Five fit one row on wide screens; smaller screens show the first three.
+  const recent = trips
+    .filter((t) => t.status === "completed")
+    .sort((a, b) => (b.startDate ?? "").localeCompare(a.startDate ?? "") || new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime() || b.id - a.id)
+    .slice(0, 5);
   const days = next?.startDate ? Math.max(0, Math.ceil((new Date(`${next.startDate}T00:00:00`).getTime() - Date.now()) / 86400000)) : null;
   const where = (t: TripCard) => [t.region, fmtDateRange(t.startDate, t.nights) ?? "No dates"].filter(Boolean).join(" · ");
   return (
@@ -73,11 +78,12 @@ export function HomeView({ trips, baseG, byCategory, nextReady }: Props) {
             <h2 className="font-display text-[22px] font-bold">Recent trips</h2>
             <Link href="/trips" className="inline-flex min-h-11 items-center font-semibold text-signal">All trips</Link>
           </div>
-          <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))]">
-            {recent.map((t) => <a key={t.id} href={`/trips/${t.id}`} className="card overflow-hidden transition hover:border-accent/50">
+          {recent.length === 0 && <p className="mt-2 text-sm text-muted">Completed trips will show up here.</p>}
+          <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {recent.map((t, i) => <a key={t.id} href={`/trips/${t.id}`} className={cn("card overflow-hidden transition hover:border-accent/50", i >= 3 && "hidden lg:block")}>
               {t.track && t.track.length > 1 ? <RouteMapThumb track={t.track} className="h-28 w-full" /> : <div className="h-28 bg-map" aria-hidden="true" />}
               <div className="p-3"><div className="font-bold">{t.name}</div><div className="mt-1 text-xs text-muted">{where(t)}</div>
-                <div className="mt-2 text-sm tabular-nums">{t.status === "idea" && !t.distanceMi && !t.elevationFt && t.nights == null ? "Idea · no route yet" : [!t.distanceMi ? null : `${t.distanceMi} mi`, !t.elevationFt ? null : `${(t.elevationFt / 1000).toFixed(1)}k ft`, t.nights == null ? null : `${t.nights} nights`].filter(Boolean).join(" · ")}</div>
+                <div className="mt-2 text-sm tabular-nums">{[!t.distanceMi ? null : `${t.distanceMi} mi`, !t.elevationFt ? null : `${(t.elevationFt / 1000).toFixed(1)}k ft`, t.nights == null ? null : `${t.nights} nights`].filter(Boolean).join(" · ")}</div>
               </div>
             </a>)}
           </div>
