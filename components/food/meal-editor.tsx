@@ -27,6 +27,14 @@ import { useFoodSearch, FoodSearchResults, FOOD_SEARCH_PLACEHOLDER, foodSearchKe
 const MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack"];
 type EnteredAmount = { amount: number; unit: string };
 const storedEntered = (i: MealRow["items"][number]): EnteredAmount | null => i.enteredAmount != null && i.enteredUnit != null ? { amount: i.enteredAmount, unit: i.enteredUnit } : null;
+// Re-express a gram amount in a line's entered unit, so editing in the weight
+// view keeps the original unit. null when a volume has no density to convert with.
+const enteredForGrams = (grams: number, unit: string, density: number | null): EnteredAmount | null => {
+  if (unit === "g") return { amount: Math.round(grams), unit };
+  if (unit === "oz") return { amount: +gToOz(grams).toFixed(2), unit };
+  const v = volumeFromGrams(grams, unit as VolumeUnit, density);
+  return v == null ? null : { amount: +v.toFixed(2), unit };
+};
 
 // Number field without the native up/down spinner.
 const NUM = "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
@@ -40,6 +48,7 @@ export function MealEditor({ meal, ingredients, onBack, exitRef, isNew = false }
   const [entered, setEntered] = useState<Record<number, EnteredAmount | null>>(() => Object.fromEntries(meal.items.map((i) => [i.id, storedEntered(i)])));
   const [resetKey, setResetKey] = useState(0);
   const [preview, setPreview] = useState(meal.baseServings);
+  const [asWeight, setAsWeight] = useState(false);
   const [leaving, setLeaving] = useState(false);
 
   // Add/remove of ingredients happens server-side; merge in new rows while
@@ -176,11 +185,25 @@ export function MealEditor({ meal, ingredients, onBack, exitRef, isNew = false }
           <Stat label="Efficiency">{calOz != null ? `${calOz.toFixed(0)} cal/oz` : "—"}</Stat>
         </div>
 
-        <div className="mt-3 flex items-center gap-2 whitespace-nowrap">
-          <label htmlFor={`meal-preview-${meal.id}`} className="text-[13px] font-semibold text-muted">Show amounts for</label>
-          <Input id={`meal-preview-${meal.id}`} className="!w-16 shrink-0" type="number" min="1" step="1" value={preview}
-            onChange={(e) => setPreview(Math.max(1, Number(e.target.value) || 1))} />
-          <span className="text-sm text-muted">servings</span>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+          <div className="flex items-center gap-2 whitespace-nowrap">
+            <label htmlFor={`meal-preview-${meal.id}`} className="text-[13px] font-semibold text-muted">Show amounts for</label>
+            <Input id={`meal-preview-${meal.id}`} className="!w-16 shrink-0" type="number" min="1" step="1" value={preview}
+              onChange={(e) => setPreview(Math.max(1, Number(e.target.value) || 1))} />
+            <span className="text-sm text-muted">servings</span>
+          </div>
+          <label className="flex min-h-11 cursor-pointer items-center gap-2.5 whitespace-nowrap text-[13px] font-semibold text-muted">
+            View as weight
+            <button
+              type="button"
+              role="switch"
+              aria-checked={asWeight}
+              onClick={() => setAsWeight((v) => !v)}
+              className={`relative inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${asWeight ? "bg-accent" : "bg-fieldborder"}`}
+            >
+              <span className={`absolute left-0.5 h-5 w-5 rounded-full bg-panel shadow-sm transition-transform ${asWeight ? "translate-x-4" : ""}`} />
+            </button>
+          </label>
         </div>
 
         <div className="mt-4 divide-y rounded-lg border">
@@ -188,7 +211,20 @@ export function MealEditor({ meal, ingredients, onBack, exitRef, isNew = false }
           {items.map((it) => (
             <div key={it.id} data-meal-line={it.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-1.5 pr-1 pl-3 sm:pl-4">
               <span className="min-w-0 flex-1 text-sm font-medium leading-snug break-words max-sm:basis-full sm:basis-0">{it.name}</span>
-              <AmountControl
+              {asWeight ? (
+                <WeightAmount
+                  key={`${it.id}-${resetKey}-weight`}
+                  grams={Math.round(it.amountG * scale)}
+                  onChange={(displayG) => {
+                    const baseG = displayG / scale;
+                    setAmounts((a) => ({ ...a, [it.id]: Math.max(0, Math.round(baseG)) }));
+                    setEntered((e) => {
+                      const cur = e[it.id];
+                      return cur ? { ...e, [it.id]: enteredForGrams(baseG, cur.unit, it.densityGMl) } : e;
+                    });
+                  }}
+                />
+              ) : <AmountControl
                 key={`${it.id}-${resetKey}`}
                 grams={Math.round(it.amountG * scale)}
                 density={it.densityGMl}
@@ -202,7 +238,7 @@ export function MealEditor({ meal, ingredients, onBack, exitRef, isNew = false }
                   setAmounts((a) => ({ ...a, [it.id]: Math.max(0, Math.round(displayG / scale)) }));
                   setEntered((e) => ({ ...e, [it.id]: { amount: value.amount / scale, unit: value.unit } }));
                 }}
-              />
+              />}
               <span className="readout w-16 shrink-0 text-right text-xs text-muted max-sm:ml-auto">{kcalForGrams(it.kcalPer100g, Math.round(it.amountG * scale))} kcal</span>
               <IconButton aria-label={`Remove ${it.name}`} onClick={() => run(() => removeMealIngredient(it.id))} className="text-signal"><X size={16} /></IconButton>
             </div>
@@ -236,6 +272,31 @@ export function MealEditor({ meal, ingredients, onBack, exitRef, isNew = false }
         </div>
       </Sheet>
     </div>
+  );
+}
+
+// Gram-only amount field for the "View as weight" mode. Emits displayed grams.
+function WeightAmount({ grams, onChange }: { grams: number; onChange: (grams: number) => void }) {
+  const [val, setVal] = useState(String(grams));
+  const emitted = useRef(grams);
+  // Resync only on an external change (the serving preview), not the echo of typing.
+  const [lastGrams, setLastGrams] = useState(grams);
+  if (grams !== lastGrams) {
+    setLastGrams(grams);
+    if (Math.abs(grams - emitted.current) > 1) { emitted.current = grams; setVal(String(grams)); }
+  }
+  const onInput = (text: string) => {
+    setVal(text);
+    const g = Number(text);
+    if (text.trim() === "" || !Number.isFinite(g) || g < 0) return;
+    emitted.current = g;
+    onChange(g);
+  };
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Input aria-label="Ingredient amount" className={`!w-20 text-right ${NUM}`} type="number" min="0" step="1" value={val} onChange={(e) => onInput(e.target.value)} />
+      <span className="inline-flex min-h-11 w-[4.25rem] items-center px-2 text-sm text-muted">g</span>
+    </span>
   );
 }
 
