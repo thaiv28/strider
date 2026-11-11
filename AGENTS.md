@@ -12,6 +12,7 @@ persistent user data.
 4. `docs/handoff/CONVENTIONS.md` for coding and verification rules.
 5. `docs/handoff/OPERATIONS.md` for deployment, recovery, or AWS work.
 6. Relevant records in `docs/adr/` before changing an architectural decision.
+7. `DESIGN.md` before any UI change.
 
 The schema, application code, deployment scripts, and GitHub workflows are the
 operational source of truth. If they disagree with a handoff document, verify
@@ -41,12 +42,19 @@ Platform-wide AWS provisioning and domain/IAM controls belong to the private
   without first checking `thaiv28/project-platform-infrastructure`.
 - Workflow tests create uniquely named production records and must retain their
   `finally` cleanup behavior.
+- UI follows `DESIGN.md`. Build from the primitives in `components/ui.tsx` and the
+  Topo tokens; add as few visible elements as a feature needs, extending an
+  existing surface before adding a card, tab, page, or navigation entry. Any new
+  token, color, font, primitive, layout pattern, or navigation entry, or any
+  change to `DESIGN.md` or the `scripts/check-design.mjs` baseline, needs Thai's
+  explicit approval first: propose it, do not ship it.
 
 ## Required verification
 
 For application changes, run:
 
 ```bash
+npm run check:design
 npx tsc --noEmit
 npm run build
 npm run test:mobile

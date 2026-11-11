@@ -20,7 +20,8 @@
     "test:mobile": "playwright test tests/mobile.spec.ts",
     "test:workflow": "playwright test tests/workflows.spec.ts --project=workflow",
     "test:e2e": "playwright test",
-    "verify": "tsx scripts/verify.ts"
+    "verify": "tsx scripts/verify.ts",
+    "check:design": "node scripts/check-design.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -57,6 +57,7 @@ jobs:
           done
 
       - run: npm ci
+      - run: npm run check:design
       - run: npx tsc --noEmit
       - run: npm run build
 

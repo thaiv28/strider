@@ -61,6 +61,9 @@ changes correct.
 
 ## UI palette (Tailwind v4 tokens)
 
+This is the inventory. How to use it, what not to add, and what needs approval
+are in `DESIGN.md`, enforced in part by `npm run check:design`.
+
 Topo uses semantic Tailwind v4 color tokens: `canvas`, `panel`, `panel2`, `ink`,
 `muted`, `line`, `accent`, `accentink`, `cbase`, `ccons`, and `cworn`;
 `header`, `headerline`, `headerborder`, `headerink`, `headermuted`, `headeractive`,
@@ -90,6 +93,8 @@ stays light.
 ## Working agreements
 - Iterate with `npm run dev` and the local health endpoint. Type-check with
   `npx tsc --noEmit` and create a production build with `npm run build`.
+- Run `npm run check:design` for UI changes. CI and deploy run it before the
+  build; it fails on colors, fonts, or stylesheets outside the Topo tokens.
 - Run `npm run test:mobile` for responsive changes and
   `npm run test:workflow` for authenticated/data-flow changes. Run both for
   shared layout, routing, deployment, database, or authentication changes.

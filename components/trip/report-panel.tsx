@@ -150,7 +150,7 @@ export function ReportPanel({
               <div className="mt-3 space-y-2">
                 {blocks.map((b) => (
                   <label key={b.token} className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={!!on[b.token]} onChange={(e) => setOn((o) => ({ ...o, [b.token]: e.target.checked }))} className="h-4 w-4 accent-[var(--accent)]" />
+                    <input type="checkbox" checked={!!on[b.token]} onChange={(e) => setOn((o) => ({ ...o, [b.token]: e.target.checked }))} className="h-4 w-4 accent-accent" />
                     {b.label}
                   </label>
                 ))}
