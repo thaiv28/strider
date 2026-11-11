@@ -60,7 +60,7 @@ See `docs/handoff/OPERATIONS.md` and `docs/adr/0001-single-instance-aws-runtime.
 | Route | Purpose |
 |---|---|
 | `/` | public Strider landing page |
-| `/basecamp` | **Basecamp** — authenticated dashboard: all-time stats, next trip, base weight, recent trips |
+| `/basecamp` | **Basecamp** — authenticated dashboard: all-time stats, next trip, base weight, recent completed trips |
 | `/trips` · `/trips/[id]` | trip list + trip view (trip band, route card with map and elevation, then sections for logistics, planning, gear, food, weather, report) |
 | `/trips/[id]/print` | printable trip sheet (USGS topo map, per-day distance/gain, permit) |
 | `/trips/[id]/permit` | GET handler returning the stored permit blob inline |

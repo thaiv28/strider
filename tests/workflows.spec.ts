@@ -253,6 +253,16 @@ test("a trip can be planned, shared, exported, and deleted", async ({ browser, c
     await fillAndSave(page, "Day 1 elevation gain in feet", "1200");
 
     // Basecamp must reflect the trip's own stats, not only linked-trail defaults.
+    // Recent trips lists completed trips newest first, so complete this one with a
+    // far-future date to guarantee it leads the list whatever else exists.
+    await Promise.all([
+      page.waitForResponse((response) => response.request().method() === "POST" && response.ok()),
+      page.getByLabel("Trip status", { exact: true }).selectOption("completed"),
+    ]);
+    await Promise.all([
+      page.waitForResponse((response) => response.request().method() === "POST" && response.ok()),
+      page.getByLabel("Start date", { exact: true }).fill("2099-06-01"),
+    ]);
     await page.goto("/basecamp");
     const basecampCard = page.locator('a[href^="/trips/"]').filter({ hasText: updatedName });
     await expect(basecampCard).toContainText("4.5 mi");
