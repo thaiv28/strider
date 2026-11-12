@@ -50,7 +50,7 @@ for (const destination of pages) {
 
 test("the public landing page fits the phone viewport", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /Plan farther/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Plan your backpacking trip/ })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Primary navigation" })).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
 });

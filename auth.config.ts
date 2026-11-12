@@ -7,7 +7,7 @@ export default {
   secret: process.env.AUTH_SECRET ?? process.env.SESSION_SECRET,
   trustHost: true,
   providers: [Google],
-  pages: { signIn: "/login" },
+  pages: { signIn: "/", error: "/" },
   session: { strategy: "jwt" },
   callbacks: {
     authorized({ auth, request }) {

@@ -70,10 +70,10 @@ const BASELINE = {
   },
   "components/trip/options-menu.tsx": { why: "Light map control over map tiles.", "color-literal": 1, "palette-class": 1 },
   "components/settings/calendar-feeds.tsx": { why: "Default color for a user-chosen calendar feed color.", "color-literal": 2 },
-  "app/login/page.tsx": {
-    why: "Google's required sign-in button styling and logo; error text predates tokens.",
+  "components/landing/landing-page.tsx": {
+    why: "Google's required sign-in button styling and logo.",
     "color-literal": 7,
-    "palette-class": 3,
+    "palette-class": 1,
     font: 1,
   },
   "components/shell.tsx": { why: "Active desktop nav label predates the headerink token.", "palette-class": 1 },

@@ -1,6 +1,6 @@
 # Strider current state
 
-Last reviewed: 2026-11-09.
+Last reviewed: 2026-11-12.
 
 ## Deployed baseline
 
@@ -59,8 +59,10 @@ developer's local GitHub CLI session—is the durable publication path.
 - Calendar feeds and configurable report/energy settings.
 - Light/Dark/System appearance setting, defaulting to light and saved per device.
 - Mobile navigation and responsive coverage at 360, 390, 430 and 720 CSS pixels.
-- Public, responsive Strider landing page at `/`; the authenticated dashboard is
-  available at `/basecamp`.
+- Public landing page at `/` is the sign-in surface (Google button, E2E test
+  form at `/?test=1`), showing a static sample trip with Route/Gear/Food views.
+  `/login` only redirects to `/`; protected pages and edit links redirect to
+  `/?callbackUrl=…`. The authenticated dashboard is available at `/basecamp`.
 - Verified Google accounts can create isolated Strider workspaces. The configured
   owner email claims the legacy user row in place, preserving every existing id.
 - Ownership guards cover private gear, food, loadout, calendar, and print data;

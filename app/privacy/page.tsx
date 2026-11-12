@@ -51,7 +51,7 @@ export default function PrivacyPage() {
         <ContourBand />
         <div className="relative mx-auto flex max-w-4xl items-center justify-between px-5 py-5 sm:px-8">
           <Link href="/" className="font-display text-[22px] font-bold">Strider</Link>
-          <Link href="/login" className="inline-flex min-h-11 items-center rounded-xl bg-headerink px-4 text-sm font-semibold text-headeractionink hover:opacity-90">Log in</Link>
+          <Link href="/" className="inline-flex min-h-11 items-center rounded-xl bg-headerink px-4 text-sm font-semibold text-headeractionink hover:opacity-90">Log in</Link>
         </div>
         <div className="relative mx-auto max-w-4xl px-5 pb-12 pt-5 sm:px-8"><p className="mb-2 text-sm text-headermuted">Legal</p><h1 className="font-display text-4xl font-bold">Privacy Policy</h1></div>
       </header>
