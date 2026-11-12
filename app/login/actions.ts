@@ -20,5 +20,5 @@ export async function loginForE2e(formData: FormData) {
 }
 
 export async function logout() {
-  await signOut({ redirectTo: "/login" });
+  await signOut({ redirectTo: "/" });
 }

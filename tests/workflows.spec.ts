@@ -57,13 +57,13 @@ test("protected pages redirect to sign in", async ({ browser }) => {
   const context = await browser.newContext();
   const page = await context.newPage();
   await page.goto(`${baseURL}/`);
-  await expect(page.getByRole("heading", { name: /Plan farther/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Plan your backpacking trip/ })).toBeVisible();
   await expect(page).toHaveURL(`${baseURL}/`);
   await page.goto(`${baseURL}/privacy`);
   await expect(page.getByRole("heading", { name: "Privacy Policy", exact: true })).toBeVisible();
   await page.goto(`${baseURL}/trips`);
-  await expect.poll(() => new URL(page.url()).pathname).toBe("/login");
-  await expect(page.getByRole("heading", { name: "Strider", exact: true })).toBeVisible();
+  await expect.poll(() => new URL(page.url()).pathname).toBe("/");
+  await expect(page.getByRole("button", { name: "Sign in with Google", exact: true })).toBeVisible();
   await context.close();
 });
 
@@ -130,7 +130,7 @@ test("view and edit links grant distinct, revocable access", async ({ browser })
     expect(editLink).not.toBe(viewLink);
 
     await guestPage.goto(editLink!);
-    await expect(guestPage).toHaveURL(/\/login\?callbackUrl=/);
+    await expect(guestPage).toHaveURL(/\/\?callbackUrl=/);
     await guestPage.goto(viewLink!);
     await expect(guestPage.getByTestId("shared-trip")).toBeVisible();
     await expect(guestPage.getByRole("link", { name: "Strider", exact: true })).toBeVisible();

@@ -50,7 +50,7 @@ export default async function SharedTripPage({ params }: { params: Promise<{ tok
   const session = await auth();
   const visitorId = Number(session?.user?.id);
   if (shared.editToken === token) {
-    if (!visitorId) redirect(`/login?callbackUrl=${encodeURIComponent(`/share/trips/${token}`)}`);
+    if (!visitorId) redirect(`/?callbackUrl=${encodeURIComponent(`/share/trips/${token}`)}`);
     if (visitorId !== shared.userId) {
       await db.insert(schema.tripShareVisit).values({ tripId: shared.id, userId: visitorId, permission: "edit" })
         .onConflictDoNothing();

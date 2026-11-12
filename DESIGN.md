@@ -55,7 +55,7 @@ utilities (`bg-panel`, `text-muted`, `border-fieldborder`). Never use hex,
 | Warm emphasis | `signal` | Sparing: inline text actions ("All trips", "Add day"), "Next up", conflicts, savings, destructive actions |
 | Route | `route` | The route line and route-specific highlights only |
 | Weight classes | `cbase`, `ccons`, `cworn` | Base, consumable and worn weight only, via `Badge` tones and weight bars |
-| Header band | `header*` tokens | Inside `PageHeader`, the app shell header and the phone trip header only |
+| Header band | `header*` tokens | Inside `PageHeader`, the app shell header, the phone trip header and the landing band; `header-alert` is error text on the header band (e.g. the landing sign-in error) |
 | Map | `map`, `contour`, `lake`, `elevation` | Map placeholders, contour art, the elevation profile |
 
 Category colors come only from `categoryColor()` in `lib/categories.ts`.

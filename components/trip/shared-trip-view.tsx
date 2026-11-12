@@ -78,13 +78,13 @@ export function SharedTripView(props: Props) {
   return (
     <main data-testid="shared-trip" className={tripLayout.frame}>
       {!props.signedIn && <header className="relative hidden shrink-0 overflow-hidden bg-header text-headerink sm:block">
-        <ContourBand /><div className="relative mx-auto flex min-h-16 max-w-[1136px] items-center gap-6 px-6"><Link href="/" className="font-display text-[22px] font-bold">Strider</Link><span className="flex-1 text-sm text-headermuted">View-only trip plan</span><Link href="/login" className="inline-flex min-h-11 items-center rounded-xl bg-headerink px-4 text-sm font-semibold text-headeractionink hover:opacity-90">Sign in</Link></div>
+        <ContourBand /><div className="relative mx-auto flex min-h-16 max-w-[1136px] items-center gap-6 px-6"><Link href="/" className="font-display text-[22px] font-bold">Strider</Link><span className="flex-1 text-sm text-headermuted">View-only trip plan</span><Link href={`/?callbackUrl=${encodeURIComponent(`/share/trips/${props.shareToken}`)}`} className="inline-flex min-h-11 items-center rounded-xl bg-headerink px-4 text-sm font-semibold text-headeractionink hover:opacity-90">Sign in</Link></div>
       </header>}
       <header className={`${phoneView === "logistics" ? "hidden" : "block"} relative shrink-0 overflow-hidden bg-header text-headerink sm:hidden`}>
         <ContourBand /><div className="relative flex min-h-[72px] items-center gap-2 px-3">
           <Link href={props.signedIn ? "/trips?section=shared" : "/"} aria-label={props.signedIn ? "Back to Trips" : "Strider home"} className="grid h-11 w-11 shrink-0 place-items-center"><ArrowLeft size={21} /></Link>
           <div className="min-w-0 flex-1"><div className="truncate font-display text-[21px] font-bold">{trip.name}</div><div className="truncate text-xs text-headermuted">{dates} · View-only trip plan</div></div>
-          {!props.signedIn && <Link href="/login" className="inline-flex min-h-11 shrink-0 items-center rounded-xl border border-headerborder px-3 text-sm font-semibold hover:bg-headeractive">Sign in</Link>}
+          {!props.signedIn && <Link href={`/?callbackUrl=${encodeURIComponent(`/share/trips/${props.shareToken}`)}`} className="inline-flex min-h-11 shrink-0 items-center rounded-xl border border-headerborder px-3 text-sm font-semibold hover:bg-headeractive">Sign in</Link>}
         </div>
       </header>
       <TripBand name={trip.name} region={props.region} startDate={trip.startDate} nights={trip.nights} status={trip.status} distance={props.distanceMi} gain={props.elevationFt} packG={props.weights.packG} skinOutG={props.weights.skinOutG} backHref={props.signedIn ? "/trips?section=shared" : undefined} phoneVisible={phoneView === "logistics"} overlap={hasRoute} />

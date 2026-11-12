@@ -21,6 +21,7 @@
   --color-headermuted: var(--header-muted);
   --color-headeractive: var(--header-active);
   --color-headeractionink: var(--header-action-ink);
+  --color-headeralert: var(--header-alert);
   --color-route: var(--route);
   --color-signal: var(--signal);
   --color-map: var(--map);
@@ -131,9 +132,9 @@ summary {
 .landing p { max-width: 65ch; }
 .landing h1, .landing h2, .landing h3 { text-wrap: balance; }
 .landing a:focus-visible { outline: 2px solid var(--route); outline-offset: 4px; }
-.landing-header-button:hover { background: var(--header-muted); }
 .landing-contours { animation: landing-drift 18s ease-in-out infinite alternate; }
 @keyframes landing-drift { to { transform: translate3d(24px, -10px, 0); } }
+@keyframes landing-view { from { opacity: 0; transform: translateY(6px); } }
 
 /* Topo tokens. Dark overrides apply on screen so print stays light. */
 :root {
@@ -156,6 +157,7 @@ summary {
   --header-muted: #d3e0d7;
   --header-active: #2a5344;
   --header-action-ink: #17382d;
+  --header-alert: #f2a279;
   --route: #d9622b;
   --signal: #a8430f;
   --map: #e7ece0;
@@ -187,6 +189,7 @@ summary {
     --header-muted: #b8b8b8;
     --header-active: #333333;
     --header-action-ink: #141414;
+    --header-alert: #f2a279;
     --route: #f08a55;
     --signal: #f2a279;
     --map: #262626;
