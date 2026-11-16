@@ -114,11 +114,15 @@ developer's local GitHub CLI session—is the durable publication path.
 
 ## Recommended next work
 
-Milestone 2a's desktop device sign-in and `/api/v1` sync server are implemented
-on `desktop-spike` and are **not deployed**. The additive migration and
-database-backed API suite still require maintainer verification with PostgreSQL.
+The desktop sync API (`/api/v1`), device sign-in at `/desktop/authorize`, the
+Settings Devices section and migrations 0019 (sync columns, triggers, device
+tables) and 0020 (drops the legacy `trip.companions` column) ship with the Strider
+Desktop app in `desktop/` (a Rust workspace, excluded from the Docker image).
+Desktop updates are hosted at `https://strider-releases.thaiv.dev` by the
+`ThaivStriderReleases` stack in `project-platform-infrastructure`.
 
-1. Review and deploy the desktop sync API (branch `desktop-spike`).
+1. Get an Apple Developer ID so desktop builds can be signed and notarized for
+   trip partners (see `docs/adr/0006-desktop-distribution-and-updates.md`).
 2. Add an automated, isolated backup restore drill and explicit retention policy.
 3. Add safe application rollback around container replacement and document the
    migration compatibility window it requires.
