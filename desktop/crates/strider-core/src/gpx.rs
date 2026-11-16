@@ -115,6 +115,11 @@ pub fn parse_gpx(xml: &str) -> Option<ParsedGpx> {
             .map(|c| c[1].parse::<f64>().unwrap_or(f64::NAN));
         pts.push((lat, lon, ele));
     }
+    route_stats(&pts)
+}
+/// The stats and 800-point downsampling shared by every route source (GPX, FIT): `(lat, lon,
+/// elevation in metres)` in track order. `None` below two points.
+pub fn route_stats(pts: &[(f64, f64, Option<f64>)]) -> Option<ParsedGpx> {
     if pts.len() < 2 {
         return None;
     }

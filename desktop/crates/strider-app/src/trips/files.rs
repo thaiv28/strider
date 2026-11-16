@@ -36,8 +36,10 @@ impl AppView {
         {
             return;
         }
-        if !["gpx", "json", "pdf", "png", "jpg", "jpeg", "webp"].contains(&extension.as_str()) {
-            self.error = Some("Choose a GPX, JSON, PDF or image file.".into());
+        if !["gpx", "fit", "json", "pdf", "png", "jpg", "jpeg", "webp"]
+            .contains(&extension.as_str())
+        {
+            self.error = Some("Choose a GPX, FIT, JSON, PDF or image file.".into());
             cx.notify();
             return;
         }
@@ -48,6 +50,16 @@ impl AppView {
             .and_then(|s| s.to_str())
             .unwrap_or("document")
             .to_owned();
+        // A FIT route is converted to GPX and attached through the GPX path.
+        let is_fit = extension == "fit";
+        let filename = if is_fit {
+            Path::new(&filename)
+                .with_extension("gpx")
+                .to_string_lossy()
+                .into_owned()
+        } else {
+            filename
+        };
         let task = cx.background_executor().spawn(async move {
             use std::io::Read;
             let file = std::fs::File::open(path)?;
@@ -55,6 +67,11 @@ impl AppView {
             file.take(15 * 1024 * 1024 + 1).read_to_end(&mut bytes)?;
             if bytes.len() > 15 * 1024 * 1024 {
                 return Err(std::io::Error::other("File exceeds 15 MB."));
+            }
+            if is_fit {
+                return strider_devices::fit::fit_to_gpx(&bytes)
+                    .map(String::into_bytes)
+                    .map_err(std::io::Error::other);
             }
             Ok(bytes)
         });
@@ -70,7 +87,7 @@ impl AppView {
                         });
                     }
                     let trip = trip.ok_or("Open a trip first.")?;
-                    if extension == "gpx" {
+                    if extension == "gpx" || is_fit {
                         return Ok(Command::AttachGpx {
                             trip,
                             filename,
@@ -116,13 +133,18 @@ impl AppView {
         })
         .detach();
     }
-    pub(in crate::app) fn export_trip_gpx(&mut self, cx: &mut Context<Self>) {
-        let Some(d) = &self.trips.detail else { return };
+    /// The open Trip as a GPX file name and document, as Export GPX and Send to GPS write it.
+    pub(in crate::app) fn trip_gpx(&self) -> Option<(String, String)> {
+        let d = self.trips.detail.as_ref()?;
         let name = text(&d.fields, "name");
         let points: Vec<ExportPoint> = d.points.iter().map(ExportPoint::from).collect();
         let camps: Vec<_> = camps(d).into_iter().map(|(_, c)| c).collect();
-        let xml = build_gpx(&name, &points, &camps);
-        let filename = gpx_filename(&name);
+        Some((gpx_filename(&name), build_gpx(&name, &points, &camps)))
+    }
+    pub(in crate::app) fn export_trip_gpx(&mut self, cx: &mut Context<Self>) {
+        let Some((filename, xml)) = self.trip_gpx() else {
+            return;
+        };
         let receiver = cx.prompt_for_new_path(self.store.borrow().data_dir(), Some(&filename));
         cx.spawn(async move |this, cx| match receiver.await {
             Ok(Ok(Some(path))) => {

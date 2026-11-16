@@ -328,7 +328,16 @@ impl AppView {
         let editable = d.access != "view";
         let trip = text(&d.fields, "sync_id");
         let mut route = strider_ui::card(t).flex().flex_col();
-        let mut options = vec![("Attach GPX / permit", "attach"), ("Export GPX", "export")];
+        let mut options = vec![("Attach GPX", "attach"), ("Export GPX", "export")];
+        let sends: Vec<(String, String)> = if d.points.is_empty() {
+            vec![]
+        } else {
+            self.devices
+                .volumes()
+                .iter()
+                .map(|v| (format!("send:{}", v.name), format!("Send to {}", v.name)))
+                .collect()
+        };
         if !d.points.is_empty() {
             options.push(("Download map for offline", "download"));
         }
@@ -367,6 +376,7 @@ impl AppView {
                             .into_iter()
                             .filter(|(_, key)| editable || matches!(*key, "export" | "download"))
                             .map(|(l, k)| (k.into(), l.into()))
+                            .chain(sends)
                             .collect(),
                         cx,
                         |this, key, _, cx| {
@@ -374,7 +384,8 @@ impl AppView {
                                 return;
                             };
                             match key.as_str() {
-                                "attach" => this.pick_trip_file(cx),
+                                "attach" => this.open_attach_sheet(cx),
+                                k if k.starts_with("send:") => this.send_trip_gpx(&k[5..], cx),
                                 "export" => this.export_trip_gpx(cx),
                                 "download" => this.open_map_sheet(cx),
                                 "reverse" => this.command(Command::ReverseGpx { trip }, cx),

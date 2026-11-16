@@ -166,6 +166,7 @@ impl AppView {
                 } => self.finish_share(kind, action, result, cx),
             }
         }
+        notify |= self.poll_devices();
         if let Some((_, at)) = &self.toast
             && at.elapsed() > Duration::from_secs(6)
         {

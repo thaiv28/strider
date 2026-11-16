@@ -24,7 +24,9 @@ strider-map = { path = "../strider-map" }
 strider-print = { path = "../strider-print" }
 strider-services = { path = "../strider-services" }
 strider-update = { path = "../strider-update" }
+strider-devices = { path = "../strider-devices" }
 chrono.workspace = true
 
 [dev-dependencies]
+strider-devices = { path = "../strider-devices", features = ["test-support"] }
 gpui = { workspace = true, features = ["test-support"] }

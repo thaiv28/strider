@@ -6310,6 +6310,7 @@ dependencies = [
  "rusqlite",
  "serde_json",
  "strider-core",
+ "strider-devices",
  "strider-map",
  "strider-print",
  "strider-services",
@@ -6334,6 +6335,9 @@ version = "0.1.0"
 dependencies = [
  "fitparser",
  "notify",
+ "serde",
+ "serde_json",
+ "strider-core",
 ]
 
 [[package]]

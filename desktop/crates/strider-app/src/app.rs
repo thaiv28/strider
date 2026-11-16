@@ -2,6 +2,8 @@
 mod account;
 #[path = "calendar.rs"]
 mod calendar;
+#[path = "devices.rs"]
+mod devices;
 #[path = "food/mod.rs"]
 mod food;
 #[path = "gear/mod.rs"]
@@ -137,6 +139,7 @@ pub(crate) struct AppView {
     food: FoodState,
     trips: trips::TripsState,
     offline: offline::OfflineState,
+    devices: devices::DevicesState,
     panels: Option<panels::PanelData>,
     share: share::ShareState,
     settings: Option<settings::SettingsState>,
@@ -180,6 +183,7 @@ impl AppView {
         });
         let focus = cx.focus_handle();
         focus.focus(window, cx);
+        let data_dir = store.borrow().data_dir().to_path_buf();
         let mut this = Self {
             entity_id: cx.entity_id(),
             store,
@@ -205,6 +209,7 @@ impl AppView {
             food: FoodState::new(window, cx),
             trips: trips::TripsState::new(cx),
             offline: offline::OfflineState::new(),
+            devices: devices::DevicesState::new(devices::DevicesState::default_root(), data_dir),
             panels: None,
             share: share::ShareState::default(),
             settings: None,
@@ -729,6 +734,7 @@ impl AppView {
             || self.trip_menu.is_some()
             || self.trips.editor.is_some()
             || self.offline.sheet
+            || self.devices.sheet
             || self.share.open
             || self.account.sheet
             || self.account.update.sheet
@@ -743,6 +749,7 @@ impl AppView {
         self.trip_menu = None;
         self.trips.editor = None;
         self.offline.sheet = false;
+        self.devices.sheet = false;
         self.share.open = false;
         self.account.sheet = false;
         self.account.update.sheet = false;
@@ -798,6 +805,8 @@ impl AppView {
             Some(self.render_trip_editor(cx))
         } else if self.offline.sheet {
             Some(self.render_map_sheet(cx))
+        } else if self.devices.sheet {
+            Some(self.render_attach_sheet(cx))
         } else if self.share.open {
             Some(self.render_share_sheet(cx))
         } else if self.account.sheet {

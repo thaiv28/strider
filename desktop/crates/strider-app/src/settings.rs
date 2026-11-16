@@ -623,7 +623,8 @@ impl AppView {
             .child(div().meta(t).child(format!(
                 "Manage signed-in devices on the web at {}/settings.",
                 self.account.server.trim_end_matches('/')
-            )));
+            )))
+            .child(self.devices_rows(cx));
         let left = div()
             .flex_1()
             .min_w(px(420.))
