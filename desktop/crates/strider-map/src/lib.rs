@@ -226,10 +226,28 @@ pub struct Fetch {
 pub trait TileFetcher: Send + Sync + 'static {
     fn fetch(&self, source: Source, tile: Tile) -> io::Result<Fetch>;
 }
-pub struct HttpFetcher;
+/// HTTPS tile fetcher. One shared `ureq::Agent` keeps connections alive and pooled, so a
+/// map session or an offline download reuses a few TLS connections instead of opening one
+/// per tile.
+pub struct HttpFetcher {
+    agent: ureq::Agent,
+}
+impl Default for HttpFetcher {
+    fn default() -> Self {
+        let agent = ureq::Agent::config_builder()
+            .timeout_global(Some(Duration::from_secs(30)))
+            .https_only(true)
+            .max_idle_connections_per_host(4)
+            .build()
+            .into();
+        Self { agent }
+    }
+}
 impl TileFetcher for HttpFetcher {
     fn fetch(&self, source: Source, tile: Tile) -> io::Result<Fetch> {
-        let mut response = ureq::get(source.url(tile))
+        let mut response = self
+            .agent
+            .get(source.url(tile))
             .header(
                 "User-Agent",
                 concat!("StriderDesktop/", env!("CARGO_PKG_VERSION")),
