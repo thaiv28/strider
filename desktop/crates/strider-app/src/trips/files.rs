@@ -208,7 +208,7 @@ impl AppView {
             strider_map::DEFAULT_DISK_CAP,
             32 * 1024 * 1024,
             4,
-            Arc::new(strider_map::HttpFetcher),
+            Arc::new(strider_map::HttpFetcher::default()),
         ) {
             Ok(cache) => {
                 self.trips.map = cx.new(|cx| RouteMap::new(Some(Arc::new(cache)), cx));

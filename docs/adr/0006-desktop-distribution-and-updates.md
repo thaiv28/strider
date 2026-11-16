@@ -40,9 +40,9 @@ pass the Team ID check.
   signed and need right-click > Open on other Macs.
 - Updates are hosted as GitHub releases (`desktop-v<version>`) built by
   `.github/workflows/desktop-release.yml`; apps read
-  `releases/latest/download/manifest.json`. Version 0.1.0 shipped with the
-  earlier AWS host (`strider-releases.thaiv.dev`) baked in, so that host keeps
-  serving a manifest that points at the newest GitHub release until 0.1.0 is gone.
+  `releases/latest/download/manifest.json`. Version 0.1.0 shipped with an
+  earlier AWS host (`strider-releases.thaiv.dev`) baked in; that host was retired
+  on 2026-11-16, so any remaining 0.1.0 install must be replaced by hand.
 - The update seed lives in the login Keychain (`dev.thaiv.strider.update-signing`)
   and the `STRIDER_UPDATE_SIGNING_KEY` repository secret.
 - Notarization and a real end-to-end update have not been exercised.

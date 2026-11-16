@@ -91,7 +91,7 @@ impl OfflineState {
             jobs_rx,
             backend: Backend {
                 http: Arc::new(strider_services::UreqClient::new()),
-                fetcher: Arc::new(HttpFetcher),
+                fetcher: Arc::new(HttpFetcher::default()),
                 tiles_root: PathBuf::new(),
                 db_path: PathBuf::new(),
             },
