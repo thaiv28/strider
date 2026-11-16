@@ -581,7 +581,7 @@ installs a strictly newer semver.
 
 | Variable | Used by | Meaning |
 | --- | --- | --- |
-| `STRIDER_UPDATE_URL` | `bundle`, `release`, `publish` | HTTPS URL of `manifest.json`, baked into the build (`StriderUpdateURL`). Default: `https://strider-releases.thaiv.dev/manifest.json`. Updates stay off in builds without `STRIDER_UPDATE_PUBKEY`. |
+| `STRIDER_UPDATE_URL` | `bundle`, `release` | HTTPS URL of `manifest.json`, baked into the build (`StriderUpdateURL`). Default: `https://github.com/thaiv28/strider/releases/latest/download/manifest.json`. Updates stay off in builds without `STRIDER_UPDATE_PUBKEY`. |
 | `STRIDER_UPDATE_PUBKEY` | `bundle`, `release` | Base64 ed25519 public key, baked in (`StriderUpdatePublicKey`). Default: `packaging/update-public-key.txt`. |
 | `STRIDER_SIGN_IDENTITY` | `sign` | Developer ID Application identity name. Unset: ad-hoc signing (`--sign -`, no timestamp) and a one-line notice. |
 | `STRIDER_NOTARY_PROFILE` | `notarize`, `release` | A `notarytool` keychain profile (`xcrun notarytool store-credentials <name>`). Unset: notarization is skipped and the missing variable is printed. |
@@ -602,21 +602,23 @@ the key baked into them.
 
 ### Cut a release
 
-```sh
-export STRIDER_SIGN_IDENTITY="Developer ID Application: <Name> (<TEAMID>)"
-export STRIDER_NOTARY_PROFILE=<profile>
-cargo xtask release
-aws sso login                           # any session that can read the stack and write its bucket
-cargo xtask publish
-```
+Releases are GitHub releases on this repository, built by
+`.github/workflows/desktop-release.yml`:
 
-Releases are hosted on AWS by the `ThaivStriderReleases` stack in
-`thaiv28/project-platform-infrastructure` (deployed only by its **Deploy Strider Releases
-Infrastructure** workflow): a private S3 bucket behind CloudFront at
-`https://strider-releases.thaiv.dev`. `publish` reads the bucket and distribution from the stack's
-outputs, uploads `Strider-<version>.zip` (immutable) before `manifest.json` (no-cache) under
-`current/`, then invalidates `/manifest.json`. The manifest URL is fixed in every build. The
-manifest is
+1. Bump `version` in `desktop/crates/strider-app/Cargo.toml` and merge it to `main`.
+2. Tag that commit `desktop-v<version>` and push the tag.
+
+The workflow checks the tag matches the version, runs `cargo test --workspace` on an Apple
+silicon runner, runs `cargo xtask release` with the `STRIDER_UPDATE_SIGNING_KEY` repository
+secret, and creates the release with `Strider-<version>.zip` and `manifest.json`, marked
+latest. Installed apps read `releases/latest/download/manifest.json`, so the newest desktop
+release must stay "latest"; mark any non-desktop release otherwise. Each manifest's `url`
+points at its own tag's zip. To build locally instead, run `cargo xtask release` (the seed is
+read from the Keychain item `dev.thaiv.strider.update-signing`).
+
+Signing with a Developer ID and notarizing will need `STRIDER_SIGN_IDENTITY` and
+`STRIDER_NOTARY_PROFILE` plus the certificate on the runner; until then releases are ad-hoc
+signed. The manifest is
 `{ version, url, sha256, size, signature, notes, minimum_os }`; `signature` is ed25519 over
 `"<version>\n<sha256>"`.
 

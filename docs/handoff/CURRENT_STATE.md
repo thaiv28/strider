@@ -118,8 +118,8 @@ The desktop sync API (`/api/v1`), device sign-in at `/desktop/authorize`, the
 Settings Devices section and migrations 0019 (sync columns, triggers, device
 tables) and 0020 (drops the legacy `trip.companions` column) ship with the Strider
 Desktop app in `desktop/` (a Rust workspace, excluded from the Docker image).
-Desktop updates are hosted at `https://strider-releases.thaiv.dev` by the
-`ThaivStriderReleases` stack in `project-platform-infrastructure`.
+Desktop releases are GitHub releases tagged `desktop-v<version>`, built by
+`.github/workflows/desktop-release.yml` when such a tag is pushed.
 
 1. Get an Apple Developer ID so desktop builds can be signed and notarized for
    trip partners (see `docs/adr/0006-desktop-distribution-and-updates.md`).
