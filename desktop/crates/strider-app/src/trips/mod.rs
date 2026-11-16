@@ -38,6 +38,10 @@ pub(super) struct TripsState {
     pub section: &'static str,
     pub route_menu: bool,
     pub minimized: bool,
+    /// Logbook filter: all, planned, idea, completed or shared.
+    pub filter: &'static str,
+    /// Shared trips seen at the last load, id to name, to notice a revoked one.
+    pub shared_known: std::collections::HashMap<String, String>,
 }
 impl TripsState {
     pub fn new(cx: &mut Context<AppView>) -> Self {
@@ -51,6 +55,8 @@ impl TripsState {
             section: "Logistics",
             route_menu: false,
             minimized: false,
+            filter: "all",
+            shared_known: Default::default(),
         }
     }
 }
@@ -96,6 +102,7 @@ impl AppView {
     }
     pub(super) fn reload_trips(&mut self, cx: &mut Context<Self>) -> strider_store::Result<()> {
         self.trips.list = self.store.trips_list()?;
+        self.notice_revoked_trips();
         self.trips.detail = self
             .trips
             .selected
@@ -103,6 +110,9 @@ impl AppView {
             .map(|id| self.store.trip_detail(id))
             .transpose()?
             .flatten();
+        if self.trips.selected.is_some() && self.trips.detail.is_none() {
+            self.trips.selected = None;
+        }
         if let Some(d) = &self.trips.detail {
             let points = d.points.clone();
             let camps = camps(d);
@@ -121,13 +131,46 @@ impl AppView {
                 cx.notify();
             });
         }
+        self.load_regions();
+        self.load_pois();
+        self.push_pois(cx);
+        self.load_panels();
         Ok(())
+    }
+    /// A shared trip that disappears after a sync was revoked by its owner: say so.
+    fn notice_revoked_trips(&mut self) {
+        let now: std::collections::HashMap<String, String> = self
+            .all_trips()
+            .into_iter()
+            .filter(|t| t.access != "owner")
+            .map(|t| (t.sync_id, t.name))
+            .collect();
+        let gone: Vec<&String> = self
+            .trips
+            .shared_known
+            .iter()
+            .filter(|(id, _)| !now.contains_key(*id))
+            .map(|(_, name)| name)
+            .collect();
+        match gone.as_slice() {
+            [] => {}
+            [name] => {
+                let message = format!("{name} is no longer shared with you.");
+                self.toast(message);
+            }
+            many => {
+                let message = format!("{} trips are no longer shared with you.", many.len());
+                self.toast(message);
+            }
+        }
+        self.trips.shared_known = now;
     }
     pub(super) fn open_trip(&mut self, id: String, cx: &mut Context<Self>) {
         self.area = "Trips";
         self.trips.selected = Some(id);
         self.trips.section = "Logistics";
         self.trips.route_menu = false;
+        self.panels = None;
         self.reload(cx);
     }
     pub(super) fn route_click(&mut self, event: &RouteClick, cx: &mut Context<Self>) {
@@ -474,9 +517,17 @@ impl AppView {
                 .when(d.access != "view", |v| {
                     v.child(
                         strider_ui::button("trip-details", "Edit trip", ButtonVariant::Header, t)
+                            .debug_selector(|| "trip-details".to_owned())
                             .on_click(cx.listener(|this, _, w, cx| {
                                 this.edit_trip(EditKind::Details, w, cx)
                             })),
+                    )
+                })
+                .when(d.access == "owner", |v| {
+                    v.child(
+                        strider_ui::button("share-trip", "Share", ButtonVariant::Header, t)
+                            .debug_selector(|| "share-trip".to_owned())
+                            .on_click(cx.listener(|this, _, _, cx| this.open_share(cx))),
                     )
                 })
                 .into_any_element();

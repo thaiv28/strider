@@ -21,6 +21,8 @@ gpui_platform.workspace = true
 rusqlite.workspace = true
 serde_json.workspace = true
 strider-map = { path = "../strider-map" }
+strider-services = { path = "../strider-services" }
+chrono.workspace = true
 
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }

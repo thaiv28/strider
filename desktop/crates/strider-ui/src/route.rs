@@ -18,6 +18,8 @@ pub struct RouteMap {
     pub points: Vec<RoutePoint>,
     pub camps: Vec<(String, ExportCampsite)>,
     pub editable: bool,
+    /// Campsite points of interest (`lat`, `lon`, name) drawn under the trip's own markers.
+    pub pois: Vec<(f64, f64, Option<String>)>,
     pub viewport: Viewport,
     pub source: Source,
     cache: Option<Arc<TileCache>>,
@@ -63,6 +65,7 @@ impl RouteMap {
             points: vec![],
             camps: vec![],
             editable: true,
+            pois: vec![],
             viewport: Viewport::default(),
             source: Source::Topo,
             cache,
@@ -223,6 +226,20 @@ impl Render for RouteMap {
         .inset_0()
         .size_full();
         let mut markers = div().absolute().inset_0();
+        for (lat, lon, _) in &self.pois {
+            let p = project(*lat, *lon, zoom);
+            markers = markers.child(
+                div()
+                    .absolute()
+                    .left(px((p.x - origin.x) as f32 - 5.))
+                    .top(px((p.y - origin.y) as f32 - 5.))
+                    .size(px(10.))
+                    .rounded_full()
+                    .bg(t.muted)
+                    .border_1()
+                    .border_color(t.panel),
+            );
+        }
         let camps: Vec<_> = self.camps.iter().map(|(_, c)| c.clone()).collect();
         for group in group_by_location(&camps) {
             let first = group[0];

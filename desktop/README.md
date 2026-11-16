@@ -1,12 +1,13 @@
-# Strider Desktop — milestone 4a (offline and sharing services)
+# Strider Desktop — milestone 4b (offline and sharing screens)
 
 Native Rust/GPUI Gear and Food areas on a local SQLite workspace.
 Gear includes inventory, kits, loadouts, category management and wishlist projections.
 Food includes Meals, Ingredients, measured recipe lines and bundled USDA search.
 Device sign-in and background push/pull synchronization use the versioned `/api/v1`
 server API. Settings contains Account controls. Trips, Basecamp and the Trip page are
-implemented (below); Calendar remains a navigation placeholder; packaged-product
-lookup is not implemented.
+implemented (below), as are the offline map download, sync status with conflicts,
+Shared with me, the share menu, the weather and snow panels, Calendar and the full
+Settings area; packaged-product lookup is not implemented.
 
 Run from `desktop/` so rustup selects the pinned toolchain:
 

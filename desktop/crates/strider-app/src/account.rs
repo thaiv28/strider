@@ -10,15 +10,15 @@ use strider_sync::{
 };
 #[derive(Default)]
 pub(super) struct AccountState {
-    path: PathBuf,
-    server: String,
-    client: Option<Client>,
+    pub path: PathBuf,
+    pub server: String,
+    pub client: Option<Client>,
     email: Option<String>,
-    handle: Option<SyncHandle>,
+    pub handle: Option<SyncHandle>,
     events: Option<Receiver<SyncEvent>>,
     auth: Option<Receiver<AuthResult>>,
     busy: bool,
-    offline: bool,
+    pub offline: bool,
     message: Option<String>,
     pub sheet: bool,
 }
@@ -38,6 +38,7 @@ impl AppView {
         server: String,
         cx: &mut Context<Self>,
     ) {
+        self.offline.backend.db_path = path.clone();
         self.account.path = path;
         self.account.server = server;
         match Keychain.load(&self.account.server) {
@@ -58,7 +59,13 @@ impl AppView {
                 cx.background_executor()
                     .timer(Duration::from_millis(200))
                     .await;
-                if this.update(cx, |this, cx| this.poll_sync(cx)).is_err() {
+                if this
+                    .update(cx, |this, cx| {
+                        this.poll_sync(cx);
+                        this.poll_jobs(cx);
+                    })
+                    .is_err()
+                {
                     break;
                 }
             }
@@ -215,7 +222,7 @@ impl AppView {
             None
         }
     }
-    pub(super) fn render_account(&self, cx: &Context<Self>) -> AnyElement {
+    pub(super) fn account_card(&self, cx: &Context<Self>) -> Div {
         let t = Theme::get(cx);
         let mut card = strider_ui::card(t)
             .p_4()
@@ -274,7 +281,13 @@ impl AppView {
         if let Some(message) = &self.account.message {
             card = card.child(div().meta(t).child(message.clone()));
         }
-        strider_ui::page_body(vec![card.into_any_element()], t).into_any_element()
+        card
+    }
+    pub(super) fn dismiss_conflict(&mut self, id: i64, cx: &mut Context<Self>) {
+        if let Err(e) = self.store.dismiss_conflict(id) {
+            self.error = Some(e.to_string());
+        }
+        cx.notify();
     }
     pub(super) fn render_sync_sheet(&self, cx: &Context<Self>) -> AnyElement {
         let t = Theme::get(cx);
@@ -284,60 +297,147 @@ impl AppView {
             .state("last_sync")
             .ok()
             .flatten()
-            .and_then(|v| v.parse::<u64>().ok())
-            .and_then(|s| std::time::SystemTime::UNIX_EPOCH.checked_add(Duration::from_secs(s)))
-            .and_then(|t| t.elapsed().ok());
+            .and_then(|v| v.parse::<i64>().ok());
         let mut content = div()
             .flex()
             .flex_col()
             .gap_3()
-            .child(format!("{pending} changes waiting"))
+            .child(if pending == 1 {
+                "1 change waiting".to_owned()
+            } else {
+                format!("{pending} changes waiting")
+            })
             .child(
                 div().meta(t).child(
-                    last.map(|d| format!("Last synced {} minutes ago", d.as_secs() / 60))
+                    last.map(|at| format!("Last synced {}", offline::format::age(self.now(), at)))
                         .unwrap_or_else(|| "Not synced yet".into()),
                 ),
             );
+        if self.offline() {
+            content = content.child(
+                div()
+                    .meta(t)
+                    .child("Offline. Changes sync when you reconnect."),
+            );
+        }
         if let Some(message) = &self.account.message {
             content = content.child(div().meta(t).child(message.clone()));
         }
-        match self.store.sync_details() {
-            Ok(details) => {
-                for (i, (label, text)) in details.into_iter().enumerate() {
-                    let copy = text.clone();
+        match self.store.conflicts() {
+            Ok(conflicts) => {
+                for c in conflicts {
+                    let copy = c.text.clone();
+                    let id = c.id;
                     content = content.child(
                         div()
+                            .id(("conflict", c.id as usize))
                             .flex()
                             .flex_col()
                             .gap_2()
-                            .child(div().meta(t).child(if label == "rejected" {
-                                "Rejected change"
-                            } else {
-                                "Replaced text"
-                            }))
-                            .child(text)
-                            .when(label != "rejected", |d| {
-                                d.child(
-                                    strider_ui::button(
-                                        ("copy-conflict", i),
-                                        "Copy",
-                                        ButtonVariant::Ghost,
-                                        t,
+                            .child(div().meta(t).child(format!("Replaced text · {}", c.field)))
+                            .child(c.text)
+                            .child(
+                                div()
+                                    .flex()
+                                    .gap_2()
+                                    .child(
+                                        strider_ui::button(
+                                            ("copy-conflict", id as usize),
+                                            "Copy",
+                                            ButtonVariant::Ghost,
+                                            t,
+                                        )
+                                        .on_click(
+                                            move |_, _, cx| {
+                                                cx.write_to_clipboard(ClipboardItem::new_string(
+                                                    copy.clone(),
+                                                ))
+                                            },
+                                        ),
                                     )
-                                    .on_click(
-                                        move |_, _, cx| {
-                                            cx.write_to_clipboard(ClipboardItem::new_string(
-                                                copy.clone(),
-                                            ))
-                                        },
+                                    .child(
+                                        strider_ui::button(
+                                            ("dismiss-conflict", id as usize),
+                                            "Dismiss",
+                                            ButtonVariant::Ghost,
+                                            t,
+                                        )
+                                        .on_click(
+                                            cx.listener(move |this, _, _, cx| {
+                                                this.dismiss_conflict(id, cx)
+                                            }),
+                                        ),
                                     ),
-                                )
-                            }),
+                            ),
                     );
                 }
             }
             Err(e) => content = content.child(e.to_string()),
         }
+        match self.store.rejections() {
+            Ok(rejected) => {
+                for r in rejected {
+                    content = content.child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_1()
+                            .child(div().meta(t).child("Rejected change"))
+                            .child(r),
+                    );
+                }
+            }
+            Err(e) => content = content.child(e.to_string()),
+        }
+        content = content.child(
+            strider_ui::button("sync-now-sheet", "Sync now", ButtonVariant::Outline, t)
+                .when(self.account.handle.is_none(), |b| b.opacity(0.5))
+                .on_click(cx.listener(|this, _, _, cx| {
+                    if let Some(h) = &this.account.handle {
+                        h.now();
+                    }
+                    cx.notify();
+                })),
+        );
         self.modal("Sync", content.into_any_element(), cx)
+    }
+}
+#[cfg(test)]
+mod tests {
+    use crate::app::test_support::{headless, with_view};
+    use gpui::TestAppContext;
+
+    #[gpui::test]
+    fn a_conflict_appears_in_the_sync_sheet_and_can_be_dismissed(cx: &mut TestAppContext) {
+        let (view, mut cx) = headless(cx);
+        cx.run_until_parked();
+        let id = with_view(&view, &mut cx, |g, _, cx| {
+            g.store
+                .connection()
+                .execute_batch(
+                    "INSERT INTO conflict(tbl,sync_id,col,local_value,server_value) VALUES('trip','t','planning_notes','mine','their longer text');
+                     INSERT INTO sync_log(kind,detail) VALUES('rejected','batch 7: stale');",
+                )
+                .expect("conflict");
+            g.account.sheet = true;
+            cx.notify();
+            let conflicts = g.store.conflicts().expect("conflicts");
+            assert_eq!(conflicts.len(), 1);
+            assert_eq!(conflicts[0].text, "their longer text");
+            assert_eq!(g.store.rejections().expect("rejections").len(), 1);
+            conflicts[0].id
+        });
+        cx.run_until_parked(); // renders the sheet with Copy, Dismiss and Sync now
+        with_view(&view, &mut cx, |g, w, cx| {
+            assert!(g.render_overlay(w, cx).is_some());
+            g.dismiss_conflict(id, cx);
+            assert!(g.store.conflicts().expect("conflicts").is_empty());
+            assert_eq!(
+                g.store.rejections().expect("rejections").len(),
+                1,
+                "rejections stay listed"
+            );
+        });
+        cx.run_until_parked();
     }
 }

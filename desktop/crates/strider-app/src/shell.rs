@@ -75,6 +75,7 @@ impl AppView {
                 .on_click(cx.listener(|this, _, w, cx| this.add_gear(w, cx)))
                 .into_any_element(),
             "Trips" | "Basecamp" => self.trip_header_actions(cx),
+            "Calendar" => self.calendar_header_actions(cx),
             "Food" => strider_ui::button(
                 "add-food",
                 if self.food.pantry {
@@ -171,6 +172,14 @@ impl AppView {
                         fmt_weight(Some(strider_core::units::Grams(d.weights.pack as i32))),
                         fmt_weight(Some(strider_core::units::Grams(d.weights.skin_out as i32)))
                     ))
+                    .into_any_element(),
+            )
+        } else if self.area == "Calendar" {
+            (
+                self.area.to_owned(),
+                div()
+                    .text_color(t.header_muted)
+                    .child(self.calendar_label())
                     .into_any_element(),
             )
         } else {

@@ -206,7 +206,9 @@ pub fn fetch_snow_depths(
     fetch_snow_depths_with(store, http, clock, queries, RETRY_DELAY)
 }
 
-pub(crate) fn fetch_snow_depths_with(
+/// [`fetch_snow_depths`] with the pause before the single retry of a failed request. Passing
+/// `Duration::ZERO` makes a cache-only read (with a client that always fails) return at once.
+pub fn fetch_snow_depths_with(
     store: &Store,
     http: &dyn HttpClient,
     clock: &dyn Clock,

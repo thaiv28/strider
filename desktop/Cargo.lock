@@ -6303,6 +6303,7 @@ dependencies = [
 name = "strider-app"
 version = "0.0.0"
 dependencies = [
+ "chrono",
  "gpui-component",
  "gpui-pre",
  "gpui-pre-platform",
@@ -6310,6 +6311,7 @@ dependencies = [
  "serde_json",
  "strider-core",
  "strider-map",
+ "strider-services",
  "strider-store",
  "strider-sync",
  "strider-ui",

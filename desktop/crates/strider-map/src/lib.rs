@@ -500,6 +500,34 @@ fn evict(root: &Path, cap: u64) -> io::Result<()> {
     }
     Ok(())
 }
+/// Total bytes of tile files under a tile root (pinned and unpinned); zero when it does not exist.
+pub fn disk_usage(root: &Path) -> u64 {
+    fn walk(path: &Path) -> u64 {
+        let Ok(entries) = fs::read_dir(path) else {
+            return 0;
+        };
+        entries
+            .flatten()
+            .map(|e| match e.file_type() {
+                Ok(t) if t.is_dir() => walk(&e.path()),
+                Ok(_) if e.path().extension().is_none() => {
+                    e.metadata().map(|m| m.len()).unwrap_or(0)
+                }
+                _ => 0,
+            })
+            .sum()
+    }
+    walk(root)
+}
+/// Delete every cached tile no offline region pins. Returns the bytes freed.
+pub fn clear_unpinned(root: &Path) -> io::Result<u64> {
+    if !root.exists() {
+        return Ok(0);
+    }
+    let before = disk_usage(root);
+    evict(root, 0)?;
+    Ok(before.saturating_sub(disk_usage(root)))
+}
 #[cfg(test)]
 mod tests {
     use super::*;

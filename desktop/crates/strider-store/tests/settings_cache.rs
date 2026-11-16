@@ -290,3 +290,24 @@ fn trip_track_reads_the_gpx_route() {
         vec![[40.0, -105.0], [40.5, -105.5]]
     );
 }
+#[test]
+fn conflicts_can_be_dismissed_and_rejections_listed() {
+    let s = Store::in_memory().unwrap();
+    s.connection()
+        .execute_batch(
+            "INSERT INTO conflict(tbl,sync_id,col,local_value,server_value) VALUES('trip','a','planning_notes','mine','theirs');
+             INSERT INTO conflict(tbl,sync_id,col,local_value,server_value) VALUES('trip','b','permit_notes','x',NULL);
+             INSERT INTO sync_log(kind,detail) VALUES('rejected','batch: invalid');
+             INSERT INTO sync_log(kind,detail) VALUES('other','ignored');",
+        )
+        .unwrap();
+    let list = s.conflicts().unwrap();
+    assert_eq!(list.len(), 2);
+    assert_eq!(list[1].field, "trip.planning_notes");
+    assert_eq!(list[1].text, "theirs");
+    s.dismiss_conflict(list[1].id).unwrap();
+    assert_eq!(s.conflicts().unwrap().len(), 1);
+    let rejected = s.rejections().unwrap();
+    assert_eq!(rejected.len(), 1);
+    assert!(rejected[0].ends_with("batch: invalid"));
+}

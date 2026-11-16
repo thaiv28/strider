@@ -1,9 +1,19 @@
 #[path = "account.rs"]
 mod account;
+#[path = "calendar.rs"]
+mod calendar;
 #[path = "food/mod.rs"]
 mod food;
 #[path = "gear/mod.rs"]
 mod gear;
+#[path = "offline/mod.rs"]
+mod offline;
+#[path = "panels.rs"]
+mod panels;
+#[path = "settings.rs"]
+mod settings;
+#[path = "share.rs"]
+mod share;
 #[path = "shell.rs"]
 mod shell;
 #[path = "trips/mod.rs"]
@@ -113,6 +123,13 @@ pub(crate) struct AppView {
     manager: Option<Manager>,
     food: FoodState,
     trips: trips::TripsState,
+    offline: offline::OfflineState,
+    panels: Option<panels::PanelData>,
+    share: share::ShareState,
+    settings: Option<settings::SettingsState>,
+    cal: calendar::CalendarState,
+    /// A short notice that clears itself.
+    toast: Option<(String, Instant)>,
     pending_navigation: Option<Navigation>,
     wishlist: bool,
     wishlist_query: Entity<InputState>,
@@ -162,6 +179,12 @@ impl AppView {
             manager: None,
             food: FoodState::new(window, cx),
             trips: trips::TripsState::new(cx),
+            offline: offline::OfflineState::new(),
+            panels: None,
+            share: share::ShareState::default(),
+            settings: None,
+            cal: calendar::CalendarState::new(),
+            toast: None,
             pending_navigation: None,
             wishlist: false,
             wishlist_query: input("", false, window, cx),
@@ -347,7 +370,8 @@ impl Render for AppView {
                 }
             }
             "Food" => self.render_food(_window, cx),
-            "Settings" => self.render_account(cx),
+            "Settings" => self.render_settings(_window, cx),
+            "Calendar" => self.render_calendar(cx),
             "Trips" | "Basecamp" => self.render_trips(_window, cx),
             _ => strider_ui::page_body(
                 vec![
@@ -445,6 +469,30 @@ impl Render for AppView {
                     }),
             )
             .children(overlay)
+            .when_some(self.toast.clone(), |d, (message, _)| {
+                d.child(
+                    div()
+                        .absolute()
+                        .bottom_6()
+                        .left_0()
+                        .right_0()
+                        .flex()
+                        .justify_center()
+                        .child(
+                            strider_ui::card(t)
+                                .id("toast")
+                                .px_4()
+                                .py_3()
+                                .shadow_md()
+                                .cursor_pointer()
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.toast = None;
+                                    cx.notify();
+                                }))
+                                .child(message),
+                        ),
+                )
+            })
     }
 }
 pub(crate) fn menus(cx: &mut App) {
@@ -631,6 +679,8 @@ impl AppView {
     }
     fn overlay_open(&self) -> bool {
         self.trips.editor.is_some()
+            || self.offline.sheet
+            || self.share.open
             || self.account.sheet
             || self.pending_navigation.is_some()
             || self.editor.is_some()
@@ -640,6 +690,8 @@ impl AppView {
     }
     fn close_overlays(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.trips.editor = None;
+        self.offline.sheet = false;
+        self.share.open = false;
         self.account.sheet = false;
         self.pending_navigation = None;
         self.editor = None;
@@ -689,6 +741,10 @@ impl AppView {
     fn render_overlay(&self, window: &mut Window, cx: &Context<Self>) -> Option<AnyElement> {
         if self.trips.editor.is_some() {
             Some(self.render_trip_editor(cx))
+        } else if self.offline.sheet {
+            Some(self.render_map_sheet(cx))
+        } else if self.share.open {
+            Some(self.render_share_sheet(cx))
         } else if self.account.sheet {
             Some(self.render_sync_sheet(cx))
         } else if self.pending_navigation.is_some() {
@@ -825,6 +881,9 @@ pub(crate) fn launch(store: Store, path: std::path::PathBuf, server: String) {
     });
 }
 
+#[cfg(test)]
+#[path = "test_support.rs"]
+mod test_support;
 #[cfg(test)]
 #[path = "workflow_tests.rs"]
 mod workflow_tests;

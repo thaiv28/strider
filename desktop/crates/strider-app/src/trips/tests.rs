@@ -161,3 +161,142 @@ fn view_only_flow(cx: &mut TestAppContext) {
     });
     cx.run_until_parked(); // renders the read-only page
 }
+fn set_access(view: &Entity<AppView>, id: &str, access: &str, cx: &mut VisualTestContext) {
+    cx.update(|_, cx| {
+        view.update(cx, |g, cx| {
+            g.store
+                .connection()
+                .execute(
+                    "UPDATE trip SET access=?1, trip_report='private' WHERE sync_id=?2",
+                    [access, id],
+                )
+                .expect("access");
+            g.reload(cx);
+        })
+    });
+    cx.run_until_parked();
+}
+fn has(cx: &mut VisualTestContext, selector: &'static str) -> bool {
+    cx.debug_bounds(selector).is_some()
+}
+#[gpui::test]
+fn shared_view_and_edit_trips_hide_what_their_permission_forbids(cx: &mut TestAppContext) {
+    let (view, mut cx) = headless(cx);
+    cx.run_until_parked();
+    let id = open_new_trip(&view, &mut cx);
+    cx.update(|_, cx| {
+        view.update(cx, |g, cx| {
+            g.trips.section = "Report";
+            cx.notify();
+        })
+    });
+    cx.run_until_parked();
+    // The owner sees everything.
+    assert!(has(&mut cx, "share-trip"), "owner share");
+    assert!(has(&mut cx, "trip-details"), "owner edit");
+    assert!(has(&mut cx, "note-trip_report"), "owner notes");
+    view.read_with(&cx, |g, _| assert!(g.is_owner()));
+
+    // Edit access: full editing, but no sharing, private report notes, or deleting.
+    set_access(&view, &id, "edit", &mut cx);
+    assert!(
+        has(&mut cx, "trip-details"),
+        "collaborators can edit the trip"
+    );
+    assert!(!has(&mut cx, "share-trip"), "sharing is the owner's");
+    assert!(
+        !has(&mut cx, "note-trip_report"),
+        "private notes are the owner's"
+    );
+    cx.update(|w, cx| {
+        view.update(cx, |g, cx| {
+            assert!(!g.is_owner() && !g.can_share());
+            g.open_share(cx);
+            assert!(
+                !g.share.open,
+                "the share menu does not open for a collaborator"
+            );
+            g.edit_trip(EditKind::Details, w, cx);
+            assert!(g.trips.editor.is_some(), "edit access edits");
+            g.trips.editor = None;
+            g.command(Command::AddTripDay { trip: id.clone() }, cx);
+            assert!(g.error.is_none(), "edit access writes");
+            assert_eq!(g.trips.detail.as_ref().expect("detail").access, "edit");
+        })
+    });
+    // Shared trips are in the Logbook's shared section, never in Mine, and never deletable.
+    cx.update(|_, cx| {
+        view.update(cx, |g, cx| {
+            g.trips.selected = None;
+            g.area = "Basecamp";
+            g.reload(cx);
+        })
+    });
+    cx.run_until_parked();
+    assert!(
+        !has(&mut cx, "trip-delete"),
+        "a collaborator cannot delete the trip"
+    );
+    cx.update(|_, cx| {
+        view.update(cx, |g, cx| {
+            g.area = "Trips";
+            g.trips.filter = "all";
+            cx.notify();
+        })
+    });
+    cx.run_until_parked();
+    assert!(!has(&mut cx, "shared-card") && !has(&mut cx, "trip-delete"));
+    cx.update(|_, cx| {
+        view.update(cx, |g, cx| {
+            g.trips.filter = "shared";
+            cx.notify();
+        })
+    });
+    cx.run_until_parked();
+    assert!(has(&mut cx, "shared-card"));
+
+    // View access: read-only.
+    set_access(&view, &id, "view", &mut cx);
+    cx.update(|w, cx| {
+        view.update(cx, |g, cx| {
+            g.open_trip(id.clone(), cx);
+            g.trips.section = "Report";
+            g.edit_trip(EditKind::Details, w, cx);
+            assert!(g.trips.editor.is_none());
+            let days = g.trips.detail.as_ref().expect("detail").days.len();
+            g.command(Command::AddTripDay { trip: id.clone() }, cx);
+            // The store refuses the write for a viewer, and nothing changed.
+            assert!(g.error.is_some());
+            assert_eq!(g.trips.detail.as_ref().expect("detail").days.len(), days);
+        })
+    });
+    cx.run_until_parked();
+    assert!(
+        !has(&mut cx, "trip-details")
+            && !has(&mut cx, "share-trip")
+            && !has(&mut cx, "note-trip_report")
+    );
+}
+#[gpui::test]
+fn a_revoked_shared_trip_disappears_with_a_toast(cx: &mut TestAppContext) {
+    let (view, mut cx) = headless(cx);
+    cx.run_until_parked();
+    let id = open_new_trip(&view, &mut cx);
+    set_access(&view, &id, "view", &mut cx);
+    cx.update(|_, cx| {
+        view.update(cx, |g, cx| {
+            g.open_trip(id.clone(), cx);
+            assert!(g.trips.detail.is_some() && g.toast.is_none());
+            // The owner revokes access: the next pull deletes the trip row.
+            g.store
+                .connection()
+                .execute("DELETE FROM trip WHERE sync_id=?1", [&id])
+                .expect("revoked");
+            g.reload(cx);
+            assert!(g.trips.selected.is_none() && g.trips.detail.is_none());
+            let (message, _) = g.toast.clone().expect("toast");
+            assert!(message.contains("no longer shared"), "{message}");
+        })
+    });
+    cx.run_until_parked();
+}

@@ -611,6 +611,41 @@ impl Store {
         details.extend(self.connection.prepare("SELECT tbl || '.' || col, COALESCE(server_value,'') FROM conflict WHERE dismissed=0 ORDER BY id DESC")?.query_map([], |r| Ok((r.get(0)?,r.get(1)?)))?.collect::<std::result::Result<Vec<_>,_>>()?);
         Ok(details)
     }
+    /// Undismissed text conflicts, newest first.
+    pub fn conflicts(&self) -> Result<Vec<ConflictRow>> {
+        let mut statement = self.connection.prepare("SELECT id, tbl || '.' || col, COALESCE(server_value,'') FROM conflict WHERE dismissed=0 ORDER BY id DESC")?;
+        let rows = statement.query_map([], |r| {
+            Ok(ConflictRow {
+                id: r.get(0)?,
+                field: r.get(1)?,
+                text: r.get(2)?,
+            })
+        })?;
+        Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
+    }
+    /// Hide a conflict from the sync sheet. The row stays for diagnostics.
+    pub fn dismiss_conflict(&self, id: i64) -> Result<()> {
+        self.connection
+            .execute("UPDATE conflict SET dismissed=1 WHERE id=?", [id])?;
+        Ok(())
+    }
+    /// Pushes the server rejected, newest first.
+    pub fn rejections(&self) -> Result<Vec<String>> {
+        let mut statement = self.connection.prepare(
+            "SELECT at || ' · ' || detail FROM sync_log WHERE kind='rejected' ORDER BY id DESC",
+        )?;
+        let rows = statement.query_map([], |r| r.get(0))?;
+        Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
+    }
+}
+/// A server-replaced long text the user may want back.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ConflictRow {
+    pub id: i64,
+    /// `table.column`.
+    pub field: String,
+    /// The replaced text.
+    pub text: String,
 }
 fn merge_buffer(buffer: Option<String>, page: &Json) -> Result<Json> {
     let mut page = page.clone();

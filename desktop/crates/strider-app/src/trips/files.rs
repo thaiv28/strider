@@ -179,6 +179,7 @@ impl AppView {
             .map(PathBuf::from)
             .map(|p| p.join("Library/Caches/Strider"))
             .unwrap_or_else(|| self.store.data_dir().join("cache"));
+        self.offline.backend.tiles_root = root.join("tiles");
         match strider_map::TileCache::new(
             root,
             strider_map::DEFAULT_DISK_CAP,

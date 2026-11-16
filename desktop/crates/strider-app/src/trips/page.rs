@@ -107,6 +107,7 @@ impl AppView {
                         ButtonVariant::Danger,
                         t,
                     )
+                    .debug_selector(|| "trip-delete".to_owned())
                     .on_click(cx.listener(move |this, _, _, cx| {
                         cx.stop_propagation();
                         this.command(
@@ -120,25 +121,123 @@ impl AppView {
             })
             .into_any_element()
     }
+    fn shared_card(&self, trip: &TripSummary, cx: &Context<Self>) -> AnyElement {
+        let t = Theme::get(cx);
+        let id = trip.sync_id.clone();
+        let edit = trip.access == "edit";
+        let when = strider_core::format::fmt_date_range(trip.start_date.as_deref(), trip.nights)
+            .unwrap_or_else(|| "No dates".into());
+        let detail = [
+            trip.region.clone(),
+            Some(when),
+            trip.route.distance_mi.map(|d| format!("{d} mi")),
+        ]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .join(" · ");
+        strider_ui::card(t)
+            .id(eid("shared", &trip.sync_id))
+            .debug_selector(|| "shared-card".to_owned())
+            .w(px(340.))
+            .p_4()
+            .flex()
+            .flex_col()
+            .gap_2()
+            .cursor_pointer()
+            .on_click(cx.listener(move |this, _, _, cx| this.open_trip(id.clone(), cx)))
+            .child(
+                div()
+                    .flex()
+                    .items_start()
+                    .justify_between()
+                    .gap_3()
+                    .child(div().card_heading().child(trip.name.clone()))
+                    .child(strider_ui::badge(
+                        if edit { "Can edit" } else { "View only" },
+                        if edit { "current" } else { "neutral" },
+                        t,
+                    )),
+            )
+            .child(div().meta(t).readout().child(detail))
+            .into_any_element()
+    }
+    /// The Logbook: your trips by status, or the trips shared with you (port of `logbook-view.tsx`).
     fn render_trip_list(&self, cx: &Context<Self>) -> AnyElement {
         let t = Theme::get(cx);
-        let mut body = div().flex().flex_col().gap_5();
+        let filter = self.trips.filter;
+        let shared: Vec<TripSummary> = self
+            .all_trips()
+            .into_iter()
+            .filter(|t| t.access != "owner")
+            .collect();
+        let chips = div().flex().flex_wrap().gap_2().children(
+            [
+                ("all", "All".to_owned()),
+                ("planned", "Planned".into()),
+                ("idea", "Ideas".into()),
+                ("completed", "Completed".into()),
+                ("shared", format!("Shared with me ({})", shared.len())),
+            ]
+            .map(|(value, label)| {
+                strider_ui::chip(value, label, filter == value, t).on_click(cx.listener(
+                    move |this, _, _, cx| {
+                        this.trips.filter = value;
+                        cx.notify();
+                    },
+                ))
+            }),
+        );
+        let mut body = div().flex().flex_col().gap_5().child(chips);
+        if filter == "shared" {
+            if shared.is_empty() {
+                body = body.child(
+                    div()
+                        .meta(t)
+                        .child("Open a trip link while signed in to find it here."),
+                );
+            }
+            body = body.child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .gap_3()
+                    .children(shared.iter().map(|trip| self.shared_card(trip, cx))),
+            );
+            return body.into_any_element();
+        }
+        let mut shown = 0;
         for (label, trips) in [
             ("In progress", &self.trips.list.in_progress),
             ("Upcoming", &self.trips.list.upcoming),
             ("Past", &self.trips.list.past),
         ] {
+            let trips: Vec<&TripSummary> = trips
+                .iter()
+                .filter(|t| t.access == "owner" && (filter == "all" || t.status == filter))
+                .collect();
             if trips.is_empty() {
                 continue;
             }
-            body=body.child(div().child(div().section_heading().mb_3().child(label)).child(strider_ui::card(t).child(div().px_4().py_3().meta(t).child("Trip                                      Date          Status      Nights    Miles    Gain ft     Base     Skin-out")).children(trips.iter().map(|trip|self.trip_row(trip,cx)))));
-        }
-        if self.all_trips().is_empty() {
+            shown += trips.len();
             body = body.child(
                 div()
-                    .meta(t)
-                    .child("No trips yet. Create a trip or import a trip JSON file."),
+                    .child(div().section_heading().mb_3().child(label))
+                    .child(
+                        strider_ui::card(t)
+                            .child(div().px_4().py_3().meta(t).child(
+                                "Trip                                      Date          Status      Nights    Miles    Gain ft     Base     Skin-out",
+                            ))
+                            .children(trips.into_iter().map(|trip| self.trip_row(trip, cx))),
+                    ),
             );
+        }
+        if shown == 0 {
+            body = body.child(div().meta(t).child(if filter == "all" {
+                "No trips yet. Create a trip or import a trip JSON file."
+            } else {
+                "No trips in this section yet."
+            }));
         }
         body.child(
             strider_ui::button("undo-trip", "Undo", ButtonVariant::Ghost, t)
@@ -220,6 +319,9 @@ impl AppView {
         let trip = text(&d.fields, "sync_id");
         let mut route = strider_ui::card(t).flex().flex_col();
         let mut options = vec![("Attach GPX / permit", "attach"), ("Export GPX", "export")];
+        if !d.points.is_empty() {
+            options.push(("Download map for offline", "download"));
+        }
         if editable {
             options.extend([
                 ("Reverse route", "reverse"),
@@ -253,7 +355,7 @@ impl AppView {
                         "Route options",
                         options
                             .into_iter()
-                            .filter(|(_, key)| editable || *key == "export")
+                            .filter(|(_, key)| editable || matches!(*key, "export" | "download"))
                             .map(|(l, k)| (k.into(), l.into()))
                             .collect(),
                         cx,
@@ -264,6 +366,7 @@ impl AppView {
                             match key.as_str() {
                                 "attach" => this.pick_trip_file(cx),
                                 "export" => this.export_trip_gpx(cx),
+                                "download" => this.open_map_sheet(cx),
                                 "reverse" => this.command(Command::ReverseGpx { trip }, cx),
                                 "remove" => this.command(Command::RemoveGpx { trip }, cx),
                                 "clear" => this.command(Command::ClearCampsites { trip }, cx),
@@ -274,9 +377,11 @@ impl AppView {
                 ),
         );
         if !self.trips.minimized {
-            route = route
-                .child(self.trips.map.clone())
-                .child(self.trips.profile.clone());
+            route = route.child(self.trips.map.clone());
+            if let Some(message) = self.map_message(d) {
+                route = route.child(div().px_4().py_2().meta(t).child(message));
+            }
+            route = route.child(self.trips.profile.clone());
         }
         if d.points.is_empty() {
             route = route.child(
@@ -287,12 +392,13 @@ impl AppView {
             );
         }
         let sections = div().flex().flex_wrap().gap_1p5().children(
-            ["Logistics", "Planning", "Gear", "Food", "Report"]
+            ["Logistics", "Planning", "Gear", "Food", "Weather", "Report"]
                 .into_iter()
                 .map(|section| {
                     strider_ui::chip(section, section, self.trips.section == section, t).on_click(
                         cx.listener(move |this, _, _, cx| {
                             this.trips.section = section;
+                            this.load_panels();
                             cx.notify();
                         }),
                     )
@@ -302,6 +408,7 @@ impl AppView {
             "Gear" => self.render_trip_gear(d, cx),
             "Food" => self.render_trip_food(d, cx),
             "Planning" => self.render_trip_planning(d, cx),
+            "Weather" => self.render_trip_weather(cx),
             "Report" => self.render_trip_report(d, cx),
             _ => self.render_trip_logistics(d, cx),
         };
@@ -354,6 +461,7 @@ impl AppView {
     ) -> AnyElement {
         let t = Theme::get(cx);
         strider_ui::card(t)
+            .debug_selector(|| format!("note-{key}"))
             .p_4()
             .child(div().card_heading().child(title))
             .child(div().py_3().child(text(&d.fields, key)))
