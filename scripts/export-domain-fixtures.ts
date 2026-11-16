@@ -5,6 +5,9 @@ import * as food from "@/lib/food";
 import { fuelPlan } from "@/lib/fuel";
 import { mifflinBmr } from "@/lib/energy";
 import { dayTargetKcal, effectiveRouteStats, computeDaySegments } from "@/lib/trip";
+import { parseGpx } from "@/lib/gpx";
+import { buildGpx, gpxFilename } from "@/lib/gpx-export";
+import { groupByLocation, isLoopTrack } from "@/lib/map-style";
 type Case = { fn: string; args: unknown[]; out: unknown };
 let seed = 0x5eed1234;
 const next = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
@@ -38,6 +41,17 @@ for (const value of [-1.5,-0.5,-0.5000000000000001,-1e-300,1e-300,0.499999999999
   add("util","ozToG",util.ozToG,[value/util.OZ_TO_G]);
 }
 for (const grams of [-100,-50,-35,-28,-1]) for (const name of ["fmtWeight","fmtOz","fmtLbs","displayOz","gToOz"] as const) add("util",name,util[name] as any,[grams]);
+// GPX: generated tracks covering trkpt/rtept, missing and noisy elevation, self-closing points and downsampling.
+const gpxDoc=(tag:string,pts:{lat:number;lon:number;ele:number|null}[],selfClose:boolean)=>`<?xml version="1.0"?><gpx><trk><trkseg>\n${pts.map(p=>selfClose&&p.ele==null?`<${tag} lat="${p.lat}" lon="${p.lon}"/>`:`<${tag} lon="${p.lon}" lat="${p.lat}">${p.ele==null?"":`<ele>${p.ele}</ele>`}<time>2024-01-01T00:00:00Z</time></${tag}>`).join("\n")}\n</trkseg></trk></gpx>`;
+for(let k=0;k<24;k++){ const n=[0,1,2,3,10,50,799,800,801,1700][k%10]; let lat=37+next(),lon=-119-next(),ele=2000+next()*1000; const pts=[] as {lat:number;lon:number;ele:number|null}[];
+  for(let i=0;i<n;i++){ lat+=(next()-.5)*.002; lon+=(next()-.5)*.002; ele+=(next()-.45)*(k%3===0?12:3); pts.push({lat:+lat.toFixed(7),lon:+lon.toFixed(7),ele:next()<(k%4===1?.3:.02)?null:+ele.toFixed(1)}); }
+  const xml=gpxDoc(k%5===2?"rtept":"trkpt",pts,k%7===3); add("gpx","parseGpx",parseGpx,[xml]);
+  const parsed=parseGpx(xml); if(parsed){ const camps=[1,2,3].slice(0,k%4).map(night=>{const p=parsed.points[Math.floor(parsed.points.length*night/4)];return {night,lat:k%6===5?null:p.lat,lon:k%6===5?null:p.lon,eleFt:night===2?null:p.e};});
+    if(k%9===4&&camps.length>1){camps[1].lat=camps[0].lat;camps[1].lon=camps[0].lon;}
+    add("gpx","buildGpx",buildGpx,[`Trip ${k} <&"x">`,parsed.points.map(p=>({lat:p.lat,lon:p.lon,e:p.e})),camps]);
+    add("gpx","isLoopTrack",isLoopTrack,[parsed.track]); } }
+add("gpx","isLoopTrack",isLoopTrack,[[[37,-119],[37.1,-119],[37.000001,-119.000001]]]); add("gpx","groupByLocation",groupByLocation,[[{lat:1,lon:2},{lat:null,lon:null},{lat:1.0000001,lon:2},{lat:3,lon:4}]]);
+for(const name of ["", " ","Sierra High Route","  Mt. Whitney / Day 1 ","---","Été à Yosemite","a_b.c-d"]) add("gpx","gpxFilename",gpxFilename,[name]);
 mkdirSync("desktop/fixtures/domain",{recursive:true});
-for(const [name,cases] of Object.entries(files)) writeFileSync(`desktop/fixtures/domain/${name}.json`,JSON.stringify(cases,null,2)+"\n");
+for(const [name,cases] of Object.entries(files)) writeFileSync(`desktop/fixtures/domain/${name}.json`,JSON.stringify(cases,null,name==="gpx"?0:2)+"\n");
 console.log(Object.entries(files).map(([name,cases])=>`${name}: ${cases.length}`).join("\n"));
