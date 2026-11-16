@@ -144,6 +144,18 @@ impl AppView {
         } else {
             div().into_any_element()
         };
-        strider_ui::page_header(self.area, actions, tabs, t)
+        let tabs = div()
+            .child(tabs)
+            .when_some(self.sync_status(), |d, status| {
+                d.child(
+                    strider_ui::button("sync-status", status, ButtonVariant::Header, t).on_click(
+                        cx.listener(|this, _, _, cx| {
+                            this.account.sheet = true;
+                            cx.notify();
+                        }),
+                    ),
+                )
+            });
+        strider_ui::page_header(self.area, actions, tabs.into_any_element(), t)
     }
 }

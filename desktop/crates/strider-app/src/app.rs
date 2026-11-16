@@ -1,3 +1,5 @@
+#[path = "account.rs"]
+mod account;
 #[path = "food/mod.rs"]
 mod food;
 #[path = "gear/mod.rs"]
@@ -86,6 +88,7 @@ pub(crate) enum Navigation {
 }
 pub(crate) struct AppView {
     store: Store,
+    account: account::AccountState,
     groups: Vec<Group>,
     totals: Totals,
     filter: GearFilter,
@@ -133,6 +136,7 @@ impl AppView {
         focus.focus(window, cx);
         let mut this = Self {
             store,
+            account: account::AccountState::default(),
             groups: Vec::new(),
             totals: Totals::default(),
             filter: GearFilter::default(),
@@ -238,7 +242,10 @@ impl AppView {
     }
     fn command(&mut self, command: Command, cx: &mut Context<Self>) {
         match self.store.apply(command) {
-            Ok(changes) => self.reload_changes(changes, cx),
+            Ok(changes) => {
+                self.nudge_sync();
+                self.reload_changes(changes, cx);
+            }
             Err(e) => {
                 self.error = Some(e.to_string());
                 cx.notify();
@@ -301,7 +308,10 @@ impl AppView {
             self.store.undo()
         };
         match result {
-            Ok(_) => self.reload(cx),
+            Ok(_) => {
+                self.nudge_sync();
+                self.reload(cx);
+            }
             Err(e) => {
                 self.error = Some(e.to_string());
                 cx.notify();
@@ -329,6 +339,7 @@ impl Render for AppView {
                 }
             }
             "Food" => self.render_food(_window, cx),
+            "Settings" => self.render_account(cx),
             _ => strider_ui::page_body(
                 vec![
                     div()
@@ -461,6 +472,17 @@ mod tests {
         let custom = parse(&["--profile", "test", "--reset"]).expect("custom profile");
         assert_eq!(custom.profile, "test");
         assert!(custom.reset);
+        assert_eq!(
+            parse(&[]).expect("defaults").server,
+            "https://strider.thaiv.dev"
+        );
+        assert_eq!(
+            parse(&["--server", "http://localhost:3100"])
+                .expect("server")
+                .server,
+            "http://localhost:3100"
+        );
+        assert!(parse(&["--server"]).is_err());
         assert!(parse(&["--profile"]).is_err());
         assert!(parse(&["--profile", "--reset"]).is_err());
         assert!(parse(&["--unknown"]).is_err());
@@ -575,13 +597,15 @@ impl AppView {
         .into_any_element()
     }
     fn overlay_open(&self) -> bool {
-        self.pending_navigation.is_some()
+        self.account.sheet
+            || self.pending_navigation.is_some()
             || self.editor.is_some()
             || self.replacements.is_some()
             || self.manager.is_some()
             || self.food.ingredient_editor.is_some()
     }
     fn close_overlays(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.account.sheet = false;
         self.pending_navigation = None;
         self.editor = None;
         self.replacements = None;
@@ -628,7 +652,9 @@ impl AppView {
             .into_any_element()
     }
     fn render_overlay(&self, window: &mut Window, cx: &Context<Self>) -> Option<AnyElement> {
-        if self.pending_navigation.is_some() {
+        if self.account.sheet {
+            Some(self.render_sync_sheet(cx))
+        } else if self.pending_navigation.is_some() {
             Some(self.render_navigation_guard(cx))
         } else if self.replacements.is_some() {
             Some(self.render_replacements(cx))
@@ -728,7 +754,7 @@ fn textarea_input(
     state
 }
 
-pub(crate) fn launch(store: Store) {
+pub(crate) fn launch(store: Store, path: std::path::PathBuf, server: String) {
     gpui_platform::application().run(move |cx| {
         gpui_component::init(cx);
         strider_ui::initialize(cx);
@@ -748,7 +774,11 @@ pub(crate) fn launch(store: Store) {
             },
             move |window, cx| {
                 strider_ui::set_appearance(Appearance::System, window, cx);
-                let gear = cx.new(|cx| AppView::new(store, window, cx));
+                let gear = cx.new(|cx| {
+                    let mut view = AppView::new(store, window, cx);
+                    view.configure_account(path, server, cx);
+                    view
+                });
                 cx.new(|cx| gpui_component::Root::new(gear, window, cx))
             },
         )

@@ -6183,6 +6183,7 @@ dependencies = [
  "gpui-pre-platform",
  "strider-core",
  "strider-store",
+ "strider-sync",
  "strider-ui",
 ]
 

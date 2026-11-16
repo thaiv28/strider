@@ -225,10 +225,12 @@ test("delete emits a root tombstone without tombstones for cascaded children", a
 });
 
 test("edit grants hydrate old trip rows, hide reports, and revoke writes", async ({ request, owner, other }) => {
-  const trip = randomUUID(), oldDay = randomUUID(), newDay = randomUUID();
+  const trip = randomUUID(), oldDay = randomUUID(), newDay = randomUUID(), gear = randomUUID(), tripGear = randomUUID();
   await applied(request, owner, [
+    upsert("gear_item", gear, { name: "Owner's private stove", weight_g: 80 }),
     upsert("trip", trip, { name: "Shared API trip", trip_report: "Owner-only report" }),
     upsert("trip_day", oldDay, { trip_id: trip, day_number: 1, distance_mi: "4.5" }),
+    upsert("trip_gear", tripGear, { trip_id: trip, gear_item_id: gear }),
   ]);
   // The cursor is newer than the trip and its children: only grant hydration
   // can make the existing trip appear in the next pull.
@@ -243,6 +245,10 @@ test("edit grants hydrate old trip rows, hide reports, and revoke writes", async
   expect(shared.rows.find((row) => row.sync_id === trip)).not.toHaveProperty("trip_report");
   expect(shared.rows.find((row) => row.sync_id === trip)).not.toHaveProperty("edit_token");
   expect(shared.rows.find((row) => row.sync_id === oldDay)).toMatchObject({ trip_id: trip, distance_mi: "4.5" });
+  // The owner's library row is private: the collaborator gets the snapshot, not a dangling reference.
+  expect(shared.rows.find((row) => row.sync_id === tripGear)).toMatchObject({ gear_item_id: null, snapshot_name: "Owner's private stove" });
+  expect(shared.rows.some((row) => row.sync_id === gear)).toBe(false);
+  expect((await pull(request, owner)).rows.find((row) => row.sync_id === tripGear)).toMatchObject({ gear_item_id: gear });
   await applied(request, other, [upsert("trip_day", newDay, { trip_id: trip, day_number: 2 })]);
   const revoke = await request.post(`/api/v1/trips/${trip}/share`, { headers: headers(owner.token), data: { kind: "edit", action: "revoke" } });
   expect(revoke.status()).toBe(200);

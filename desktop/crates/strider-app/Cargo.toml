@@ -10,6 +10,7 @@ name = "strider"
 path = "src/main.rs"
 
 [dependencies]
+strider-sync = { path = "../strider-sync" }
 strider-core = { path = "../strider-core" }
 strider-store = { path = "../strider-store" }
 strider-ui = { path = "../strider-ui" }

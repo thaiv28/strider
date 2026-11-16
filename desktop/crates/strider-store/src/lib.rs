@@ -12,6 +12,8 @@ mod commands;
 mod fixture;
 mod propagation;
 mod queries;
+mod sync;
+pub use sync::*;
 pub mod reference;
 pub use commands::*;
 pub use fixture::*;
@@ -68,7 +70,7 @@ pub const TABLES: &[&str] = &[
     "trip_gpx",
     "trip_campsite",
 ];
-const MIGRATIONS: &[&str] = &[include_str!("schema.sql")];
+const MIGRATIONS: &[&str] = &[include_str!("schema.sql"), include_str!("sync.sql")];
 pub type Row = BTreeMap<String, Value>;
 type Snapshot = BTreeMap<String, BTreeMap<String, Row>>;
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -83,6 +85,7 @@ pub struct Store {
     connection: Connection,
     undo: Vec<Change>,
     redo: Vec<Change>,
+    pull_generation: String,
 }
 pub fn default_path() -> Result<PathBuf> {
     Store::path_for_profile("dev")
@@ -118,6 +121,7 @@ impl Store {
         Self::from_connection(Connection::open_in_memory()?)
     }
     fn from_connection(mut connection: Connection) -> Result<Self> {
+        connection.busy_timeout(std::time::Duration::from_secs(5))?;
         connection.execute_batch("PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;")?;
         let version =
             connection.query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))? as usize;
@@ -147,6 +151,7 @@ impl Store {
             connection,
             undo: vec![],
             redo: vec![],
+            pull_generation: String::new(),
         })
     }
     /// Connection access for diagnostics, import preparation, and integration tests.
@@ -154,7 +159,10 @@ impl Store {
         &self.connection
     }
     pub fn apply(&mut self, command: Command) -> Result<ChangeSet> {
-        let tx = self.connection.transaction()?;
+        self.invalidate_pulled_history()?;
+        let tx = self
+            .connection
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
         let before = snapshot(&tx)?;
         let affected = commands::run(&tx, command)?;
         let direct = snapshot(&tx)?;
@@ -171,24 +179,49 @@ impl Store {
         self.apply(command).map(|_| ())
     }
     pub fn undo(&mut self) -> Result<bool> {
-        let Some(c) = self.undo.last() else {
-            return Ok(false);
-        };
-        restore(&mut self.connection, &c.before)?;
-        if let Some(c) = self.undo.pop() {
-            self.redo.push(c);
-        }
-        Ok(true)
+        self.restore_history(false)
     }
     pub fn redo(&mut self) -> Result<bool> {
-        let Some(c) = self.redo.last() else {
-            return Ok(false);
-        };
-        restore(&mut self.connection, &c.after)?;
-        if let Some(c) = self.redo.pop() {
-            self.undo.push(c);
+        self.restore_history(true)
+    }
+    fn restore_history(&mut self, redo: bool) -> Result<bool> {
+        // Lock before checking the durable generation. A secondary pull cannot
+        // commit between this check and the snapshot restoration.
+        self.connection.execute_batch("BEGIN IMMEDIATE")?;
+        let result = (|| {
+            self.invalidate_pulled_history()?;
+            let stack = if redo { &self.redo } else { &self.undo };
+            let Some(change) = stack.last() else {
+                return Ok(false);
+            };
+            restore(
+                &self.connection,
+                if redo { &change.after } else { &change.before },
+            )?;
+            Ok(true)
+        })();
+        match result {
+            Ok(changed) => {
+                if let Err(error) = self.connection.execute_batch("COMMIT") {
+                    let _ = self.connection.execute_batch("ROLLBACK");
+                    return Err(error.into());
+                }
+                if changed {
+                    if redo {
+                        if let Some(c) = self.redo.pop() {
+                            self.undo.push(c);
+                        }
+                    } else if let Some(c) = self.undo.pop() {
+                        self.redo.push(c);
+                    }
+                }
+                Ok(changed)
+            }
+            Err(error) => {
+                let _ = self.connection.execute_batch("ROLLBACK");
+                Err(error)
+            }
         }
-        Ok(true)
     }
 }
 fn invalid<T>(message: impl Into<String>) -> Result<T> {
@@ -365,14 +398,21 @@ fn append_outbox(db: &Connection, a: &Snapshot, b: &Snapshot) -> Result<()> {
                     .collect::<Vec<_>>()
                     .join(",")
             );
-            db.execute("INSERT INTO outbox(batch_id,tbl,sync_id,op,columns,base_seq,created_at) VALUES(?1,?2,?3,?4,?5,(SELECT server_seq FROM row_meta WHERE tbl=?2 AND sync_id=?3),strftime('%Y-%m-%dT%H:%M:%fZ','now'))",params![batch,table,key,op,json])?;
+            let trip_id = if *table == "trip" {
+                Some(key.to_string())
+            } else {
+                new.get(key)
+                    .or_else(|| old.get(key))
+                    .and_then(|r| opt(r, "trip_id"))
+            };
+            db.execute("INSERT INTO outbox(batch_id,tbl,sync_id,op,columns,base_seq,created_at,trip_id) VALUES(?1,?2,?3,?4,?5,(SELECT server_seq FROM row_meta WHERE tbl=?2 AND sync_id=?3),strftime('%Y-%m-%dT%H:%M:%fZ','now'),?6)",params![batch,table,key,op,json,trip_id])?;
         }
     }
     Ok(())
 }
-fn restore(db: &mut Connection, target: &Snapshot) -> Result<()> {
+fn restore(db: &Connection, target: &Snapshot) -> Result<()> {
     let before = snapshot(db)?;
-    let tx = db.transaction()?;
+    let tx = db;
     tx.execute_batch("PRAGMA defer_foreign_keys=ON;")?;
     // Only changed rows are touched. Deferred checks preserve non-cascading references.
     for table in TABLES.iter().rev() {
@@ -387,22 +427,21 @@ fn restore(db: &mut Connection, target: &Snapshot) -> Result<()> {
             if before[*table].get(key) != Some(r) {
                 let mut r = r.clone();
                 r.remove("sync_id");
-                write(&tx, table, key, r, true)?;
+                write(tx, table, key, r, true)?;
             }
         }
     }
     // Cascades may have removed unchanged child rows; restore those as well.
     for table in TABLES {
         for (key, r) in &target[*table] {
-            if row(&tx, table, key).is_err() {
+            if row(tx, table, key).is_err() {
                 let mut r = r.clone();
                 r.remove("sync_id");
-                write(&tx, table, key, r, true)?;
+                write(tx, table, key, r, true)?;
             }
         }
     }
-    append_outbox(&tx, &before, target)?;
-    tx.commit()?;
+    append_outbox(tx, &before, target)?;
     Ok(())
 }
 #[cfg(test)]

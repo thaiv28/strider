@@ -1,11 +1,11 @@
-# Strider Desktop — milestone 1b
+# Strider Desktop — milestone 2b
 
-Native Rust/GPUI Gear and Food areas on the milestone 1a local SQLite workspace.
+Native Rust/GPUI Gear and Food areas on a local SQLite workspace.
 Gear includes inventory, kits, loadouts, category management and wishlist projections.
 Food includes Meals, Ingredients, measured recipe lines and bundled USDA search.
-There is no web service, synchronization transport, authentication, packaged-product
-lookup or production data access. Basecamp, Trips, Calendar and Settings remain
-navigation placeholders.
+Device sign-in and background push/pull synchronization use the versioned `/api/v1`
+server API. Settings contains Account controls. Basecamp, Trips and Calendar remain
+navigation placeholders; packaged-product lookup is not implemented.
 
 Run from `desktop/` so rustup selects the pinned toolchain:
 
@@ -22,10 +22,10 @@ The database is `$HOME/Library/Application Support/Strider/<profile>/workspace.d
 The app creates its parent directories, enables foreign keys and WAL, and applies
 numbered migrations using `PRAGMA user_version`. Newer schemas are refused.
 The old milestone-0 schema is explicitly refused; use `--reset` for that
-disposable fixture. `--reset` deletes this fixture file
-and reseeds it. Fixture values and valid UUIDv7 identities are deterministic;
+disposable fixture. `--reset` deletes this workspace file
+and starts an empty workspace. New profiles are empty; fixtures are test-only. Fixture values and valid UUIDv7 identities are deterministic;
 the identities use a fixed fixture timestamp and monotonic payloads. Undo history
-lives only in memory and disappears at quit.
+lives only in memory and disappears at quit or after a server pull.
 
 The pinned pair is `gpui-pre`/`gpui-pre-platform` **0.3.12**, used with
 `gpui-component` **0.9.1**. Upgrade them together. The platform's `runtime_shaders`
@@ -39,6 +39,7 @@ wrapping the application view in its `Root`.
 | --- | --- |
 | `strider-core` | Units, decimal arithmetic, formatting, food, fuel, energy, route, gear, trip and propagation rules; no runtime dependencies |
 | `strider-store` | Local workspace schema, deterministic fixture, Gear/Food queries and commands, outbox batches, undo/redo |
+| `strider-sync` | Blocking HTTP, loopback PKCE sign-in, Keychain credentials, durable push/pull and background scheduling |
 | `strider-ui` | Generated Topo colors, embedded fonts, primitives, icons and contour drawing |
 | `strider-app` (`strider`) | Window/shell, Gear inventory/wishlist, Food pantry/meal editors, actions and drag/drop |
 
@@ -174,7 +175,7 @@ spacing at desktop widths to retain all five links at the 640px minimum.
 
 ### Synchronous storage and undo memory
 
-One `rusqlite::Connection` belongs to `Store`; queries and commands run
+One UI `rusqlite::Connection` belongs to `Store`; queries and commands run
 synchronously on the main thread, acceptable for this spike. Each reload fetches
 items/components in bulk. A command stores complete before/after snapshots as
 its inverse, so delete/undo restores exact component ids and ordering, including
@@ -218,7 +219,7 @@ runs the same exporter without that socket. The exporter never queries PostgreSQ
   description tie-break uses lowercase Rust lexical order, not ICU English collation;
   rare punctuation/accent ties can differ. Seven top-three TypeScript goldens pass.
 - There are no browser deep links to meals or trip back-links in this milestone.
-  All data is local, mutations are synchronous and no web pending indicator is needed.
+  UI mutations are local and synchronous; a background thread synchronizes them.
 
 ### Module map
 
@@ -243,8 +244,8 @@ Identities and foreign keys use UUIDv7 strings instead of server serial ids;
 the synthetic Other category uses `None` instead of `-1`. Singleton indexes
 replace per-user singleton constraints in this single-user workspace. Permits
 store blob hashes instead of bytes, and trip access is a local checked column.
-No identity, authentication, sharing-token mutation, or remote USDA density
-lookup is performed. Ingredient creation uses the supplied density; reference
+Device sign-in is implemented; sharing-token mutation and remote USDA density
+lookup are not implemented. Ingredient creation uses the supplied density; reference
 linking accepts already-resolved reference data so it works offline.
 
 SQL propagation uses exact decimals and half-away rounding. Web display and
@@ -260,3 +261,81 @@ configured collation; equal sort positions use UUID order for determinism.
 Undo/redo restores exact stored before/after images, including propagated
 snapshots and cascades, and emits a fresh outbox batch for the restoration.
 Ordinary commands emit only their direct changes, excluding propagation.
+
+
+## Device sign-in and synchronization
+
+Use a fresh profile for sync; earlier milestones' deterministic fixture databases
+are not a server import format. Existing fixture rows have no remote base state.
+The profile binds to a server origin and email before its first push; switching
+account or origin requires another profile. Sign-out retains local rows and this
+binding. Tokens are generic passwords in macOS Keychain (`dev.thaiv.strider`,
+account = server host), never SQLite values or logs. Keychain credentials are
+shared by profiles for that host; use distinct hosts for distinct server accounts.
+
+```sh
+cargo run --offline -p strider-app -- --profile local-sync --server http://localhost:3100
+```
+
+Settings → Account → Sign in opens the browser using macOS `open`. The app uses
+PKCE S256, a random state, and an ephemeral `127.0.0.1` callback with a five-minute
+accept deadline. Sign-out waits for the worker's current sync pass before revoking
+the device token. Failed revocation retains the credential and resumes the worker.
+
+The worker owns a secondary WAL connection. It synchronizes at startup, after a
+500 ms local-change debounce, on Sync now, and every minute. Transient failures
+back off from two seconds to five minutes; Sync now explicitly retries immediately.
+401 and 426 stop the worker and surface sign-in/update instructions.
+Only offline status and waiting changes appear in the header. Its Sync Sheet shows
+pending writes, elapsed time since last success, replaced text with Copy, and
+rejections. Account errors also appear in Settings.
+
+Each request contains at most 500 operations. Oversized local command batches are
+split into persisted batch identities, so they lose atomicity across those chunks.
+The exact in-flight JSON is saved before transmission and cleared with its ack;
+a lost response retries the same payload and batch id after restart. Adoption
+rewrites identities and foreign keys atomically. Rejected batches are logged,
+local-only inserts without newer corrections are removed, and the pull cursor rewinds to refetch server
+values. Pull preserves pending columns, updates long-text bases, applies revocation
+cascades, and never appends undo or outbox entries. Because undo contains whole
+workspace snapshots, any pulled row invalidates all undo/redo history, including
+history held by a different UI connection.
+
+Parents can appear on later pages because the API orders current row versions by
+sequence. Such pages and their cursors are buffered atomically in SQLite until
+all referenced parents are available, including across restart. A remaining
+unresolvable dependency surfaces an error rather than dropping references.
+
+**Server limitation found by source inspection:** shared Trip rows can reference
+the owner's private Trail, Gear Items, Meals and Ingredients, but pull visibility
+omits that library. Those foreign keys cannot be materialized in the existing
+local schema. The client retains the affected pages and reports unavailable
+parents; shared trips with those references remain blocked until the server
+provides a representation compatible with its visibility boundary. Server code
+was not changed. Owner-only workspace convergence is the integration target.
+
+### Real local server tests (maintainer)
+
+These tests are ignored by default; no app or server is launched by the tests.
+Prepare an isolated local PostgreSQL-backed server and export
+`STRIDER_TEST_SERVER`, `STRIDER_TEST_TOKEN_A`, and `STRIDER_TEST_TOKEN_B`.
+A/B must be separate device sessions of the **same user**. Also export
+`STRIDER_TEST_TOKEN_OTHER` from a **different user** to run the isolation test.
+Keep tokens out of shell history. From `desktop/`:
+
+```sh
+cargo test --offline -p strider-sync --test server -- --ignored --test-threads=1
+```
+
+The three ignored tests cover seeded 200-step Gear/Food interleavings and full
+row comparison across two devices and a fresh server pull; a replaced long-text
+conflict; and different-user isolation. A cleanup guard deletes uniquely named
+`STRIDER-DESKTOP-TEST-*` records even on assertion failure. Without the third token,
+run the two same-user tests individually with filters
+`seeded_two_device_convergence_200_steps` and `replaced_long_text_is_saved`.
+Local unit tests cover PKCE, callback validation, credentials, outbox conversion,
+long-text bases, bounded batches, parent ordering, page buffering/restart,
+adoption, revocation, pending columns, resurrection, atomicity and secondary
+connection undo invalidation. Real browser sign-in, Keychain prompts, visual
+layout and real-server convergence require maintainer verification; the GUI and
+network-dependent integration tests are not run in the constrained sandbox.

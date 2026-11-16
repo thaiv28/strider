@@ -429,3 +429,28 @@ fn inventory_keeps_a_list_viewport_at_half_width(cx: &mut TestAppContext) {
     assert!(wide.size.width > half.size.width);
     assert!(wide.size.height > gpui::px(0.));
 }
+
+#[gpui::test]
+fn account_pending_status_and_sheet_use_existing_shell(cx: &mut TestAppContext) {
+    let (view, mut cx) = headless(cx);
+    cx.run_until_parked();
+    cx.update(|w, cx| {
+        view.update(cx, |g, cx| {
+            assert!(g.sync_status().is_none());
+            g.area = "Settings";
+            g.command(
+                Command::CreateMeal {
+                    name: "Offline meal".into(),
+                },
+                cx,
+            );
+            assert_eq!(g.sync_status().as_deref(), Some("1 changes waiting"));
+            g.account.sheet = true;
+            assert!(g.overlay_open());
+            assert!(g.render_overlay(w, cx).is_some());
+            g.close_overlays(w, cx);
+            assert!(!g.overlay_open());
+        });
+    });
+    cx.run_until_parked();
+}

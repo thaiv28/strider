@@ -12,7 +12,12 @@ async function encode(reader: Reader, e: Entry, row: SyncRow, userId: number) {
     if (key === "id" || key === "user_id" || key === "data") continue;
     if (access !== "owner" && e.hidden.has(key)) continue;
     if (e.foreignKeys[key] && value != null) {
-      const fk = await reader.execute<{ sync_id: string }>(sql`SELECT sync_id FROM ${sql.raw(ident(e.foreignKeys[key]))} WHERE id=${value}`);
+      // A shared Trip's rows point at the owner's private library (gear, meals, trail). Other users
+      // never receive those rows, so send null: the snapshot columns carry what they need.
+      const target = registry[e.foreignKeys[key]];
+      // The trip itself is visible through the grant, so only library references are restricted.
+      const owned = target?.scope === "user" && target.name !== "trip" ? sql` AND user_id=${userId}` : sql``;
+      const fk = await reader.execute<{ sync_id: string }>(sql`SELECT sync_id FROM ${sql.raw(ident(e.foreignKeys[key]))} WHERE id=${value}${owned}`);
       out[key] = fk.rows[0]?.sync_id ?? null;
     } else out[key] = value instanceof Date ? (columns.find(c => c.name === key)?.columnType === "PgDateString" ? `${value.getFullYear()}-${String(value.getMonth()+1).padStart(2,"0")}-${String(value.getDate()).padStart(2,"0")}` : value.toISOString()) : typeof value === "bigint" ? value.toString() : value;
   }
