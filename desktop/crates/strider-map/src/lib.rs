@@ -1,4 +1,5 @@
 //! UI-independent, clamped Web Mercator viewport and bounded raster tile cache.
+pub mod region;
 use std::{
     collections::{HashMap, HashSet},
     fs, io,
@@ -440,7 +441,18 @@ fn tile_path(root: &Path, source: Source, tile: Tile) -> PathBuf {
         .join(tile.x.to_string())
         .join(tile.y.to_string())
 }
+/// Marker beside a tile file naming the offline regions that pin it.
+pub(crate) fn pin_path(path: &Path) -> PathBuf {
+    path.with_extension("pin")
+}
+fn pinned(path: &Path) -> bool {
+    pin_path(path).exists()
+}
 fn fresh(path: &Path) -> bool {
+    // Pinned tiles are an offline guarantee: they never expire.
+    if pinned(path) && path.exists() {
+        return true;
+    }
     let age = path
         .metadata()
         .and_then(|m| m.modified())
@@ -460,7 +472,7 @@ fn evict(root: &Path, cap: u64) -> io::Result<()> {
             let path = e.path();
             if e.file_type()?.is_dir() {
                 walk(&path, out)?;
-            } else if path.extension().is_none() {
+            } else if path.extension().is_none() && !pinned(&path) {
                 let meta = e.metadata()?;
                 let used = path
                     .with_extension("used")

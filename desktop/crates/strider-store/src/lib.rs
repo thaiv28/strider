@@ -9,14 +9,18 @@ use strider_core::units::Dec;
 use strider_core::{Cents, Grams};
 use uuid::Uuid;
 mod blobs;
+mod cache;
 mod commands;
 mod fixture;
 mod propagation;
 mod queries;
+mod settings;
 mod sync;
 mod trip_queries;
 mod trips;
 pub use blobs::*;
+pub use cache::*;
+pub use settings::*;
 pub use sync::*;
 pub use trip_queries::*;
 pub use trips::{AddTripFood, Site};
@@ -80,6 +84,7 @@ const MIGRATIONS: &[&str] = &[
     include_str!("schema.sql"),
     include_str!("sync.sql"),
     include_str!("trips.sql"),
+    include_str!("cache.sql"),
 ];
 pub type Row = BTreeMap<String, Value>;
 type Snapshot = BTreeMap<String, BTreeMap<String, Row>>;

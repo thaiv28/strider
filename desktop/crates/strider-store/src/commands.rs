@@ -43,8 +43,43 @@ pub struct MealPatch {
     pub water_ml: Option<Option<i32>>,
     pub notes: Option<Option<String>>,
 }
+/// Settings > Energy, with the same clamping as the web's `updateEnergyParams`.
+#[derive(Debug, Clone, Default)]
+pub struct EnergyInput {
+    pub bmr: f64,
+    pub cal_per_mile: f64,
+    pub ft_per_mile: f64,
+    pub sex: Option<String>,
+    pub weight_lb: Option<Dec>,
+    pub height_in: Option<Dec>,
+    pub age_years: Option<i32>,
+}
 #[derive(Debug, Clone)]
 pub enum Command {
+    UpdateEnergyParams {
+        input: EnergyInput,
+    },
+    UpdateReportSettings {
+        template: String,
+        packing_default: String,
+    },
+    AddCalendarFeed {
+        label: String,
+        color: String,
+        url: String,
+    },
+    UpdateCalendarFeed {
+        id: String,
+        label: String,
+        color: String,
+        url: String,
+    },
+    DeleteCalendarFeed {
+        id: String,
+    },
+    ReorderCalendarFeeds {
+        ordered_ids: Vec<String>,
+    },
     CreateTrip {
         name: String,
         trail: Option<String>,
@@ -499,6 +534,100 @@ fn set_member(
 pub(crate) fn run(db: &Connection, cmd: Command, data_dir: &Path) -> Result<Affected> {
     let mut a = Affected::default();
     match cmd {
+        Command::UpdateEnergyParams { input: v } => {
+            let round = |x: f64| if x.is_finite() { x.round() as i64 } else { 0 };
+            let values = fields([
+                ("bmr", Value::Integer(round(v.bmr).max(0))),
+                (
+                    "cal_per_energy_mile",
+                    Value::Integer(round(v.cal_per_mile).max(0)),
+                ),
+                (
+                    "ft_per_energy_mile",
+                    Value::Integer(round(v.ft_per_mile).max(1)),
+                ),
+                ("sex", clean(v.sex)),
+                ("weight_lb", decimal(v.weight_lb)),
+                ("height_in", decimal(v.height_in)),
+                ("age_years", number(v.age_years)),
+            ]);
+            match rows(db, "energy_params")?.first() {
+                Some(r) => write(db, "energy_params", s(r, "sync_id"), values, false)?,
+                None => write(db, "energy_params", &id(), values, true)?,
+            }
+        }
+        Command::UpdateReportSettings {
+            template,
+            packing_default,
+        } => {
+            let values = fields([
+                ("template", text(template)),
+                ("packing_default", text(packing_default)),
+            ]);
+            match rows(db, "report_settings")?.first() {
+                Some(r) => write(db, "report_settings", s(r, "sync_id"), values, false)?,
+                None => write(db, "report_settings", &id(), values, true)?,
+            }
+        }
+        Command::AddCalendarFeed { label, color, url } => {
+            let url = url.trim().to_string();
+            if url.is_empty() {
+                return invalid("A calendar address is required");
+            }
+            let max: i64 = db.query_row(
+                "SELECT coalesce(max(sort_order),-1)+1 FROM calendar_feed",
+                [],
+                |r| r.get(0),
+            )?;
+            write(
+                db,
+                "calendar_feed",
+                &id(),
+                fields([
+                    ("label", text(fallback(label, "Calendar"))),
+                    ("color", text(color)),
+                    ("url", text(url)),
+                    ("sort_order", Value::Integer(max)),
+                ]),
+                true,
+            )?;
+        }
+        Command::UpdateCalendarFeed {
+            id: key,
+            label,
+            color,
+            url,
+        } => {
+            let url = url.trim().to_string();
+            if url.is_empty() {
+                return invalid("A calendar address is required");
+            }
+            write(
+                db,
+                "calendar_feed",
+                &key,
+                fields([
+                    ("label", text(fallback(label, "Calendar"))),
+                    ("color", text(color)),
+                    ("url", text(url)),
+                ]),
+                false,
+            )?;
+            db.execute("DELETE FROM calendar_cache WHERE key=?", [&key])?;
+        }
+        Command::DeleteCalendarFeed { id: key } => {
+            delete(db, "calendar_feed", &key)?;
+            db.execute("DELETE FROM calendar_cache WHERE key=?", [&key])?;
+        }
+        Command::ReorderCalendarFeeds { ordered_ids } => order(
+            db,
+            "calendar_feed",
+            ordered_ids,
+            rows(db, "calendar_feed")?
+                .iter()
+                .map(|r| s(r, "sync_id").to_string())
+                .collect(),
+        )?,
         Command::CreateGear { input } => {
             let key = id();
             write(db, "gear_item", &key, gear_values(&input)?, true)?;

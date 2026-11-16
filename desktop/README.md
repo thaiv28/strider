@@ -1,4 +1,4 @@
-# Strider Desktop — milestone 3b (Trips, Basecamp, Trip page)
+# Strider Desktop — milestone 4a (offline and sharing services)
 
 Native Rust/GPUI Gear and Food areas on a local SQLite workspace.
 Gear includes inventory, kits, loadouts, category management and wishlist projections.
@@ -422,3 +422,35 @@ are absent; the elevation profile paints one stroked line over a filled area wit
 campsite lines instead of the web's per-day coloring.
 The live Trip convergence test is `trip_two_device_convergence` in
 `crates/strider-sync/tests/server.rs` (ignored; same environment variables).
+
+## Milestone 4a: offline and sharing services (no UI yet)
+
+Non-UI services for the Calendar, weather and snow panels, the route map and sharing. Nothing
+here makes a network call in tests: public sources sit behind `strider_services::HttpClient`, the
+signed-in server behind `strider_sync::Transport`, and recorded response bodies live in
+`fixtures/http/`.
+
+- **`strider-services`**: `weather` (`describe`, `is_far_future`, `fetch_day`,
+  `fetch_climatology`, `add_days`, `pretty_date`, `clock`), `forecast_window`, `snow`,
+  `calendar` (ICS parse and expansion, `calendar_data` month grid, `load_month`), `overpass`
+  and `share` (`change_share_link`, `geocode`, `food_search`). Cached reads return
+  `Cached { value, fetched_at, stale }`; `stale` means a refresh was needed but impossible, so
+  the UI can say "Updated 3 h ago" offline. Freshness: forecast 1 h, archive 7 days,
+  climatology 30 days, snow now 30 min, calendar feeds 5 min, Overpass 7 days.
+- **Local caches** (migration 4, not synced, never in the outbox or undo): `weather_cache`
+  (also holds snow), `calendar_cache` (raw ICS per feed; dropped when the feed is edited or
+  deleted), `overpass_cache` (per Trip bbox) and `map_region`.
+- **Offline map regions** (`strider_map::region`): a Trip's route bbox padded 10%, zooms 8..=15,
+  USGS Topo only, refused above 20,000 tiles, at most 4 concurrent requests, resumable (tiles
+  already on disk are pinned, not refetched), progress callback and cancel flag. Pinned tiles
+  carry a `.pin` marker listing the regions that need them and are skipped by LRU eviction and
+  never expire; `delete_region` unpins (tiles stay cached but become evictable).
+- **Settings parity** commands: `UpdateEnergyParams`, `UpdateReportSettings`,
+  `AddCalendarFeed`, `UpdateCalendarFeed`, `DeleteCalendarFeed`, `ReorderCalendarFeeds`, with
+  `energy_settings()`, `report_settings()` and `calendar_feeds()` reads. Device listing and
+  revoking stay on the web (Settings > Devices); the desktop adds no server routes for them.
+- **Logbook "Shared with me"**: `Store::shared_trips()` returns Trips owned by someone else,
+  grouped into `edit` and `view`.
+- Calendar display zone is a parameter (`Zone`, an `rrule::Tz`): pass `Tz::LOCAL` in the app.
+  Windows zone names are mapped for a few common zones; unknown `TZID`s are treated as floating.
+- `geocode` calls a server route that answers 501 today and maps to `NotImplemented`.

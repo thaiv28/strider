@@ -6,7 +6,9 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+strider-core = { path = "../strider-core" }
 strider-store = { path = "../strider-store" }
+strider-sync = { path = "../strider-sync" }
 ureq.workspace = true
 url.workspace = true
 serde.workspace = true
@@ -14,3 +16,6 @@ serde_json.workspace = true
 rrule.workspace = true
 chrono.workspace = true
 chrono-tz.workspace = true
+
+[dev-dependencies]
+rusqlite.workspace = true
