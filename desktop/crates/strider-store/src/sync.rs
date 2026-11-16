@@ -819,6 +819,24 @@ mod tests {
         assert_eq!(s.pending_count().unwrap(), 0);
     }
     #[test]
+    fn pulled_share_tokens_reach_the_owner_trip_detail() {
+        let mut s = Store::in_memory().unwrap();
+        s.apply_pull_page(&page(json!([
+            {"table":"trip","sync_id":"trip","name":"Trip","access":"owner","share_token":"v1","edit_token":null,"server_seq":"1"}
+        ])))
+        .unwrap();
+        let d = s.trip_detail("trip").unwrap().unwrap();
+        assert_eq!(d.share_token.as_deref(), Some("v1"));
+        assert_eq!(d.edit_token, None);
+        // Revoking arrives as null on the next pull.
+        s.apply_pull_page(&page(json!([
+            {"table":"trip","sync_id":"trip","name":"Trip","access":"owner","share_token":null,"edit_token":"e1","server_seq":"2"}
+        ])))
+        .unwrap();
+        let d = s.trip_detail("trip").unwrap().unwrap();
+        assert_eq!((d.share_token, d.edit_token.as_deref()), (None, Some("e1")));
+    }
+    #[test]
     fn pull_is_atomic_and_validates_identifiers() {
         let mut s = Store::in_memory().unwrap();
         assert!(

@@ -161,3 +161,36 @@ fn cancelling_a_download_keeps_what_was_fetched(cx: &mut TestAppContext) {
     });
     let _ = std::fs::remove_dir_all(root);
 }
+
+#[gpui::test]
+fn share_sheet_shows_existing_links_and_copies_them_offline(cx: &mut TestAppContext) {
+    let (view, mut cx) = headless(cx);
+    cx.run_until_parked();
+    let trip = open_routed_trip(&view, "Shared trip", &mut cx);
+    with_view(&view, &mut cx, |g, _, cx| {
+        g.open_share(cx);
+        assert!(
+            g.share.view.is_none() && g.share.edit.is_none(),
+            "no links yet"
+        );
+        // A pull delivers the owner's live token; the sheet must show it without a request.
+        g.store
+            .borrow()
+            .connection()
+            .execute(
+                "UPDATE trip SET share_token='tok123' WHERE sync_id=?",
+                [&trip],
+            )
+            .expect("set token");
+        g.reload(cx);
+        g.account.offline = true;
+        g.open_share(cx);
+        let link = g.share.view.clone().expect("view link");
+        assert!(link.url.ends_with("/share/trips/tok123"));
+        assert!(g.share.edit.is_none());
+        g.copy_link(strider_services::share::LinkKind::View, cx);
+        assert!(!g.share.busy, "copying a known link needs no request");
+        assert_eq!(g.share.message.as_deref(), Some("View-only link copied."));
+    });
+    cx.run_until_parked();
+}

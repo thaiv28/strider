@@ -21,7 +21,7 @@ async function find(tx: Tx, table: string, syncId: string) {
   // Raw pg queries parse SQL dates as local Dates, unlike Drizzle's date codec.
   // Normalize before validating a merged row, including unchanged date fields.
   if (!row) return row;
-  // Drop columns the schema no longer declares (e.g. the legacy trip.companions)
+  // Drop columns the schema does not declare (trip.companions lingered until 0020)
   // so they are never validated, written, or echoed back.
   const known = new Set(Object.values(getTableColumns(registry[table].table)).map((column) => column.name));
   for (const key of Object.keys(row)) if (!known.has(key)) delete row[key];

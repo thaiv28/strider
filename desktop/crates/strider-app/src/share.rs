@@ -37,6 +37,18 @@ impl AppView {
         }
         self.share.message = None;
         self.share.confirm = None;
+        // The owner's pull carries the live tokens, so existing links show without a request.
+        let server = self.account.server.trim_end_matches('/').to_string();
+        let link = |token: &Option<String>| {
+            token.as_ref().map(|token| ShareLink {
+                token: token.clone(),
+                url: format!("{server}/share/trips/{token}"),
+            })
+        };
+        if let Some(d) = &self.trips.detail {
+            self.share.view = link(&d.share_token);
+            self.share.edit = link(&d.edit_token);
+        }
         self.share.open = true;
         cx.notify();
     }
@@ -60,8 +72,19 @@ impl AppView {
         });
         cx.notify();
     }
+    fn current_link(&self, kind: LinkKind) -> Option<&ShareLink> {
+        match kind {
+            LinkKind::View => self.share.view.as_ref(),
+            LinkKind::Edit => self.share.edit.as_ref(),
+        }
+    }
+    /// Copies an existing link (works offline, as on the web) or creates one.
     pub(super) fn copy_link(&mut self, kind: LinkKind, cx: &mut Context<Self>) {
         self.share.confirm = None;
+        if let Some(link) = self.current_link(kind).cloned() {
+            self.finish_share(kind, LinkAction::Create, Ok(Some(link)), cx);
+            return;
+        }
         self.change_link(kind, LinkAction::Create, cx);
     }
     pub(super) fn revoke_link(&mut self, kind: LinkKind, cx: &mut Context<Self>) {
@@ -112,19 +135,22 @@ impl AppView {
     }
     fn link_block(&self, kind: LinkKind, hint: &'static str, cx: &Context<Self>) -> Div {
         let t = Theme::get(cx);
+        let exists = self.current_link(kind).is_some();
         let enabled = self.can_share() && !self.share.busy;
         let id = match kind {
             LinkKind::View => "view",
             LinkKind::Edit => "edit",
         };
+        // Copying a known link needs no connection; creating one does.
+        let copy_enabled = self.is_owner() && !self.share.busy && (exists || enabled);
         let copy = strider_ui::button(
             format!("copy-{id}-link"),
-            "Copy link",
+            if exists { "Copy link" } else { "Create link" },
             ButtonVariant::Outline,
             t,
         )
-        .when(!enabled, |b| b.opacity(0.5))
-        .when(enabled, |b| {
+        .when(!copy_enabled, |b| b.opacity(0.5))
+        .when(copy_enabled, |b| {
             b.on_click(cx.listener(move |this, _, _, cx| this.copy_link(kind, cx)))
         });
         let revoke = strider_ui::button(
@@ -150,7 +176,13 @@ impl AppView {
             .bg(t.panel2)
             .child(div().font_weight(FontWeight::SEMIBOLD).child(noun(kind)))
             .child(div().meta(t).child(hint))
-            .child(div().flex().gap_2().child(copy).child(revoke))
+            .child(
+                div()
+                    .flex()
+                    .gap_2()
+                    .child(copy)
+                    .when(exists, |d| d.child(revoke)),
+            )
     }
     pub(super) fn render_share_sheet(&self, cx: &Context<Self>) -> AnyElement {
         let t = Theme::get(cx);

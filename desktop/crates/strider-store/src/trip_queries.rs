@@ -28,6 +28,9 @@ pub struct TripDetail {
     pub permit: Option<PermitBlob>,
     pub packing_list: Option<String>,
     pub consumables: Vec<Row>,
+    /// The owner's live view-only and edit link tokens (None for collaborators or when no link exists).
+    pub share_token: Option<String>,
+    pub edit_token: Option<String>,
 }
 #[derive(Clone, Debug)]
 pub struct TripSummary {
@@ -187,8 +190,12 @@ impl Store {
         if access != "owner" {
             t.insert("trip_report".into(), Value::Null);
         }
-        t.remove("share_token");
-        t.remove("edit_token");
+        let token = |v: Option<Value>| match v {
+            Some(Value::Text(s)) if access == "owner" && !s.is_empty() => Some(s),
+            _ => None,
+        };
+        let share_token = token(t.remove("share_token"));
+        let edit_token = token(t.remove("edit_token"));
         let trail = opt(&t, "trail_id")
             .map(|id| row(db, "trail", &id))
             .transpose()?;
@@ -328,6 +335,8 @@ impl Store {
                 .and_then(|r| opt(r, "packing_default")))
             .or_else(|| Some(DEFAULT_PACKING_LIST.into()));
         Ok(Some(TripDetail {
+            share_token,
+            edit_token,
             region: opt(&t, "region").or_else(|| trail.as_ref().and_then(|r| opt(r, "region"))),
             area_type: opt(&t, "area_type")
                 .or_else(|| trail.as_ref().and_then(|r| opt(r, "area_type"))),

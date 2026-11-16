@@ -15,7 +15,8 @@ impl AppView {
                     .flex()
                     .items_center()
                     .pl(px(84.))
-                    .gap_1p5()
+                    // Matches the web nav bar: 28px after the wordmark, 4px between items.
+                    .gap(px(28.))
                     .child(
                         div()
                             .flex_shrink_0()
@@ -28,33 +29,40 @@ impl AppView {
                             .text_color(t.header_ink)
                             .child("Strider"),
                     )
-                    .children(
-                        ["Gear", "Food", "Trips", "Calendar", "Settings"]
-                            .into_iter()
-                            .map(|area| {
-                                div()
-                                    .id(area)
-                                    .min_h(px(44.))
-                                    .px_2()
-                                    .flex_shrink_0()
-                                    .flex()
-                                    .items_center()
-                                    .text_size(px(15.))
-                                    .rounded(px(12.))
-                                    .text_color(if area == self.area {
-                                        t.header_ink
-                                    } else {
-                                        t.header_muted
-                                    })
-                                    .when(area == self.area, |d| {
-                                        d.bg(t.header_active).font_weight(FontWeight::BOLD)
-                                    })
-                                    .cursor_pointer()
-                                    .child(area)
-                                    .on_click(cx.listener(move |this, _, window, cx| {
-                                        this.request_navigation(Navigation::Area(area), window, cx);
-                                    }))
-                            }),
+                    .child(
+                        div().flex().items_center().gap_1().children(
+                            ["Gear", "Food", "Trips", "Calendar", "Settings"]
+                                .into_iter()
+                                .map(|area| {
+                                    div()
+                                        .id(area)
+                                        .min_h(px(44.))
+                                        .px_3()
+                                        .flex_shrink_0()
+                                        .flex()
+                                        .items_center()
+                                        .text_size(px(15.))
+                                        .font_weight(FontWeight::MEDIUM)
+                                        .rounded(px(10.))
+                                        .text_color(if area == self.area {
+                                            t.header_ink
+                                        } else {
+                                            t.header_muted
+                                        })
+                                        .when(area == self.area, |d| {
+                                            d.bg(t.header_active).font_weight(FontWeight::BOLD)
+                                        })
+                                        .cursor_pointer()
+                                        .child(area)
+                                        .on_click(cx.listener(move |this, _, window, cx| {
+                                            this.request_navigation(
+                                                Navigation::Area(area),
+                                                window,
+                                                cx,
+                                            );
+                                        }))
+                                }),
+                        ),
                     )
                     .child(
                         div()
