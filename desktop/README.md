@@ -1,8 +1,9 @@
-# Strider Desktop — milestone 0
+# Strider Desktop — milestone 1a
 
-A native Rust/GPUI evaluation of the web app's Topo Gear inventory, using a
-local 2,000-item SQLite fixture. This is a toolkit spike, with no web service,
-sync, authentication, production data, or implementation of the other areas.
+A native Rust/GPUI Gear screen backed by a local SQLite workspace, with pure
+domain rules checked against the web application and transactional Gear and
+Food commands. There is no web service, synchronization transport,
+authentication, or production data access. Food commands currently have no UI.
 
 Run from `desktop/` so rustup selects the pinned toolchain:
 
@@ -11,11 +12,15 @@ cargo run -p strider-app --release
 cargo run -p strider-app --release -- --reset
 # Everything needed is cached; offline development:
 cargo run --offline -p strider-app -- --reset
+cargo run --offline -p strider-app -- --profile demo --reset
 ```
 
-The database is `$HOME/Library/Application Support/Strider/spike/workspace.db`.
+The database is `$HOME/Library/Application Support/Strider/<profile>/workspace.db`;
+`--profile <name>` defaults to `dev` and accepts letters, digits, `-`, and `_`.
 The app creates its parent directories, enables foreign keys and WAL, and applies
-schema version 1 using `PRAGMA user_version`. `--reset` deletes this fixture file
+numbered migrations using `PRAGMA user_version`. Newer schemas are refused.
+The old milestone-0 schema is explicitly refused; use `--reset` for that
+disposable fixture. `--reset` deletes this fixture file
 and reseeds it. Fixture values and valid UUIDv7 identities are deterministic;
 the identities use a fixed fixture timestamp and monotonic payloads. Undo history
 lives only in memory and disappears at quit.
@@ -30,8 +35,8 @@ wrapping the application view in its `Root`.
 
 | Crate | Responsibility |
 | --- | --- |
-| `strider-core` | Grams/cents and web-compatible weight formatting; no dependencies |
-| `strider-store` | SQLite schema, deterministic fixture, queries, transactional commands, undo/redo |
+| `strider-core` | Units, decimal arithmetic, formatting, food, fuel, energy, route, gear, trip and propagation rules; no runtime dependencies |
+| `strider-store` | Local workspace schema, deterministic fixture, Gear/Food queries and commands, outbox batches, undo/redo |
 | `strider-ui` | Generated Topo colors, embedded fonts, primitives, icons and contour drawing |
 | `strider-app` (`strider`) | Window, navigation, virtual Gear list, actions, editor and drag/drop |
 
@@ -75,8 +80,8 @@ cargo clippy --offline --workspace --all-targets -- -D warnings
 cargo fmt --check
 ```
 
-Tests include hand-computed TypeScript formatting outputs (including exact
-quarter-ounce decimal ties), SQLite fixture and command invariants, the Rust
+Tests include golden fixtures exported from the real TypeScript functions,
+decimal rounding and propagation edge cases, SQLite schema and command invariants, the Rust
 design guard, and a GPUI headless Gear view test. The headless test loads 2,000
 items, dispatches SelectNext twice, deletes the selected item, and verifies Undo
 restores the complete grouped result including component identities. It also
@@ -150,3 +155,37 @@ denied access to the default Application Support directory. Startup printed the
 IO error and exited without a panic; the required five-second native launch
 check therefore did **not** pass in this environment. Run the command on the
 host with access to that directory before judging native startup or visuals.
+
+Regenerate domain golden fixtures from the repository root with `npx tsx scripts/export-domain-fixtures.ts`.
+If a sandbox denies the tsx CLI's IPC socket, `node --import tsx scripts/export-domain-fixtures.ts`
+runs the same exporter without that socket. The exporter never queries PostgreSQL.
+
+## Port boundaries
+
+Category create/rename/reorder/delete and meal-line reorder are local commands;
+the web app has no corresponding category actions. Deleting a category makes its
+items uncategorized and detaches its child categories, explicitly within the
+command, while retaining the server's no-action foreign keys. Deleting gear
+referenced by a trip is refused, as on the server.
+
+Identities and foreign keys use UUIDv7 strings instead of server serial ids;
+the synthetic Other category uses `None` instead of `-1`. Singleton indexes
+replace per-user singleton constraints in this single-user workspace. Permits
+store blob hashes instead of bytes, and trip access is a local checked column.
+No identity, authentication, sharing-token mutation, or remote USDA density
+lookup is performed. Ingredient creation uses the supplied density; reference
+linking accepts already-resolved reference data so it works offline.
+
+SQL propagation uses exact decimals and half-away rounding. Web display and
+form calculations retain JavaScript floating-point rounding. `Dec` accepts
+at most nine fractional places (additional trailing zeros are allowed), and
+commands reject values exceeding server integer storage ranges. Invalid civil
+dates return `None`; the CSS-only `cn` utility has no core equivalent. Shopping
+names use lowercase lexical sorting instead of ICU `localeCompare`, since no
+locale crate is available; accented and punctuation-heavy names can sort
+differently. Other name sorting uses Rust lexical order instead of PostgreSQL's
+configured collation; equal sort positions use UUID order for determinism.
+
+Undo/redo restores exact stored before/after images, including propagated
+snapshots and cascades, and emits a fresh outbox batch for the restoration.
+Ordinary commands emit only their direct changes, excluding propagation.

@@ -8,7 +8,10 @@ use std::{
     time::{Duration, Instant},
 };
 use strider_core::{fmt_oz, fmt_weight, g_to_oz, oz_to_g};
-use strider_store::{Command, GearFilter, GearRow, Group, StatusFilter, Store, Totals, seed};
+use strider_store::{
+    Command, ComponentInput, GearFilter, GearInput, GearRow, Group, StatusFilter, Store, Totals,
+    seed,
+};
 use strider_ui::{Appearance, ButtonVariant, Icon, Theme, TopoStyle};
 actions!(
     strider,
@@ -31,7 +34,7 @@ actions!(
 enum Entry {
     Category(Group),
     Item {
-        row: GearRow,
+        row: Box<GearRow>,
         category: Option<String>,
         last: bool,
     },
@@ -231,7 +234,7 @@ impl GearView {
                 let expanded = self.expanded.contains(&row.id);
                 let last = i + 1 == group.rows.len();
                 self.entries.push(Entry::Item {
-                    row: row.clone(),
+                    row: Box::new(row.clone()),
                     category: group.id.clone(),
                     last: last && (!expanded || row.components.is_empty()),
                 });
@@ -260,8 +263,8 @@ impl GearView {
         }
     }
     fn command(&mut self, command: Command, cx: &mut Context<Self>) {
-        match self.store.execute(command) {
-            Ok(()) => self.reload(cx),
+        match self.store.apply(command) {
+            Ok(_) => self.reload(cx),
             Err(e) => {
                 self.error = Some(e.to_string());
                 cx.notify();
@@ -310,7 +313,7 @@ impl GearView {
             return;
         }
         if let Some(id) = self.selected.clone() {
-            self.command(Command::DeleteItem { id }, cx);
+            self.command(Command::DeleteGear { id }, cx);
         }
     }
     fn undo(&mut self, redo: bool, cx: &mut Context<Self>) {
@@ -405,11 +408,41 @@ impl GearView {
         editor.weight_error = weight.is_err();
         editor.quantity_error = quantity.is_none();
         if let (Ok(weight), Some(quantity)) = (weight, quantity) {
-            let command = Command::UpdateItem {
-                id: editor.id.clone(),
-                name: editor.name.read(cx).value().to_string(),
-                weight,
-                quantity,
+            let Some(row) = self
+                .groups
+                .iter()
+                .flat_map(|group| &group.rows)
+                .find(|row| row.id == editor.id)
+            else {
+                self.error = Some("Gear item no longer exists".into());
+                cx.notify();
+                return;
+            };
+            let command = Command::UpdateGear {
+                id: row.id.clone(),
+                input: GearInput {
+                    name: editor.name.read(cx).value().to_string(),
+                    category_id: row.category_id.clone(),
+                    weight_g: weight,
+                    weight_oz: None,
+                    price_cents: row.price_cents,
+                    quantity,
+                    class: row.class.clone(),
+                    status: row.status.clone(),
+                    is_kit: row.is_kit,
+                    components: row
+                        .components
+                        .iter()
+                        .map(|component| ComponentInput {
+                            name: component.name.clone(),
+                            weight_g: component.weight.0,
+                            quantity: component.quantity,
+                            notes: component.notes.clone(),
+                        })
+                        .collect(),
+                    product_url: row.product_url.clone(),
+                    notes: row.notes.clone(),
+                },
             };
             self.command(command, cx);
             if self.error.is_none() {
@@ -432,11 +465,24 @@ impl GearView {
         cx: &mut Context<Self>,
     ) {
         if self.filter.query.is_empty() && before.as_ref() != Some(&drag.id) {
+            let mut ordered_ids: Vec<_> = self
+                .groups
+                .iter()
+                .filter(|group| group.id == category)
+                .flat_map(|group| &group.rows)
+                .filter(|row| row.id != drag.id)
+                .map(|row| row.id.clone())
+                .collect();
+            let insertion = before
+                .as_ref()
+                .and_then(|id| ordered_ids.iter().position(|candidate| candidate == id))
+                .unwrap_or(ordered_ids.len());
+            ordered_ids.insert(insertion, drag.id.clone());
             self.command(
-                Command::MoveItem {
-                    id: drag.id.clone(),
+                Command::MoveGear {
+                    item: drag.id.clone(),
                     to_category: category,
-                    before,
+                    ordered_ids,
                 },
                 cx,
             );
@@ -556,6 +602,7 @@ impl GearView {
                 category,
                 last,
             } => {
+                let row = *row;
                 let id = row.id.clone();
                 let click_id = id.clone();
                 let edit_id = id.clone();
@@ -1022,9 +1069,37 @@ fn menus(cx: &mut App) {
         ]))]),
     ]);
 }
+#[derive(Debug, Default, PartialEq, Eq)]
+struct WorkspaceOptions {
+    profile: String,
+    reset: bool,
+}
+impl WorkspaceOptions {
+    fn parse(args: impl IntoIterator<Item = String>) -> Result<Self, String> {
+        let mut options = Self {
+            profile: "dev".into(),
+            reset: false,
+        };
+        let mut args = args.into_iter();
+        while let Some(arg) = args.next() {
+            match arg.as_str() {
+                "--reset" => options.reset = true,
+                "--profile" => {
+                    options.profile = args
+                        .next()
+                        .filter(|value| !value.starts_with('-'))
+                        .ok_or("--profile requires a name")?;
+                }
+                _ => return Err(format!("Unknown argument: {arg}")),
+            }
+        }
+        Ok(options)
+    }
+}
 fn open_store() -> Result<Store, Box<dyn std::error::Error>> {
-    let path = Store::default_path()?;
-    if std::env::args().any(|arg| arg == "--reset") && path.exists() {
+    let options = WorkspaceOptions::parse(std::env::args().skip(1))?;
+    let path = Store::path_for_profile(&options.profile)?;
+    if options.reset && path.exists() {
         std::fs::remove_file(&path)?;
     }
     let needs_seed = !path.exists();
@@ -1038,7 +1113,7 @@ fn main() {
     let store = match open_store() {
         Ok(store) => store,
         Err(error) => {
-            eprintln!("Could not open the Strider spike database: {error}");
+            eprintln!("Could not open the Strider workspace: {error}");
             return;
         }
     };
@@ -1076,6 +1151,19 @@ mod tests {
     use gpui::{AppContext, TestAppContext, VisualTestContext, WindowOptions};
     use gpui_component::Root;
     use strider_store::{GearFilter, StatusFilter, Store, seed};
+    #[test]
+    fn workspace_options() {
+        let parse = |args: &[&str]| {
+            super::WorkspaceOptions::parse(args.iter().map(|arg| (*arg).to_owned()))
+        };
+        assert_eq!(parse(&[]).expect("defaults").profile, "dev");
+        let custom = parse(&["--profile", "test", "--reset"]).expect("custom profile");
+        assert_eq!(custom.profile, "test");
+        assert!(custom.reset);
+        assert!(parse(&["--profile"]).is_err());
+        assert!(parse(&["--profile", "--reset"]).is_err());
+        assert!(parse(&["--unknown"]).is_err());
+    }
     #[gpui::test]
     fn gear_actions_delete_and_restore_fixture(cx: &mut TestAppContext) {
         cx.update(|cx| {
