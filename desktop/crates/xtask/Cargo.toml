@@ -1,0 +1,13 @@
+[package]
+name = "xtask"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+resvg.workspace = true
+ed25519-dalek.workspace = true
+sha2.workspace = true
+base64.workspace = true
+serde_json.workspace = true
