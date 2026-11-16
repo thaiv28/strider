@@ -12,6 +12,7 @@ mod commands;
 mod fixture;
 mod propagation;
 mod queries;
+pub mod reference;
 pub use commands::*;
 pub use fixture::*;
 pub use queries::*;

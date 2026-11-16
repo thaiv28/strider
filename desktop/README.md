@@ -1,9 +1,11 @@
-# Strider Desktop — milestone 1a
+# Strider Desktop — milestone 1b
 
-A native Rust/GPUI Gear screen backed by a local SQLite workspace, with pure
-domain rules checked against the web application and transactional Gear and
-Food commands. There is no web service, synchronization transport,
-authentication, or production data access. Food commands currently have no UI.
+Native Rust/GPUI Gear and Food areas on the milestone 1a local SQLite workspace.
+Gear includes inventory, kits, loadouts, category management and wishlist projections.
+Food includes Meals, Ingredients, measured recipe lines and bundled USDA search.
+There is no web service, synchronization transport, authentication, packaged-product
+lookup or production data access. Basecamp, Trips, Calendar and Settings remain
+navigation placeholders.
 
 Run from `desktop/` so rustup selects the pinned toolchain:
 
@@ -38,7 +40,7 @@ wrapping the application view in its `Root`.
 | `strider-core` | Units, decimal arithmetic, formatting, food, fuel, energy, route, gear, trip and propagation rules; no runtime dependencies |
 | `strider-store` | Local workspace schema, deterministic fixture, Gear/Food queries and commands, outbox batches, undo/redo |
 | `strider-ui` | Generated Topo colors, embedded fonts, primitives, icons and contour drawing |
-| `strider-app` (`strider`) | Window, navigation, virtual Gear list, actions, editor and drag/drop |
+| `strider-app` (`strider`) | Window/shell, Gear inventory/wishlist, Food pantry/meal editors, actions and drag/drop |
 
 `strider-ui/build.rs` reads the Topo light/dark blocks in `app/globals.css` and
 fails on property mismatches. Category colors are the ported web table. The
@@ -48,19 +50,49 @@ implementation. No web stylesheet is changed.
 ## Interaction
 
 Click a row to select it; double-click or use its more button to edit. Expand a
-kit with its chevron. Filter by item or category name and Current/Retired/All;
+kit with its chevron. Search by item or category name; More exposes Current /
+Retired / All, bulk loadout membership, Manage loadouts and Manage categories.
 Wishlist items never enter the inventory. Drag a grip to insert before another
-row; drop on a category header to append to it. Dragging is disabled while the
-text filter is nonempty. All commands reload groups and current-item totals.
+row; drop on a category header to append to it. Dragging is disabled while searching.
+Select a loadout above BaseBar to check membership and mark members packed/worn.
+The list and BaseBar use `strider-core::gear` subtotals; BaseBar stacks above the
+list below 1100px. Hover or focus its segments or info controls to inspect items.
+Wishlist has its own search and loadout selection, replacement checkboxes, explicit
+include/exclude overrides and automatic selection reset. Its projection uses the
+same core rules, including deduplicated replacements.
+
+Add gear opens the full Sheet: category, oz, quantity, USD, class, status, kit
+components, URL and notes. Kit weight is computed from its editable components.
+Delete errors remain inline in the Sheet. Loadouts and categories use inline
+name inputs and ↑/↓ ordering controls.
+
+Food opens on Meals. Select a meal for the editor beside the list at 1100px+;
+smaller windows show the editor alone. Save persists recipe text, base servings,
+water and all valid amount edits. Type and hot/cold choices persist immediately.
+Lines accept g/oz or tsp/tbsp/cup/fl oz/mL/L and keep their entered amount/unit.
+Set commits a line; View as weight preserves the original entered unit. Show
+changes the serving preview. Lines can be reordered or removed. Pantry matches
+precede USDA results when adding a line. Ingredients supports manual entry,
+reference-food creation, density/source editing, measured volume weights and
+linking a saved ingredient to a suggested USDA density. Invalid volume entry
+without density gives an inline error; Measure / link opens that ingredient.
+Unsaved meal text/amount edits have Save and leave / Discard / Keep editing;
+untouched new meals are discarded when leaving.
+
+All user writes call `Store::apply(Command)` and reload SQLite query models for
+the returned `ChangeSet` (currently conservatively reloading all Gear/Food models).
+Only field edits and view choices are kept locally. Undo/redo re-reads both areas
+and closes the meal editor so it cannot retain stale fields.
 
 | Shortcut | Action |
 | --- | --- |
 | ↑ / ↓ | Select previous/next item and reveal it |
 | Return | Edit selected item |
-| ⌘F | Focus Filter gear |
-| Escape | Leave filter focus / close the edit Sheet |
+| ⌘F | Focus the current Gear/Wishlist or Food search |
+| ⌘N | Open Add gear in the Gear area |
+| Escape | Leave search focus / close a Sheet; retain guarded meal edits |
 | ⌫ | Delete selected item, without confirmation |
-| ⌘Z / ⇧⌘Z | Undo / redo inventory command |
+| ⌘Z / ⇧⌘Z | Undo / redo workspace command (native text undo inside inputs) |
 | ⌘Q | Quit |
 
 The menu bar exposes these actions and View → Appearance → Light / Dark /
@@ -80,9 +112,15 @@ cargo clippy --offline --workspace --all-targets -- -D warnings
 cargo fmt --check
 ```
 
-Tests include golden fixtures exported from the real TypeScript functions,
-decimal rounding and propagation edge cases, SQLite schema and command invariants, the Rust
-design guard, and a GPUI headless Gear view test. The headless test loads 2,000
+Tests include domain golden fixtures, USDA top-three search goldens derived from
+the unchanged TypeScript over the bundled index, decimal rounding and propagation,
+SQLite schema/command invariants, the Rust design guard, and GPUI headless workflows.
+The workflows create gear through the dialog, edit kit contents, check loadout
+membership/totals/defaults, project wishlist replacements, create meals, enter
+pantry volumes, propagate measured/reference densities, and undo/redo across areas.
+They also cover invalid meal saves, unsaved navigation, serving previews and
+preserving entered units in weight view, plus a 640px/1180px retained-list layout
+check. The original Gear view test remains: The headless test loads 2,000
 items, dispatches SelectNext twice, deletes the selected item, and verifies Undo
 restores the complete grouped result including component identities. It also
 checks invalid numeric edits keep the Sheet open and Escape closes it from a
@@ -150,15 +188,48 @@ exercise action routing and state restoration, not pixel parity, physical drag
 feel, macOS accessibility behavior, or sustained 2,000-row scroll performance.
 Those require a visual and interaction comparison with the web app on a Mac.
 
-The implementation-session launch check reached the executable but the sandbox
-denied access to the default Application Support directory. Startup printed the
-IO error and exited without a panic; the required five-second native launch
-check therefore did **not** pass in this environment. Run the command on the
-host with access to that directory before judging native startup or visuals.
+Milestone 1b validation uses GPUI headless tests only. The GUI is deliberately
+not launched in this resource-constrained session; pixel parity, physical drag
+feel and native accessibility still need host-side visual verification.
 
 Regenerate domain golden fixtures from the repository root with `npx tsx scripts/export-domain-fixtures.ts`.
 If a sandbox denies the tsx CLI's IPC socket, `node --import tsx scripts/export-domain-fixtures.ts`
 runs the same exporter without that socket. The exporter never queries PostgreSQL.
+
+### Milestone 1b differences from the web UI
+
+- Native GPUI dropdown menus, text controls, focus outlines and centered Sheets
+  approximate the web primitives; no CSS, tokens, colors, fonts or radii were added.
+  Gear retains its virtualized card slices. Text keyboard shortcuts remain native.
+- **Desktop-only category management needs Thai's approval before product adoption.**
+  This spike exposes existing store category commands in More → Manage categories.
+  Category/loadout names use inline fields rather than browser prompts, and their
+  ordering uses ↑/↓. Meal lines also offer ↑/↓ ordering.
+- BaseBar implements the requested category bar with hover/focus item popovers;
+  the web's optional pie chart and category-detail modal are not ported. At half
+  width the stacked page scrolls around a finite 500px virtual-list viewport.
+- Meal amount **Set** and serving-preview **Show** are explicit commit controls;
+  the web updates these fields continuously. Type and hot/cold changes persist
+  immediately; recipe text and amounts use Save. Unsaved navigation uses a Sheet.
+  Measurement/linking opens the ingredient Sheet rather than expanding below a line.
+  Pantry deletion is immediate and undoable rather than using a browser confirmation.
+- Packaged search is disabled with “Packaged search needs a connection.” Search
+  uses bundled reference data, not remote density lookup. Ranking's final
+  description tie-break uses lowercase Rust lexical order, not ICU English collation;
+  rare punctuation/accent ties can differ. Seven top-three TypeScript goldens pass.
+- There are no browser deep links to meals or trip back-links in this milestone.
+  All data is local, mutations are synchronous and no web pending indicator is needed.
+
+### Module map
+
+`strider-app/src/main.rs` owns startup/profile/reset flags; `app.rs` owns the
+window, root, actions, routing and appearance; `shell.rs` owns header/nav.
+`gear/` contains inventory, the virtual list, dialog, BaseBar, loadouts/categories
+and wishlist. `food/` contains pantry, meals, meal editor, ingredient dialog and
+reference search. `strider-ui/src/controls.rs` supplies the ported Select,
+Textarea, SegmentedControl, WornToggle, InfoBadge, Badge tones and accent Checkbox.
+`strider-store::reference` embeds `lib/usda-reference-data.json` using `include_str!`
+and parses it once with `serde_json`; no new crates or online fetching are required.
 
 ## Port boundaries
 

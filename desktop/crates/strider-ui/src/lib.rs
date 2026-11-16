@@ -1,6 +1,8 @@
 //! Topo primitives. Color tokens are generated from the web application's stylesheet.
 pub mod categories;
 pub use categories::category_color;
+mod controls;
+pub use controls::*;
 use gpui::{prelude::*, *};
 use std::{borrow::Cow, sync::Arc};
 include!(concat!(env!("OUT_DIR"), "/theme.rs"));
@@ -154,6 +156,8 @@ pub fn button(
     let base = div()
         .id(id)
         .role(Role::Button)
+        .focusable()
+        .focus_visible(move |s| s.border_2().border_color(theme.accent))
         .flex()
         .items_center()
         .justify_center()
@@ -269,6 +273,8 @@ pub fn icon_button(id: impl Into<ElementId>, kind: Icon, theme: Theme) -> Statef
     div()
         .id(id)
         .role(Role::Button)
+        .focusable()
+        .focus_visible(move |s| s.border_2().border_color(theme.accent))
         .aria_label(match kind {
             Icon::Grip => "Reorder gear",
             Icon::ChevronDown => "Expand kit",
