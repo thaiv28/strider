@@ -582,10 +582,10 @@ installs a strictly newer semver.
 | Variable | Used by | Meaning |
 | --- | --- | --- |
 | `STRIDER_UPDATE_URL` | `bundle`, `release`, `publish` | HTTPS URL of `manifest.json`, baked into the build (`StriderUpdateURL`). Default: `https://strider-releases.thaiv.dev/manifest.json`. Updates stay off in builds without `STRIDER_UPDATE_PUBKEY`. |
-| `STRIDER_UPDATE_PUBKEY` | `bundle`, `release` | Base64 ed25519 public key, baked in (`StriderUpdatePublicKey`). |
+| `STRIDER_UPDATE_PUBKEY` | `bundle`, `release` | Base64 ed25519 public key, baked in (`StriderUpdatePublicKey`). Default: `packaging/update-public-key.txt`. |
 | `STRIDER_SIGN_IDENTITY` | `sign` | Developer ID Application identity name. Unset: ad-hoc signing (`--sign -`, no timestamp) and a one-line notice. |
 | `STRIDER_NOTARY_PROFILE` | `notarize`, `release` | A `notarytool` keychain profile (`xcrun notarytool store-credentials <name>`). Unset: notarization is skipped and the missing variable is printed. |
-| `STRIDER_UPDATE_SIGNING_KEY` | `release` | Base64 32-byte seed. Unset: no `manifest.json` is written. Must match `STRIDER_UPDATE_PUBKEY` when both are set. Keep it out of the repo. |
+| `STRIDER_UPDATE_SIGNING_KEY` | `release` | Base64 32-byte seed. Default: the login Keychain item `dev.thaiv.strider.update-signing` (where the current seed lives). Neither: no `manifest.json` is written. Must match `STRIDER_UPDATE_PUBKEY` when both are set. Keep it out of the repo. |
 | `STRIDER_RELEASE_URL` | `release` | Zip URL for the manifest. Default: the manifest URL with its file name replaced by `Strider-<version>.zip`. |
 | `STRIDER_RELEASE_NOTES` | `release` | Text shown in the update Sheet. |
 
@@ -603,8 +603,6 @@ the key baked into them.
 ### Cut a release
 
 ```sh
-export STRIDER_UPDATE_PUBKEY=...        # from keygen
-export STRIDER_UPDATE_SIGNING_KEY=...   # from keygen
 export STRIDER_SIGN_IDENTITY="Developer ID Application: <Name> (<TEAMID>)"
 export STRIDER_NOTARY_PROFILE=<profile>
 cargo xtask release

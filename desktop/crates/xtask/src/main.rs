@@ -266,11 +266,7 @@ fn bundle(release: bool) -> Result<PathBuf> {
     fs::create_dir_all(&resources).map_err(|e| e.to_string())?;
     fs::copy(&binary, macos.join("strider")).map_err(|e| format!("{}: {e}", binary.display()))?;
     let version = app_version()?;
-    let plist = info_plist(
-        &version,
-        &update_url(),
-        &env_var("STRIDER_UPDATE_PUBKEY").unwrap_or_default(),
-    );
+    let plist = info_plist(&version, &update_url(), &update_pubkey());
     let plist_path = app.join("Contents/Info.plist");
     fs::write(&plist_path, plist).map_err(|e| e.to_string())?;
     run(Command::new("/usr/bin/plutil")
@@ -389,10 +385,39 @@ fn sha256_hex(path: &Path) -> Result<String> {
         .collect())
 }
 
-/// The signing key from `STRIDER_UPDATE_SIGNING_KEY` (base64 32-byte seed), if set.
+/// Keychain item holding the release signing seed (`security add-generic-password -s ...`).
+const SIGNING_KEYCHAIN_SERVICE: &str = "dev.thaiv.strider.update-signing";
+
+/// The public key baked into builds: `STRIDER_UPDATE_PUBKEY`, else the committed
+/// `packaging/update-public-key.txt`.
+fn update_pubkey() -> String {
+    env_var("STRIDER_UPDATE_PUBKEY").unwrap_or_else(|| {
+        fs::read_to_string(root().join("packaging/update-public-key.txt"))
+            .map(|s| s.trim().to_owned())
+            .unwrap_or_default()
+    })
+}
+
+/// The signing key from `STRIDER_UPDATE_SIGNING_KEY` (base64 32-byte seed), else from the
+/// login Keychain item `dev.thaiv.strider.update-signing`, if either exists.
 fn signing_key() -> Result<Option<SigningKey>> {
-    let Some(text) = env_var("STRIDER_UPDATE_SIGNING_KEY") else {
-        return Ok(None);
+    let text = match env_var("STRIDER_UPDATE_SIGNING_KEY") {
+        Some(text) => text,
+        None => {
+            let out = Command::new("/usr/bin/security")
+                .args([
+                    "find-generic-password",
+                    "-s",
+                    SIGNING_KEYCHAIN_SERVICE,
+                    "-w",
+                ])
+                .output()
+                .map_err(|e| format!("security: {e}"))?;
+            if !out.status.success() {
+                return Ok(None);
+            }
+            String::from_utf8_lossy(&out.stdout).trim().to_owned()
+        }
     };
     let seed: [u8; 32] = STANDARD
         .decode(text.trim())
@@ -400,9 +425,8 @@ fn signing_key() -> Result<Option<SigningKey>> {
         .and_then(|b| b.try_into().ok())
         .ok_or("STRIDER_UPDATE_SIGNING_KEY must be a base64 32-byte seed")?;
     let key = SigningKey::from_bytes(&seed);
-    if let Some(public) = env_var("STRIDER_UPDATE_PUBKEY")
-        && public.trim() != STANDARD.encode(key.verifying_key().to_bytes())
-    {
+    let public = update_pubkey();
+    if !public.is_empty() && public != STANDARD.encode(key.verifying_key().to_bytes()) {
         return Err("STRIDER_UPDATE_SIGNING_KEY does not match STRIDER_UPDATE_PUBKEY".into());
     }
     Ok(Some(key))
