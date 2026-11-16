@@ -21,6 +21,7 @@ pub(super) struct AccountState {
     pub offline: bool,
     message: Option<String>,
     pub sheet: bool,
+    pub update: super::updates::UpdateState,
 }
 enum AuthResult {
     SignedIn(strider_sync::Result<auth::Session>),
@@ -52,6 +53,7 @@ impl AppView {
             Ok(None) => (),
             Err(e) => self.account.message = Some(e.to_string()),
         }
+        self.account.update.init();
         self.start_polling(cx);
     }
     /// GPUI's timer only polls thread channels; all HTTP, Keychain writes and
@@ -66,6 +68,7 @@ impl AppView {
                     .update(cx, |this, cx| {
                         this.poll_sync(cx);
                         this.poll_jobs(cx);
+                        this.poll_updates(cx);
                     })
                     .is_err()
                 {

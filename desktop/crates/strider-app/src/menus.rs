@@ -7,6 +7,7 @@ actions!(
     strider,
     [
         About,
+        CheckForUpdates,
         OpenSettings,
         NewWindow,
         NewTrip,
@@ -73,6 +74,7 @@ pub(crate) fn key_bindings() -> Vec<KeyBinding> {
 pub(crate) fn commands() -> Vec<(&'static str, Box<dyn Action>)> {
     vec![
         ("About Strider", About.boxed_clone()),
+        ("Check for Updates", CheckForUpdates.boxed_clone()),
         ("Settings", OpenSettings.boxed_clone()),
         ("New Window", NewWindow.boxed_clone()),
         ("New Gear", AddGear.boxed_clone()),
@@ -108,6 +110,15 @@ pub(crate) fn app_menus() -> Vec<Menu> {
     vec![
         Menu::new("Strider").items([
             MenuItem::action("About Strider", About),
+            // Enabled only when the bundle names an update URL and key.
+            MenuItem::action(
+                if strider_update::Config::from_bundle().is_some() {
+                    "Check for Updates\u{2026}"
+                } else {
+                    "Updates are not configured"
+                },
+                CheckForUpdates,
+            ),
             MenuItem::separator(),
             MenuItem::action("Settings\u{2026}", OpenSettings),
             MenuItem::separator(),

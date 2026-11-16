@@ -24,6 +24,8 @@ mod share;
 mod shell;
 #[path = "trips/mod.rs"]
 mod trips;
+#[path = "updates.rs"]
+mod updates;
 #[path = "windows.rs"]
 mod windows;
 use food::{FoodState, ingredient_dialog::IngredientEditor, meal_editor::MealEditor};
@@ -481,6 +483,11 @@ impl Render for AppView {
                     .on_action(cx.listener(|this, _: &SyncNow, _, cx| this.sync_now(cx)))
             })
             .on_action(cx.listener(|this, _: &ShowSyncStatus, _, cx| this.show_sync_status(cx)))
+            .when(self.updates_enabled(cx), |d| {
+                d.on_action(
+                    cx.listener(|this, _: &CheckForUpdates, _, cx| this.check_for_updates(cx)),
+                )
+            })
             .on_action(
                 cx.listener(|this, _: &CommandPalette, window, cx| this.toggle_palette(window, cx)),
             )
@@ -724,6 +731,7 @@ impl AppView {
             || self.offline.sheet
             || self.share.open
             || self.account.sheet
+            || self.account.update.sheet
             || self.pending_navigation.is_some()
             || self.editor.is_some()
             || self.replacements.is_some()
@@ -737,6 +745,7 @@ impl AppView {
         self.offline.sheet = false;
         self.share.open = false;
         self.account.sheet = false;
+        self.account.update.sheet = false;
         self.pending_navigation = None;
         self.editor = None;
         self.replacements = None;
@@ -793,6 +802,8 @@ impl AppView {
             Some(self.render_share_sheet(cx))
         } else if self.account.sheet {
             Some(self.render_sync_sheet(cx))
+        } else if self.account.update.sheet {
+            Some(self.render_update_sheet(cx))
         } else if self.pending_navigation.is_some() {
             Some(self.render_navigation_guard(cx))
         } else if self.replacements.is_some() {

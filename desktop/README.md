@@ -522,3 +522,85 @@ signed-in server behind `strider_sync::Transport`, and recorded response bodies 
 - Calendar display zone is a parameter (`Zone`, an `rrule::Tz`): pass `Tz::LOCAL` in the app.
   Windows zone names are mapped for a few common zones; unknown `TZID`s are treated as floating.
 - `geocode` calls a server route that answers 501 today and maps to `NotImplemented`.
+
+## Distribution (milestone 5b)
+
+Strider ships as a signed `Strider.app` in a zip, with a self-hosted, ed25519-signed
+manifest for updates (ADR 0006). All tasks run from `desktop/` as `cargo xtask <task>`.
+
+| Task | What it does |
+| --- | --- |
+| `bundle [--release]` | Builds `strider` and assembles `target/bundle/Strider.app`: `Info.plist` (bundle id `dev.thaiv.strider`, version from `strider-app`'s `Cargo.toml`, macOS 13.0+, `strider://` scheme, GPX viewer), `AppIcon.icns` rendered from `app/icon.svg`, and `assets/`. |
+| `sign` | Signs the binary then the bundle with the hardened runtime and `packaging/Strider.entitlements` (network client, user-selected files; no JIT), then runs `codesign --verify --deep --strict`. |
+| `notarize` | Zips the bundle, submits it with `notarytool --wait`, staples and checks with `spctl`. |
+| `release` | `bundle --release`, `sign`, `notarize` when configured, then `target/release-artifacts/Strider-<version>.zip` and `manifest.json`. |
+| `keygen` | Prints a new update key pair (base64) to stdout. |
+
+Bump `version` in `crates/strider-app/Cargo.toml` before every release; the updater only
+installs a strictly newer semver.
+
+### Environment variables
+
+| Variable | Used by | Meaning |
+| --- | --- | --- |
+| `STRIDER_UPDATE_URL` | `bundle`, `release` | HTTPS URL of `manifest.json`, baked into the build (`StriderUpdateURL`). Empty means updates are off. |
+| `STRIDER_UPDATE_PUBKEY` | `bundle`, `release` | Base64 ed25519 public key, baked in (`StriderUpdatePublicKey`). |
+| `STRIDER_SIGN_IDENTITY` | `sign` | Developer ID Application identity name. Unset: ad-hoc signing (`--sign -`, no timestamp) and a one-line notice. |
+| `STRIDER_NOTARY_PROFILE` | `notarize`, `release` | A `notarytool` keychain profile (`xcrun notarytool store-credentials <name>`). Unset: notarization is skipped and the missing variable is printed. |
+| `STRIDER_UPDATE_SIGNING_KEY` | `release` | Base64 32-byte seed. Unset: no `manifest.json` is written. Must match `STRIDER_UPDATE_PUBKEY` when both are set. Keep it out of the repo. |
+| `STRIDER_RELEASE_URL` | `release` | Zip URL for the manifest. Default: the manifest URL with its file name replaced by `Strider-<version>.zip`. |
+| `STRIDER_RELEASE_NOTES` | `release` | Text shown in the update Sheet. |
+
+### Generate keys
+
+```sh
+cargo xtask keygen
+```
+
+Store `STRIDER_UPDATE_SIGNING_KEY` in a password manager or CI secret; it is never logged by
+any other task. Put `STRIDER_UPDATE_PUBKEY` in the environment of every `bundle`/`release`.
+Losing or rotating the key means shipping one more build by hand: installed apps only trust
+the key baked into them.
+
+### Cut a release
+
+```sh
+export STRIDER_UPDATE_URL=https://<host>/strider/manifest.json
+export STRIDER_UPDATE_PUBKEY=...        # from keygen
+export STRIDER_UPDATE_SIGNING_KEY=...   # from keygen
+export STRIDER_SIGN_IDENTITY="Developer ID Application: <Name> (<TEAMID>)"
+export STRIDER_NOTARY_PROFILE=<profile>
+cargo xtask release
+```
+
+Upload both files from `target/release-artifacts/` to the same public HTTPS directory:
+`manifest.json` at exactly `STRIDER_UPDATE_URL` and `Strider-<version>.zip` at the manifest's
+`url`. Upload the zip first, the manifest last. The manifest URL is fixed in every build, so
+choose the host once. The manifest is
+`{ version, url, sha256, size, signature, notes, minimum_os }`; `signature` is ed25519 over
+`"<version>\n<sha256>"`.
+
+### How the app updates
+
+With no `StriderUpdateURL`/`StriderUpdatePublicKey` in the running bundle's Info.plist (or
+when not running from a `.app`, as with `cargo run`) updates are off and the Strider menu
+shows a disabled "Updates are not configured". Otherwise the primary window checks 30 s
+after launch and every 24 h, and on Strider > Check for Updates…. It fetches the manifest,
+verifies the signature, and compares semver. A newer release shows "Strider <v> is available"
+with the notes and Install and Relaunch / Later (a background check only shows a toast). Install downloads the
+zip to a temp directory, checks size and SHA-256, unzips with `ditto`, runs
+`codesign --verify --deep --strict`, and requires the same bundle id and Team ID as the
+running app (ad-hoc builds compare the bundle id only). A detached helper then waits for the
+app to quit, swaps the bundles, relaunches with `open -n` and deletes the old copy.
+
+### Gatekeeper and ad-hoc builds
+
+Without `STRIDER_SIGN_IDENTITY` the bundle is ad-hoc signed: it runs on the machine that
+built it, but on another Mac Gatekeeper refuses it until the user right-clicks the app and
+chooses Open (then Open again), or approves it in System Settings > Privacy & Security.
+Only Developer ID-signed, notarized builds open with a double-click. Updates between ad-hoc
+builds work, because the bundle id check stands in for the Team ID.
+
+Not covered by tests: notarization and a real signed update need an Apple Developer ID and an
+update host; the unit tests exercise the manifest, signature, hash and identity logic with
+fake transports.

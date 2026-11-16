@@ -6301,7 +6301,7 @@ dependencies = [
 
 [[package]]
 name = "strider-app"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "chrono",
  "gpui-component",
@@ -6316,6 +6316,7 @@ dependencies = [
  "strider-store",
  "strider-sync",
  "strider-ui",
+ "strider-update",
 ]
 
 [[package]]
@@ -6413,8 +6414,13 @@ dependencies = [
 name = "strider-update"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "ed25519-dalek",
  "semver",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "ureq",
 ]
 
 [[package]]
@@ -8392,6 +8398,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "ed25519-dalek",
+ "rand 0.9.5",
  "resvg 0.45.1",
  "serde_json",
  "sha2 0.10.9",
