@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
+edition = "2024"
+license = "UNLICENSED"
+publish = false
+
+[workspace.dependencies]
+# gpui-component 0.9.1 is built on gpui-pre 0.3.12. Pin both exactly and upgrade together.
+gpui = { package = "gpui-pre", version = "=0.3.12" }
+# runtime_shaders: compile Metal shaders at launch, so builds need only the Command Line Tools, not Xcode.
+gpui_platform = { package = "gpui-pre-platform", version = "=0.3.12", features = ["runtime_shaders", "font-kit"] }
+gpui-component = "=0.9.1"
+rusqlite = { version = "=0.41.1", features = ["bundled"] }
+uuid = { version = "=1.29.0", features = ["v7"] }
