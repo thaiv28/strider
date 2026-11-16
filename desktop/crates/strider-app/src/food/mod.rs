@@ -88,7 +88,10 @@ impl AppView {
         }
         self.food.editor = None;
         match next {
-            Navigation::Area(area) => self.area = area,
+            Navigation::Area(area) => {
+                self.area = area;
+                self.trips.selected = None;
+            }
             Navigation::Pantry(pantry) => self.food.pantry = pantry,
             Navigation::Meal(Some(id)) => self.open_meal(id, w, cx),
             Navigation::Meal(None) => {}

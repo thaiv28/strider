@@ -8,3 +8,5 @@ publish.workspace = true
 [dependencies]
 gpui.workspace = true
 gpui-component.workspace = true
+strider-map = { path = "../strider-map" }
+strider-core = { path = "../strider-core" }

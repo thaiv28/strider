@@ -6181,7 +6181,10 @@ dependencies = [
  "gpui-component",
  "gpui-pre",
  "gpui-pre-platform",
+ "rusqlite",
+ "serde_json",
  "strider-core",
+ "strider-map",
  "strider-store",
  "strider-sync",
  "strider-ui",
@@ -6194,6 +6197,13 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "strider-map"
+version = "0.1.0"
+dependencies = [
+ "ureq",
 ]
 
 [[package]]
@@ -6229,6 +6239,8 @@ version = "0.1.0"
 dependencies = [
  "gpui-component",
  "gpui-pre",
+ "strider-core",
+ "strider-map",
 ]
 
 [[package]]

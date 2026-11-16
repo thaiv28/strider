@@ -26,6 +26,11 @@ enum AuthResult {
     SignedIn(strider_sync::Result<auth::Session>),
     SignedOut(strider_sync::Result<()>),
 }
+impl AccountState {
+    pub(crate) fn syncing(&self) -> bool {
+        self.handle.is_some()
+    }
+}
 impl AppView {
     pub(super) fn configure_account(
         &mut self,

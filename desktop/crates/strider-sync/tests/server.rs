@@ -2,7 +2,9 @@
 //! the same user; TOKEN_OTHER is a separate user for the isolation test.
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
-use strider_store::{Command, GearInput, IngredientInput, MealPatch, Store, TABLES};
+use strider_store::{
+    AddTripFood, Command, GearInput, IngredientInput, MealPatch, Site, Store, TABLES,
+};
 use strider_sync::{Client, engine::SyncEngine};
 fn client(key: &str) -> Client {
     Client::new(
@@ -341,4 +343,175 @@ fn permit_round_trip_two_devices() {
     );
     let _ = std::fs::remove_dir_all(a.store.data_dir());
     let _ = std::fs::remove_dir_all(b.store.data_dir());
+}
+#[test]
+#[ignore = "requires local server and two same-user device tokens"]
+fn trip_two_device_convergence() {
+    let ca = client("STRIDER_TEST_TOKEN_A");
+    let mut a = SyncEngine::new(Store::in_memory().unwrap(), ca.clone());
+    let mut b = SyncEngine::new(Store::in_memory().unwrap(), client("STRIDER_TEST_TOKEN_B"));
+    settle(&mut a, &mut b);
+    let baseline: Vec<(String, String)> = TABLES
+        .iter()
+        .flat_map(|t| {
+            ids(&a.store, t)
+                .into_iter()
+                .map(move |id| (t.to_string(), id))
+        })
+        .collect();
+    let mut cleanup = Cleanup {
+        client: ca.clone(),
+        rows: vec![],
+    };
+    // Run the scenario in a closure so rows are registered for cleanup even if an assertion fails.
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let nonce = batch_id();
+        let name = format!("STRIDER-DESKTOP-TEST-{nonce}");
+        let one = |s: &mut Store, table: &str, command: Command| {
+            let before = ids(s, table);
+            s.apply(command).unwrap();
+            ids(s, table)
+                .into_iter()
+                .find(|id| !before.contains(id))
+                .unwrap()
+        };
+        let gear = one(
+            &mut a.store,
+            "gear_item",
+            Command::CreateGear {
+                input: GearInput {
+                    name: name.clone(),
+                    quantity: 1,
+                    class: "base".into(),
+                    status: "current".into(),
+                    ..Default::default()
+                },
+            },
+        );
+        let loadout = one(
+            &mut a.store,
+            "loadout",
+            Command::CreateLoadout { name: name.clone() },
+        );
+        a.store
+            .apply(Command::SetLoadoutMember {
+                loadout: loadout.clone(),
+                item: gear,
+                present: true,
+                class: "base".into(),
+            })
+            .unwrap();
+        let trip = one(
+            &mut a.store,
+            "trip",
+            Command::CreateTrip {
+                name: name.clone(),
+                trail: None,
+                loadout: Some(loadout),
+            },
+        );
+        a.store
+            .apply(Command::AddTripDay { trip: trip.clone() })
+            .unwrap();
+        a.store
+            .apply(Command::AddTripDay { trip: trip.clone() })
+            .unwrap();
+        let cases: Value =
+            serde_json::from_str(include_str!("../../../fixtures/domain/gpx.json")).unwrap();
+        let xml = cases[11]["args"][0].as_str().unwrap().as_bytes().to_vec();
+        a.store
+            .apply(Command::AttachGpx {
+                trip: trip.clone(),
+                filename: "route.gpx".into(),
+                bytes: xml,
+            })
+            .unwrap();
+        let points = a.store.trip_detail(&trip).unwrap().unwrap().points;
+        let mid = &points[points.len() / 2];
+        a.store
+            .apply(Command::AddCampsite {
+                trip: trip.clone(),
+                site: Site {
+                    distance_mi: mid.d,
+                    lat: Some(mid.lat),
+                    lon: Some(mid.lon),
+                    ele_ft: Some(mid.e as i32),
+                },
+            })
+            .unwrap();
+        let ingredient = one(
+            &mut a.store,
+            "ingredient",
+            Command::CreateIngredient {
+                input: IngredientInput {
+                    name: name.clone(),
+                    ..Default::default()
+                },
+            },
+        );
+        a.store
+            .apply(Command::AddTripMeal {
+                trip: trip.clone(),
+                day: 1,
+                entry: AddTripFood::Ingredient {
+                    ingredient,
+                    grams: 80.,
+                },
+            })
+            .unwrap();
+        let tg = ids(&a.store, "trip_gear");
+        a.store
+            .apply(Command::SetTripGearPacked {
+                trip: trip.clone(),
+                id: tg[0].clone(),
+                packed: true,
+            })
+            .unwrap();
+        settle(&mut a, &mut b);
+        assert_eq!(rows(&a.store), rows(&b.store));
+        // Device B edits the same trip, then both converge with a fresh pull.
+        b.store
+            .apply(Command::SetTripGearPacked {
+                trip: trip.clone(),
+                id: tg[0].clone(),
+                packed: false,
+            })
+            .unwrap();
+        b.store
+            .apply(Command::SetTripGearQty {
+                trip: trip.clone(),
+                id: tg[0].clone(),
+                qty: 2.,
+            })
+            .unwrap();
+        b.store
+            .apply(Command::SaveTripPackingList {
+                trip: trip.clone(),
+                packing_list: "Stove\nWater".into(),
+            })
+            .unwrap();
+        b.store
+            .apply(Command::AddTripDay { trip: trip.clone() })
+            .unwrap();
+        settle(&mut a, &mut b);
+        let mut server = SyncEngine::new(Store::in_memory().unwrap(), ca.clone());
+        server.sync_once().unwrap();
+        assert_eq!(rows(&a.store), rows(&b.store));
+        assert_eq!(rows(&a.store), rows(&server.store));
+        let detail = a.store.trip_detail(&trip).unwrap().unwrap();
+        assert_eq!(detail.packed_count, 0);
+        assert_eq!(detail.packing_list.as_deref(), Some("Stove\nWater"));
+        assert_eq!(detail.campsites.len(), 1);
+    }));
+    for table in TABLES {
+        for id in ids(&a.store, table) {
+            if !baseline.contains(&(table.to_string(), id.clone())) {
+                cleanup.rows.push((table.to_string(), id));
+            }
+        }
+    }
+    drop(cleanup);
+    if let Err(panic) = result {
+        std::panic::resume_unwind(panic);
+    }
 }

@@ -1,11 +1,12 @@
-# Strider Desktop — milestone 3a (Trip backend)
+# Strider Desktop — milestone 3b (Trips, Basecamp, Trip page)
 
 Native Rust/GPUI Gear and Food areas on a local SQLite workspace.
 Gear includes inventory, kits, loadouts, category management and wishlist projections.
 Food includes Meals, Ingredients, measured recipe lines and bundled USDA search.
 Device sign-in and background push/pull synchronization use the versioned `/api/v1`
-server API. Settings contains Account controls. Basecamp, Trips and Calendar remain
-navigation placeholders; packaged-product lookup is not implemented.
+server API. Settings contains Account controls. Trips, Basecamp and the Trip page are
+implemented (below); Calendar remains a navigation placeholder; packaged-product
+lookup is not implemented.
 
 Run from `desktop/` so rustup selects the pinned toolchain:
 
@@ -388,3 +389,36 @@ use supplied density instead of remote density lookup. Non-finite file-derived
 storage values are rejected. Existing UUID tie-breaking and lexical shopping
 ordering differences remain. Real-server convergence (four ignored tests) still
 requires maintainer verification; offline fakes exercise the transfer boundary.
+
+## Milestone 3b: Trips, Basecamp and the Trip page
+
+Areas: **Trips** (grouped list with route thumbnails, New trip, Import trip JSON,
+delete with undo), **Basecamp** (next trip, recent trips including completed, quick
+links; no weather), and the **Trip page** (route card with a native raster
+`RouteMap` and `ElevationProfile`; Logistics, Planning, Gear, Food and Report
+sections; permit document; options; read-only for `view` access).
+
+Keyboard: ⌘N New trip (Trips) or Add gear (Gear); ⌘O import/attach a file on a
+Trip page (GPX, permit PDF/image, trip JSON); ⌘E export GPX; ⌘Z / ⇧⌘Z undo/redo;
+⌘+ / ⌘− zoom the map (map focused). Dropping a `.gpx`, PDF or image on the window
+attaches it to the open trip. Map: drag or trackpad-scroll to pan, pinch or
+double-click to zoom, click near the route (or the profile) to add a campsite,
+drag a campsite marker to move it.
+
+Tile cache: `~/Library/Caches/Strider/tiles/<source>/<z>/<x>/<y>` (falls back to
+`<data dir>/cache` without `$HOME`), capped at 500 MB with least-recently-used
+eviction, tiles kept at most 30 days, up to 4 concurrent fetches with
+`User-Agent: StriderDesktop/<version>`. Sources match the web (USGS Topo to zoom 16,
+OpenStreetMap to zoom 19). Without a cached or fetched tile the map shows the
+`map` token background with the route and markers. Tests inject a fake fetcher
+and never use the network.
+
+Differences from the web (spike): rasters are drawn by GPUI, not MapLibre
+(no vector styling, hillshade, or satellite); the list and trip details use
+plain stacked cards and dialogs rather than the web's inline editors; gear/meal
+reordering is by "Move up"/category choice rather than drag; permits open in the
+system viewer from a temporary copy; weather, snow, share, print and Plan with AI
+are absent; the elevation profile paints one stroked line over a filled area with
+campsite lines instead of the web's per-day coloring.
+The live Trip convergence test is `trip_two_device_convergence` in
+`crates/strider-sync/tests/server.rs` (ignored; same environment variables).

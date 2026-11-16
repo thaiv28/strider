@@ -6,6 +6,8 @@ mod food;
 mod gear;
 #[path = "shell.rs"]
 mod shell;
+#[path = "trips/mod.rs"]
+mod trips;
 use food::{FoodState, ingredient_dialog::IngredientEditor, meal_editor::MealEditor};
 use gear::dialog::Editor;
 use gear::list::Entry;
@@ -38,7 +40,9 @@ actions!(
         Light,
         Dark,
         System,
-        AddGear
+        AddGear,
+        ImportGpx,
+        ExportGpx
     ]
 );
 struct FrameLog {
@@ -108,6 +112,7 @@ pub(crate) struct AppView {
     replacements: Option<String>,
     manager: Option<Manager>,
     food: FoodState,
+    trips: trips::TripsState,
     pending_navigation: Option<Navigation>,
     wishlist: bool,
     wishlist_query: Entity<InputState>,
@@ -156,6 +161,7 @@ impl AppView {
             replacements: None,
             manager: None,
             food: FoodState::new(window, cx),
+            trips: trips::TripsState::new(cx),
             pending_navigation: None,
             wishlist: false,
             wishlist_query: input("", false, window, cx),
@@ -172,6 +178,7 @@ impl AppView {
                     cx.notify();
                 }
             }));
+        this.subscribe_routes(cx);
         this.reload(cx);
         this.loadout = this
             .loadouts
@@ -220,6 +227,7 @@ impl AppView {
             self.refresh_subtotals()?;
             self.food.ingredients = self.store.ingredients()?;
             self.food.meals = self.store.meals()?;
+            self.reload_trips(cx)?;
             Ok(())
         })();
         match result {
@@ -340,6 +348,7 @@ impl Render for AppView {
             }
             "Food" => self.render_food(_window, cx),
             "Settings" => self.render_account(cx),
+            "Trips" | "Basecamp" => self.render_trips(_window, cx),
             _ => strider_ui::page_body(
                 vec![
                     div()
@@ -354,6 +363,13 @@ impl Render for AppView {
         let overlay = self.render_overlay(_window, cx);
         div()
             .size_full()
+            .on_drop(cx.listener(|this, paths: &ExternalPaths, _, cx| {
+                if this.area == "Trips" && this.trips.selected.is_some() {
+                    for path in paths.paths() {
+                        this.trip_file(path.clone(), cx);
+                    }
+                }
+            }))
             .relative()
             .body()
             .bg(t.canvas)
@@ -377,8 +393,21 @@ impl Render for AppView {
                 }
             }))
             .on_action(cx.listener(|this, _: &AddGear, window, cx| {
+                if this.area == "Trips" && !this.overlay_open() {
+                    this.new_trip_dialog(window, cx);
+                }
                 if this.area == "Gear" && !this.overlay_open() {
                     this.add_gear(window, cx);
+                }
+            }))
+            .on_action(cx.listener(|this, _: &ImportGpx, _, cx| {
+                if this.area == "Trips" && this.trips.detail.is_some() && !this.overlay_open() {
+                    this.pick_trip_file(cx);
+                }
+            }))
+            .on_action(cx.listener(|this, _: &ExportGpx, _, cx| {
+                if this.area == "Trips" && this.trips.detail.is_some() && !this.overlay_open() {
+                    this.export_trip_gpx(cx);
                 }
             }))
             .on_action(cx.listener(|this, _: &Find, window, cx| {
@@ -426,6 +455,8 @@ pub(crate) fn menus(cx: &mut App) {
         KeyBinding::new("backspace", DeleteSelected, Some("Gear")),
         KeyBinding::new("cmd-f", Find, None),
         KeyBinding::new("cmd-n", AddGear, None),
+        KeyBinding::new("cmd-o", ImportGpx, None),
+        KeyBinding::new("cmd-e", ExportGpx, None),
         KeyBinding::new("escape", Escape, None),
         KeyBinding::new("cmd-z", Undo, Some("Gear")),
         KeyBinding::new("cmd-shift-z", Redo, Some("Gear")),
@@ -443,7 +474,9 @@ pub(crate) fn menus(cx: &mut App) {
             MenuItem::action("Paste", gpui_component::input::Paste),
             MenuItem::action("Select all", gpui_component::input::SelectAll),
             MenuItem::separator(),
-            MenuItem::action("Add gear", AddGear),
+            MenuItem::action("Add gear or trip", AddGear),
+            MenuItem::action("Import GPX", ImportGpx),
+            MenuItem::action("Export GPX", ExportGpx),
             MenuItem::action("Find gear", Find),
             MenuItem::action("Select next", SelectNext),
             MenuItem::action("Select previous", SelectPrevious),
@@ -597,7 +630,8 @@ impl AppView {
         .into_any_element()
     }
     fn overlay_open(&self) -> bool {
-        self.account.sheet
+        self.trips.editor.is_some()
+            || self.account.sheet
             || self.pending_navigation.is_some()
             || self.editor.is_some()
             || self.replacements.is_some()
@@ -605,6 +639,7 @@ impl AppView {
             || self.food.ingredient_editor.is_some()
     }
     fn close_overlays(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.trips.editor = None;
         self.account.sheet = false;
         self.pending_navigation = None;
         self.editor = None;
@@ -652,7 +687,9 @@ impl AppView {
             .into_any_element()
     }
     fn render_overlay(&self, window: &mut Window, cx: &Context<Self>) -> Option<AnyElement> {
-        if self.account.sheet {
+        if self.trips.editor.is_some() {
+            Some(self.render_trip_editor(cx))
+        } else if self.account.sheet {
             Some(self.render_sync_sheet(cx))
         } else if self.pending_navigation.is_some() {
             Some(self.render_navigation_guard(cx))
@@ -776,6 +813,7 @@ pub(crate) fn launch(store: Store, path: std::path::PathBuf, server: String) {
                 strider_ui::set_appearance(Appearance::System, window, cx);
                 let gear = cx.new(|cx| {
                     let mut view = AppView::new(store, window, cx);
+                    view.configure_tiles(cx);
                     view.configure_account(path, server, cx);
                     view
                 });

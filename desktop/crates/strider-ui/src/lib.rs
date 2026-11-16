@@ -463,3 +463,6 @@ pub fn contour_band(theme: Theme) -> impl IntoElement {
     .inset_0()
     .size_full()
 }
+
+pub mod route;
+pub use route::{ElevationProfile, RouteClick, RouteMap, route_thumbnail};
