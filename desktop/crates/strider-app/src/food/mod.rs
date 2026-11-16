@@ -91,6 +91,7 @@ impl AppView {
             Navigation::Area(area) => {
                 self.area = area;
                 self.trips.selected = None;
+                self.trips.detail = None;
                 // Calendar and Settings read their data fresh on every visit.
                 self.cal.data = None;
                 self.settings = None;

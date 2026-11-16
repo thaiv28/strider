@@ -6311,6 +6311,7 @@ dependencies = [
  "serde_json",
  "strider-core",
  "strider-map",
+ "strider-print",
  "strider-services",
  "strider-store",
  "strider-sync",
@@ -6346,8 +6347,10 @@ dependencies = [
 name = "strider-print"
 version = "0.1.0"
 dependencies = [
+ "flate2",
  "image",
  "pdf-writer",
+ "strider-map",
  "tiny-skia",
  "ttf-parser",
 ]

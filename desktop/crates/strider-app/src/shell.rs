@@ -148,7 +148,7 @@ impl AppView {
         };
         let tabs = div()
             .child(tabs)
-            .when_some(self.sync_status(), |d, status| {
+            .when_some(self.sync_status(cx), |d, status| {
                 d.child(
                     strider_ui::button("sync-status", status, ButtonVariant::Header, t).on_click(
                         cx.listener(|this, _, _, cx| {

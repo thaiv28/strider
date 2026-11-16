@@ -108,7 +108,7 @@ fn trip_flow(cx: &mut TestAppContext) {
     });
     cx.update(|_, cx| {
         view.update(cx, |g, cx| {
-            g.store.connection().execute_batch("INSERT INTO ingredient(sync_id,name,kcal_per_100g) VALUES('tti','Rice','350');INSERT INTO meal(sync_id,name,base_servings,water_ml) VALUES('ttm','Dinner',2,1000);INSERT INTO meal_ingredient(sync_id,meal_id,ingredient_id,snapshot_name,snapshot_kcal_per_100g,amount_g) VALUES('ttl','ttm','tti','Rice','350',200)").expect("sql");
+            g.store.borrow().connection().execute_batch("INSERT INTO ingredient(sync_id,name,kcal_per_100g) VALUES('tti','Rice','350');INSERT INTO meal(sync_id,name,base_servings,water_ml) VALUES('ttm','Dinner',2,1000);INSERT INTO meal_ingredient(sync_id,meal_id,ingredient_id,snapshot_name,snapshot_kcal_per_100g,amount_g) VALUES('ttl','ttm','tti','Rice','350',200)").expect("sql");
             g.command(Command::AddTripMeal { trip: id.clone(), day: 1, entry: AddTripFood::Meal { meal: "ttm".into(), servings: 1. } }, cx);
             let d = g.trips.detail.as_ref().expect("detail");
             assert!(!d.shopping.is_empty() && d.food.total_g > 0);
@@ -135,6 +135,7 @@ fn view_only_flow(cx: &mut TestAppContext) {
     cx.update(|w, cx| {
         view.update(cx, |g, cx| {
             g.store
+                .borrow()
                 .connection()
                 .execute("UPDATE trip SET access='view' WHERE sync_id=?1", [&id])
                 .expect("access");
@@ -165,6 +166,7 @@ fn set_access(view: &Entity<AppView>, id: &str, access: &str, cx: &mut VisualTes
     cx.update(|_, cx| {
         view.update(cx, |g, cx| {
             g.store
+                .borrow()
                 .connection()
                 .execute(
                     "UPDATE trip SET access=?1, trip_report='private' WHERE sync_id=?2",
@@ -289,6 +291,7 @@ fn a_revoked_shared_trip_disappears_with_a_toast(cx: &mut TestAppContext) {
             assert!(g.trips.detail.is_some() && g.toast.is_none());
             // The owner revokes access: the next pull deletes the trip row.
             g.store
+                .borrow()
                 .connection()
                 .execute("DELETE FROM trip WHERE sync_id=?1", [&id])
                 .expect("revoked");

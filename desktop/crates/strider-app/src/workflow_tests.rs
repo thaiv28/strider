@@ -170,7 +170,7 @@ fn food_volume_measure_reference_and_cross_area_undo_redo(cx: &mut TestAppContex
     cx.run_until_parked();
     cx.update(|w, cx| {
         view.update(cx, |g, cx| {
-            let before = g.store.ingredients().expect("ingredients");
+            let before = g.store.borrow().ingredients().expect("ingredients");
             g.area = "Food";
             g.open_ingredient(None, w, cx);
             let e = g.food.ingredient_editor.as_ref().expect("ingredient form");
@@ -436,7 +436,7 @@ fn account_pending_status_and_sheet_use_existing_shell(cx: &mut TestAppContext) 
     cx.run_until_parked();
     cx.update(|w, cx| {
         view.update(cx, |g, cx| {
-            assert!(g.sync_status().is_none());
+            assert!(g.sync_status(cx).is_none());
             g.area = "Settings";
             g.command(
                 Command::CreateMeal {
@@ -444,7 +444,7 @@ fn account_pending_status_and_sheet_use_existing_shell(cx: &mut TestAppContext) 
                 },
                 cx,
             );
-            assert_eq!(g.sync_status().as_deref(), Some("1 changes waiting"));
+            assert_eq!(g.sync_status(cx).as_deref(), Some("1 changes waiting"));
             g.account.sheet = true;
             assert!(g.overlay_open());
             assert!(g.render_overlay(w, cx).is_some());

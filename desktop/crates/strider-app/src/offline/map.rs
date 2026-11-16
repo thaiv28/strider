@@ -44,7 +44,7 @@ impl AppView {
         Region::for_route(&text(&d.fields, "sync_id"), &track)
     }
     pub(in crate::app) fn load_regions(&mut self) {
-        self.offline.regions = self.store.map_regions().unwrap_or_default();
+        self.offline.regions = self.store.borrow().map_regions().unwrap_or_default();
         self.offline.region = self
             .trips
             .selected
@@ -60,7 +60,8 @@ impl AppView {
         let Some(bbox) = overpass::track_bbox(&track, 0.01) else {
             return;
         };
-        let read = overpass::fetch_campsite_pois(&self.store, &CacheOnly, &SystemClock, &bbox);
+        let read =
+            overpass::fetch_campsite_pois(&self.store.borrow(), &CacheOnly, &SystemClock, &bbox);
         let stale = match read {
             Ok(c) => {
                 self.offline.pois = c.value;
@@ -114,9 +115,10 @@ impl AppView {
             total: estimate.tiles,
             ..Progress::default()
         };
-        if let Err(e) = self
-            .store
-            .save_map_region(&record(&region, begin, "downloading", now))
+        if let Err(e) =
+            self.store
+                .borrow()
+                .save_map_region(&record(&region, begin, "downloading", now))
         {
             self.offline.message = Some(e.to_string());
             cx.notify();
@@ -173,6 +175,7 @@ impl AppView {
         };
         if let Err(e) = self
             .store
+            .borrow()
             .save_map_region(&record(&region, last, state, now))
         {
             self.offline.message = Some(e.to_string());
@@ -206,7 +209,7 @@ impl AppView {
             return;
         }
         if let Err(e) = region::delete_region(
-            &self.store,
+            &self.store.borrow(),
             &self.offline.backend.tiles_root,
             &from_record(&rec),
         ) {

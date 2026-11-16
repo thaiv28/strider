@@ -44,7 +44,7 @@ impl AppView {
         match Keychain.load(&self.account.server) {
             Ok(Some(token)) => match Client::new(&self.account.server, Some(token)) {
                 Ok(client) => {
-                    self.account.email = self.store.state("account_email").ok().flatten();
+                    self.account.email = self.store.borrow().state("account_email").ok().flatten();
                     self.start_sync(client);
                 }
                 Err(e) => self.account.message = Some(e.to_string()),
@@ -52,8 +52,11 @@ impl AppView {
             Ok(None) => (),
             Err(e) => self.account.message = Some(e.to_string()),
         }
-        // GPUI's timer only polls thread channels; all HTTP, Keychain writes and
-        // callback listening run on OS threads and never block the render thread.
+        self.start_polling(cx);
+    }
+    /// GPUI's timer only polls thread channels; all HTTP, Keychain writes and
+    /// callback listening run on OS threads and never block the render thread.
+    pub(super) fn start_polling(&mut self, cx: &mut Context<Self>) {
         cx.spawn(async move |this, cx| {
             loop {
                 cx.background_executor()
@@ -72,14 +75,61 @@ impl AppView {
         })
         .detach();
     }
+    /// Take over sign-in and sync from a window that is closing.
+    pub(super) fn adopt_account(&mut self, account: AccountState, cx: &mut Context<Self>) {
+        self.account = account;
+        cx.notify();
+    }
+    /// Run a sync command in the window that owns sync, and bring that window forward.
+    /// Returns whether this window forwarded it.
+    pub(super) fn forward_to_primary(
+        &self,
+        cx: &mut Context<Self>,
+        command: impl FnOnce(&mut AppView, &mut Context<AppView>),
+    ) -> bool {
+        let Some((primary, window)) = self.primary(cx) else {
+            return false;
+        };
+        primary.update(cx, command);
+        let _ = window.update(cx, |_, window, _| window.activate_window());
+        true
+    }
+    pub(super) fn sync_now(&mut self, cx: &mut Context<Self>) {
+        if self.forward_to_primary(cx, |p, cx| p.sync_now(cx)) {
+            return;
+        }
+        if let Some(h) = &self.account.handle {
+            h.now();
+        }
+        self.account.sheet = true;
+        cx.notify();
+    }
+    pub(super) fn show_sync_status(&mut self, cx: &mut Context<Self>) {
+        if self.forward_to_primary(cx, |p, cx| p.show_sync_status(cx)) {
+            return;
+        }
+        self.account.sheet = true;
+        cx.notify();
+    }
+    /// Whether the workspace is signed in (asked of the window that owns the account).
+    pub(super) fn signed_in(&self, cx: &App) -> bool {
+        match self.primary(cx) {
+            Some((primary, _)) => primary.read(cx).account.client.is_some(),
+            None => self.account.client.is_some(),
+        }
+    }
     fn start_sync(&mut self, client: Client) {
         let (tx, rx) = mpsc::channel();
         self.account.handle = Some(engine::spawn(&self.account.path, client.clone(), tx));
         self.account.events = Some(rx);
         self.account.client = Some(client);
     }
-    pub(super) fn nudge_sync(&self) {
+    pub(super) fn nudge_sync(&self, cx: &App) {
         if let Some(h) = &self.account.handle {
+            h.nudge();
+        } else if let Some((primary, _)) = self.primary(cx)
+            && let Some(h) = &primary.read(cx).account.handle
+        {
             h.nudge();
         }
     }
@@ -124,7 +174,7 @@ impl AppView {
                 SyncEvent::Started => (),
                 SyncEvent::Finished(report) => {
                     self.account.offline = false;
-                    self.account.email = self.store.state("account_email").ok().flatten();
+                    self.account.email = self.store.borrow().state("account_email").ok().flatten();
                     self.account.message = None;
                     if !report.tables.is_empty() {
                         self.reload_changes(
@@ -153,14 +203,17 @@ impl AppView {
             cx.notify();
         }
     }
-    fn sign_in(&mut self, cx: &mut Context<Self>) {
+    pub(super) fn sign_in(&mut self, cx: &mut Context<Self>) {
+        if self.forward_to_primary(cx, |p, cx| p.sign_in(cx)) {
+            return;
+        }
         if self.account.busy {
             return;
         }
         self.account.busy = true;
         self.account.message = None;
         let server = self.account.server.clone();
-        let expected = self.store.state("account_email").ok().flatten();
+        let expected = self.store.borrow().state("account_email").ok().flatten();
         let (tx, rx) = mpsc::channel();
         self.account.auth = Some(rx);
         std::thread::spawn(move || {
@@ -187,7 +240,10 @@ impl AppView {
         });
         cx.notify();
     }
-    fn sign_out(&mut self, cx: &mut Context<Self>) {
+    pub(super) fn sign_out(&mut self, cx: &mut Context<Self>) {
+        if self.forward_to_primary(cx, |p, cx| p.sign_out(cx)) {
+            return;
+        }
         if self.account.busy {
             return;
         }
@@ -212,8 +268,11 @@ impl AppView {
         });
         cx.notify();
     }
-    pub(super) fn sync_status(&self) -> Option<String> {
-        let pending = self.store.pending_count().unwrap_or_default();
+    pub(super) fn sync_status(&self, cx: &App) -> Option<String> {
+        if self.primary(cx).is_some() {
+            return None;
+        }
+        let pending = self.store.borrow().pending_count().unwrap_or_default();
         if self.account.offline {
             Some(format!("Offline · {pending} changes waiting"))
         } else if pending > 0 {
@@ -230,7 +289,11 @@ impl AppView {
             .flex_col()
             .gap_3()
             .child(div().card_heading().child("Account"));
-        if self.account.client.is_some() {
+        if self.primary(cx).is_some() {
+            card = card.child(div().meta(t).child(
+                "Sign-in and sync are managed in the first Strider window. Use the Sync menu.",
+            ));
+        } else if self.account.client.is_some() {
             card = card
                 .child(
                     self.account
@@ -284,16 +347,17 @@ impl AppView {
         card
     }
     pub(super) fn dismiss_conflict(&mut self, id: i64, cx: &mut Context<Self>) {
-        if let Err(e) = self.store.dismiss_conflict(id) {
+        if let Err(e) = self.store.borrow().dismiss_conflict(id) {
             self.error = Some(e.to_string());
         }
         cx.notify();
     }
     pub(super) fn render_sync_sheet(&self, cx: &Context<Self>) -> AnyElement {
         let t = Theme::get(cx);
-        let pending = self.store.pending_count().unwrap_or_default();
+        let pending = self.store.borrow().pending_count().unwrap_or_default();
         let last = self
             .store
+            .borrow()
             .state("last_sync")
             .ok()
             .flatten()
@@ -323,7 +387,7 @@ impl AppView {
         if let Some(message) = &self.account.message {
             content = content.child(div().meta(t).child(message.clone()));
         }
-        match self.store.conflicts() {
+        match self.store.borrow().conflicts() {
             Ok(conflicts) => {
                 for c in conflicts {
                     let copy = c.text.clone();
@@ -374,7 +438,7 @@ impl AppView {
             }
             Err(e) => content = content.child(e.to_string()),
         }
-        match self.store.rejections() {
+        match self.store.borrow().rejections() {
             Ok(rejected) => {
                 for r in rejected {
                     content = content.child(
@@ -413,7 +477,7 @@ mod tests {
         cx.run_until_parked();
         let id = with_view(&view, &mut cx, |g, _, cx| {
             g.store
-                .connection()
+                .borrow().connection()
                 .execute_batch(
                     "INSERT INTO conflict(tbl,sync_id,col,local_value,server_value) VALUES('trip','t','planning_notes','mine','their longer text');
                      INSERT INTO sync_log(kind,detail) VALUES('rejected','batch 7: stale');",
@@ -421,19 +485,19 @@ mod tests {
                 .expect("conflict");
             g.account.sheet = true;
             cx.notify();
-            let conflicts = g.store.conflicts().expect("conflicts");
+            let conflicts = g.store.borrow().conflicts().expect("conflicts");
             assert_eq!(conflicts.len(), 1);
             assert_eq!(conflicts[0].text, "their longer text");
-            assert_eq!(g.store.rejections().expect("rejections").len(), 1);
+            assert_eq!(g.store.borrow().rejections().expect("rejections").len(), 1);
             conflicts[0].id
         });
         cx.run_until_parked(); // renders the sheet with Copy, Dismiss and Sync now
         with_view(&view, &mut cx, |g, w, cx| {
             assert!(g.render_overlay(w, cx).is_some());
             g.dismiss_conflict(id, cx);
-            assert!(g.store.conflicts().expect("conflicts").is_empty());
+            assert!(g.store.borrow().conflicts().expect("conflicts").is_empty());
             assert_eq!(
-                g.store.rejections().expect("rejections").len(),
+                g.store.borrow().rejections().expect("rejections").len(),
                 1,
                 "rejections stay listed"
             );

@@ -123,7 +123,7 @@ impl AppView {
         let camps: Vec<_> = camps(d).into_iter().map(|(_, c)| c).collect();
         let xml = build_gpx(&name, &points, &camps);
         let filename = gpx_filename(&name);
-        let receiver = cx.prompt_for_new_path(self.store.data_dir(), Some(&filename));
+        let receiver = cx.prompt_for_new_path(self.store.borrow().data_dir(), Some(&filename));
         cx.spawn(async move |this, cx| match receiver.await {
             Ok(Ok(Some(path))) => {
                 let task = cx
@@ -153,10 +153,11 @@ impl AppView {
         let result = (|| -> Result<(), String> {
             let bytes = self
                 .store
+                .borrow()
                 .blob_bytes(&p.sha256)
                 .map_err(|e| e.to_string())?
                 .ok_or("Not downloaded")?;
-            let dir = self.store.data_dir().join("permit-viewer");
+            let dir = self.store.borrow().data_dir().join("permit-viewer");
             std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
             let filename = Path::new(&p.filename)
                 .file_name()
@@ -178,7 +179,7 @@ impl AppView {
         let root = std::env::var_os("HOME")
             .map(PathBuf::from)
             .map(|p| p.join("Library/Caches/Strider"))
-            .unwrap_or_else(|| self.store.data_dir().join("cache"));
+            .unwrap_or_else(|| self.store.borrow().data_dir().join("cache"));
         self.offline.backend.tiles_root = root.join("tiles");
         match strider_map::TileCache::new(
             root,

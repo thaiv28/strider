@@ -6,10 +6,16 @@ mod calendar;
 mod food;
 #[path = "gear/mod.rs"]
 mod gear;
+#[path = "menus.rs"]
+mod menus;
 #[path = "offline/mod.rs"]
 mod offline;
+#[path = "palette.rs"]
+mod palette;
 #[path = "panels.rs"]
 mod panels;
+#[path = "print.rs"]
+mod print;
 #[path = "settings.rs"]
 mod settings;
 #[path = "share.rs"]
@@ -18,12 +24,15 @@ mod share;
 mod shell;
 #[path = "trips/mod.rs"]
 mod trips;
+#[path = "windows.rs"]
+mod windows;
 use food::{FoodState, ingredient_dialog::IngredientEditor, meal_editor::MealEditor};
 use gear::dialog::Editor;
 use gear::list::Entry;
 use gear::loadouts::Manager;
 use gpui::{prelude::*, *};
 use gpui_component::input::{InputEvent, InputState};
+use menus::*;
 use std::collections::BTreeMap;
 use std::{
     collections::HashSet,
@@ -35,6 +44,7 @@ use strider_store::{
     Command, ComponentInput, GearFilter, GearInput, GearRow, Group, StatusFilter, Store, Totals,
 };
 use strider_ui::{Appearance, ButtonVariant, Icon, Theme, TopoStyle};
+use windows::SharedStore;
 actions!(
     strider,
     [
@@ -101,7 +111,8 @@ pub(crate) enum Navigation {
     CreateMeal,
 }
 pub(crate) struct AppView {
-    store: Store,
+    entity_id: EntityId,
+    store: SharedStore,
     account: account::AccountState,
     groups: Vec<Group>,
     totals: Totals,
@@ -136,11 +147,22 @@ pub(crate) struct AppView {
     wishlist_loadout: Option<String>,
     error: Option<String>,
     appearance: Appearance,
+    palette: Option<palette::PaletteState>,
+    /// A right-click menu on a Trip row: its id and where to draw the menu.
+    trip_menu: Option<(String, Point<Pixels>)>,
+    window_title: String,
+    seen_frame: Option<String>,
+    frame_pending: bool,
     _subscriptions: Vec<Subscription>,
     frames: FrameLog,
 }
 impl AppView {
+    #[cfg(test)]
     pub(crate) fn new(store: Store, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        Self::build(SharedStore::new(store), window, cx)
+    }
+    /// A window over a workspace that other windows may share.
+    pub(crate) fn build(store: SharedStore, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let filter_input = cx.new(|cx| InputState::new(window, cx).placeholder("Search gear"));
         let subscription = cx.subscribe_in(&filter_input, window, |this, input, event, _, cx| {
             if matches!(event, InputEvent::Change) {
@@ -148,8 +170,8 @@ impl AppView {
                 this.reload(cx);
             }
         });
-        let appearance_sub = cx.observe_window_appearance(window, |this, window, cx| {
-            if this.appearance == Appearance::System {
+        let appearance_sub = cx.observe_window_appearance(window, |_, window, cx| {
+            if *cx.global::<Appearance>() == Appearance::System {
                 strider_ui::set_appearance(Appearance::System, window, cx);
                 cx.notify();
             }
@@ -157,6 +179,7 @@ impl AppView {
         let focus = cx.focus_handle();
         focus.focus(window, cx);
         let mut this = Self {
+            entity_id: cx.entity_id(),
             store,
             account: account::AccountState::default(),
             groups: Vec::new(),
@@ -191,6 +214,11 @@ impl AppView {
             wishlist_loadout: None,
             error: None,
             appearance: Appearance::System,
+            palette: None,
+            trip_menu: None,
+            window_title: String::new(),
+            seen_frame: None,
+            frame_pending: false,
             _subscriptions: vec![subscription, appearance_sub],
             frames: FrameLog::new(),
         };
@@ -202,6 +230,7 @@ impl AppView {
                 }
             }));
         this.subscribe_routes(cx);
+        this.register(window, cx);
         this.reload(cx);
         this.loadout = this
             .loadouts
@@ -216,10 +245,10 @@ impl AppView {
     }
     fn reload(&mut self, cx: &mut Context<Self>) {
         let result = (|| -> strider_store::Result<()> {
-            let view = self.store.gear_view()?;
+            let view = self.store.borrow().gear_view()?;
             self.all_gear = view.groups.into_iter().flat_map(|g| g.rows).collect();
             self.categories = view.category_options;
-            self.loadouts = self.store.loadout_data()?;
+            self.loadouts = self.store.borrow().loadout_data()?;
             if self
                 .loadout
                 .as_ref()
@@ -246,10 +275,10 @@ impl AppView {
                     .or_else(|| self.loadouts.loadouts.first())
                     .map(|l| l.id.clone());
             }
-            self.groups = self.store.gear_groups(&self.filter)?;
+            self.groups = self.store.borrow().gear_groups(&self.filter)?;
             self.refresh_subtotals()?;
-            self.food.ingredients = self.store.ingredients()?;
-            self.food.meals = self.store.meals()?;
+            self.food.ingredients = self.store.borrow().ingredients()?;
+            self.food.meals = self.store.borrow().meals()?;
             self.reload_trips(cx)?;
             Ok(())
         })();
@@ -266,15 +295,17 @@ impl AppView {
         // Every query model is derived from SQLite; propagated tables are included.
         if !changes.tables.is_empty() {
             self.reload(cx);
+            self.reload_other_windows(cx);
         } else {
             self.error = None;
             cx.notify();
         }
     }
     fn command(&mut self, command: Command, cx: &mut Context<Self>) {
-        match self.store.apply(command) {
+        let applied = self.store.borrow_mut().apply(command);
+        match applied {
             Ok(changes) => {
-                self.nudge_sync();
+                self.nudge_sync(cx);
                 self.reload_changes(changes, cx);
             }
             Err(e) => {
@@ -334,14 +365,15 @@ impl AppView {
         }
         self.food.editor = None;
         let result = if redo {
-            self.store.redo()
+            self.store.borrow_mut().redo()
         } else {
-            self.store.undo()
+            self.store.borrow_mut().undo()
         };
         match result {
             Ok(_) => {
-                self.nudge_sync();
+                self.nudge_sync(cx);
                 self.reload(cx);
+                self.reload_other_windows(cx);
             }
             Err(e) => {
                 self.error = Some(e.to_string());
@@ -358,6 +390,7 @@ impl AppView {
 impl Render for AppView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.frames.record();
+        self.sync_chrome(_window, cx);
         let t = Theme::get(cx);
         let shell = self.render_shell(cx);
         let header = self.render_header(cx);
@@ -399,7 +432,7 @@ impl Render for AppView {
             .bg(t.canvas)
             .text_color(t.ink)
             .track_focus(&self.focus)
-            .key_context("Gear")
+            .key_context(KeyContext::parse(&menus::key_context(self.area)).unwrap_or_default())
             .capture_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
                 if event.keystroke.key == "escape" {
                     this.close_overlays(window, cx);
@@ -416,24 +449,71 @@ impl Render for AppView {
                     this.edit(id, window, cx);
                 }
             }))
-            .on_action(cx.listener(|this, _: &AddGear, window, cx| {
-                if this.area == "Trips" && !this.overlay_open() {
-                    this.new_trip_dialog(window, cx);
-                }
-                if this.area == "Gear" && !this.overlay_open() {
-                    this.add_gear(window, cx);
-                }
+            .when(self.area == "Gear" && !self.overlay_open(), |d| {
+                d.on_action(cx.listener(|this, _: &AddGear, window, cx| this.add_gear(window, cx)))
+            })
+            .when(
+                matches!(self.area, "Trips" | "Basecamp") && !self.overlay_open(),
+                |d| {
+                    d.on_action(
+                        cx.listener(|this, _: &NewTrip, window, cx| {
+                            this.new_trip_dialog(window, cx)
+                        }),
+                    )
+                },
+            )
+            .when(self.can_import_gpx(), |d| {
+                d.on_action(cx.listener(|this, _: &ImportGpx, _, cx| this.pick_trip_file(cx)))
+            })
+            .when(self.can_export_gpx(), |d| {
+                d.on_action(cx.listener(|this, _: &ExportGpx, _, cx| this.export_trip_gpx(cx)))
+            })
+            .when(self.can_print() && !self.overlay_open(), |d| {
+                d.on_action(
+                    cx.listener(|this, _: &PrintTripSheet, _, cx| this.print_trip_sheet(cx)),
+                )
+            })
+            .when(!self.signed_in(cx), |d| {
+                d.on_action(cx.listener(|this, _: &SignIn, _, cx| this.sign_in(cx)))
+            })
+            .when(self.signed_in(cx), |d| {
+                d.on_action(cx.listener(|this, _: &SignOut, _, cx| this.sign_out(cx)))
+                    .on_action(cx.listener(|this, _: &SyncNow, _, cx| this.sync_now(cx)))
+            })
+            .on_action(cx.listener(|this, _: &ShowSyncStatus, _, cx| this.show_sync_status(cx)))
+            .on_action(
+                cx.listener(|this, _: &CommandPalette, window, cx| this.toggle_palette(window, cx)),
+            )
+            .on_action(cx.listener(|this, _: &About, _, cx| {
+                this.toast(format!(
+                    "Strider Desktop {} \u{b7} {}",
+                    env!("CARGO_PKG_VERSION"),
+                    WEBSITE
+                ));
+                cx.notify();
             }))
-            .on_action(cx.listener(|this, _: &ImportGpx, _, cx| {
-                if this.area == "Trips" && this.trips.detail.is_some() && !this.overlay_open() {
-                    this.pick_trip_file(cx);
-                }
+            .on_action(cx.listener(|this, _: &OpenSettings, window, cx| {
+                this.request_navigation(Navigation::Area("Settings"), window, cx)
             }))
-            .on_action(cx.listener(|this, _: &ExportGpx, _, cx| {
-                if this.area == "Trips" && this.trips.detail.is_some() && !this.overlay_open() {
-                    this.export_trip_gpx(cx);
-                }
+            .on_action(cx.listener(|this, _: &ShowGear, window, cx| {
+                this.request_navigation(Navigation::Area("Gear"), window, cx)
             }))
+            .on_action(cx.listener(|this, _: &ShowFood, window, cx| {
+                this.request_navigation(Navigation::Area("Food"), window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &ShowTrips, window, cx| {
+                this.request_navigation(Navigation::Area("Trips"), window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &ShowCalendar, window, cx| {
+                this.request_navigation(Navigation::Area("Calendar"), window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &ShowBasecamp, window, cx| {
+                this.request_navigation(Navigation::Area("Basecamp"), window, cx)
+            }))
+            .on_action(cx.listener(|_, _: &CloseWindow, window, _| window.remove_window()))
+            .on_action(cx.listener(|_, _: &Minimize, window, _| window.minimize_window()))
+            .on_action(cx.listener(|_, _: &Zoom, window, _| window.zoom_window()))
+            .on_action(cx.listener(|_, _: &ToggleFullScreen, window, _| window.toggle_fullscreen()))
             .on_action(cx.listener(|this, _: &Find, window, cx| {
                 if !this.overlay_open() {
                     let state = if this.area == "Food" {
@@ -469,6 +549,7 @@ impl Render for AppView {
                     }),
             )
             .children(overlay)
+            .children(self.render_trip_menu(cx))
             .when_some(self.toast.clone(), |d, (message, _)| {
                 d.child(
                     div()
@@ -494,49 +575,6 @@ impl Render for AppView {
                 )
             })
     }
-}
-pub(crate) fn menus(cx: &mut App) {
-    cx.bind_keys([
-        KeyBinding::new("down", SelectNext, Some("Gear")),
-        KeyBinding::new("up", SelectPrevious, Some("Gear")),
-        KeyBinding::new("enter", EditSelected, Some("Gear")),
-        KeyBinding::new("backspace", DeleteSelected, Some("Gear")),
-        KeyBinding::new("cmd-f", Find, None),
-        KeyBinding::new("cmd-n", AddGear, None),
-        KeyBinding::new("cmd-o", ImportGpx, None),
-        KeyBinding::new("cmd-e", ExportGpx, None),
-        KeyBinding::new("escape", Escape, None),
-        KeyBinding::new("cmd-z", Undo, Some("Gear")),
-        KeyBinding::new("cmd-shift-z", Redo, Some("Gear")),
-        KeyBinding::new("cmd-q", Quit, None),
-    ]);
-    cx.on_action(|_: &Quit, cx| cx.quit());
-    cx.set_menus([
-        Menu::new("Strider").items([MenuItem::action("Quit Strider", Quit)]),
-        Menu::new("Edit").items([
-            MenuItem::action("Undo", Undo),
-            MenuItem::action("Redo", Redo),
-            MenuItem::separator(),
-            MenuItem::action("Cut", gpui_component::input::Cut),
-            MenuItem::action("Copy", gpui_component::input::Copy),
-            MenuItem::action("Paste", gpui_component::input::Paste),
-            MenuItem::action("Select all", gpui_component::input::SelectAll),
-            MenuItem::separator(),
-            MenuItem::action("Add gear or trip", AddGear),
-            MenuItem::action("Import GPX", ImportGpx),
-            MenuItem::action("Export GPX", ExportGpx),
-            MenuItem::action("Find gear", Find),
-            MenuItem::action("Select next", SelectNext),
-            MenuItem::action("Select previous", SelectPrevious),
-            MenuItem::action("Edit item", EditSelected),
-            MenuItem::action("Delete item", DeleteSelected),
-        ]),
-        Menu::new("View").items([MenuItem::submenu(Menu::new("Appearance").items([
-            MenuItem::action("Light", Light),
-            MenuItem::action("Dark", Dark),
-            MenuItem::action("System", System),
-        ]))]),
-    ]);
 }
 #[cfg(test)]
 mod tests {
@@ -634,6 +672,7 @@ mod tests {
             !gear
                 .read_with(&cx, |g, _| g
                     .store
+                    .borrow()
                     .gear_groups(&GearFilter {
                         status: StatusFilter::All,
                         query: String::new()
@@ -647,6 +686,7 @@ mod tests {
         assert_eq!(
             gear.read_with(&cx, |g, _| g
                 .store
+                .borrow()
                 .gear_groups(&GearFilter {
                     status: StatusFilter::All,
                     query: String::new()
@@ -678,7 +718,9 @@ impl AppView {
         .into_any_element()
     }
     fn overlay_open(&self) -> bool {
-        self.trips.editor.is_some()
+        self.palette.is_some()
+            || self.trip_menu.is_some()
+            || self.trips.editor.is_some()
             || self.offline.sheet
             || self.share.open
             || self.account.sheet
@@ -689,6 +731,8 @@ impl AppView {
             || self.food.ingredient_editor.is_some()
     }
     fn close_overlays(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.palette = None;
+        self.trip_menu = None;
         self.trips.editor = None;
         self.offline.sheet = false;
         self.share.open = false;
@@ -739,7 +783,9 @@ impl AppView {
             .into_any_element()
     }
     fn render_overlay(&self, window: &mut Window, cx: &Context<Self>) -> Option<AnyElement> {
-        if self.trips.editor.is_some() {
+        if self.palette.is_some() {
+            Some(self.render_palette(cx))
+        } else if self.trips.editor.is_some() {
             Some(self.render_trip_editor(cx))
         } else if self.offline.sheet {
             Some(self.render_map_sheet(cx))
@@ -852,35 +898,27 @@ pub(crate) fn launch(store: Store, path: std::path::PathBuf, server: String) {
         gpui_component::init(cx);
         strider_ui::initialize(cx);
         menus(cx);
-        let bounds = Bounds::centered(None, size(px(1180.), px(820.)), cx);
-        cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                window_min_size: Some(size(px(640.), px(480.))),
-                titlebar: Some(TitlebarOptions {
-                    title: Some("Strider".into()),
-                    appears_transparent: true,
-                    traffic_light_position: Some(point(px(16.), px(22.))),
-                }),
-                app_owns_titlebar_drag: true,
-                ..Default::default()
-            },
-            move |window, cx| {
-                strider_ui::set_appearance(Appearance::System, window, cx);
-                let gear = cx.new(|cx| {
-                    let mut view = AppView::new(store, window, cx);
-                    view.configure_tiles(cx);
-                    view.configure_account(path, server, cx);
-                    view
-                });
-                cx.new(|cx| gpui_component::Root::new(gear, window, cx))
-            },
-        )
-        .expect("open the Strider window");
+        cx.default_global::<windows::Registry>().workspace = Some(windows::Workspace {
+            store: SharedStore::new(store),
+            path,
+            server,
+            live: true,
+        });
+        windows::open_window(cx, windows::WindowSpec::default());
+        // Closing the last window ends the app, as in a document-less tool.
+        cx.on_window_closed(|cx, _| {
+            if cx.windows().is_empty() {
+                cx.quit();
+            }
+        })
+        .detach();
         cx.activate(true);
     });
 }
 
+#[cfg(test)]
+#[path = "chrome_tests.rs"]
+mod chrome_tests;
 #[cfg(test)]
 #[path = "test_support.rs"]
 mod test_support;

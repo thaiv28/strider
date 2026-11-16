@@ -45,6 +45,16 @@ impl AppView {
             .border_b_1()
             .border_color(t.line)
             .cursor_pointer()
+            .on_mouse_down(
+                MouseButton::Right,
+                cx.listener({
+                    let id = id.clone();
+                    move |this, event: &MouseDownEvent, _, cx| {
+                        this.trip_menu = Some((id.clone(), event.position));
+                        cx.notify();
+                    }
+                }),
+            )
             .on_click(cx.listener(move |this, _, _, cx| this.open_trip(id.clone(), cx)))
             .child(strider_ui::route_thumbnail(
                 trip.track.clone().unwrap_or_default(),

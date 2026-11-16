@@ -101,13 +101,13 @@ impl AppView {
         );
     }
     pub(super) fn reload_trips(&mut self, cx: &mut Context<Self>) -> strider_store::Result<()> {
-        self.trips.list = self.store.trips_list()?;
+        self.trips.list = self.store.borrow().trips_list()?;
         self.notice_revoked_trips();
         self.trips.detail = self
             .trips
             .selected
             .as_ref()
-            .map(|id| self.store.trip_detail(id))
+            .map(|id| self.store.borrow().trip_detail(id))
             .transpose()?
             .flatten();
         if self.trips.selected.is_some() && self.trips.detail.is_none() {
@@ -490,7 +490,7 @@ impl AppView {
             cx,
         )
     }
-    fn all_trips(&self) -> Vec<TripSummary> {
+    pub(in crate::app) fn all_trips(&self) -> Vec<TripSummary> {
         self.trips
             .list
             .in_progress

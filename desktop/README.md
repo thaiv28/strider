@@ -1,4 +1,4 @@
-# Strider Desktop — milestone 4b (offline and sharing screens)
+# Strider Desktop — milestone 5a (native chrome and PDF trip sheet)
 
 Native Rust/GPUI Gear and Food areas on a local SQLite workspace.
 Gear includes inventory, kits, loadouts, category management and wishlist projections.
@@ -43,7 +43,8 @@ wrapping the application view in its `Root`.
 | `strider-store` | Local workspace schema, deterministic fixture, Gear/Food/Trip queries and commands, outbox batches, undo/redo |
 | `strider-sync` | Blocking HTTP, loopback PKCE sign-in, Keychain credentials, durable push/pull and background scheduling |
 | `strider-ui` | Generated Topo colors, embedded fonts, primitives, icons and contour drawing |
-| `strider-app` (`strider`) | Window/shell, Gear inventory/wishlist, Food pantry/meal editors, actions and drag/drop |
+| `strider-app` (`strider`) | Windows and shell, menu bar and key map, command palette, Gear inventory/wishlist, Food pantry/meal editors, Trips, actions and drag/drop |
+| `strider-print` | Letter PDF trip sheet: layout, embedded fonts, cached-tile map raster |
 
 `strider-ui/build.rs` reads the Topo light/dark blocks in `app/globals.css` and
 fails on property mismatches. Category colors are the ported web table. The
@@ -87,19 +88,85 @@ the returned `ChangeSet` (currently conservatively reloading all Gear/Food model
 Only field edits and view choices are kept locally. Undo/redo re-reads both areas
 and closes the meal editor so it cannot retain stale fields.
 
-| Shortcut | Action |
-| --- | --- |
-| ↑ / ↓ | Select previous/next item and reveal it |
-| Return | Edit selected item |
-| ⌘F | Focus the current Gear/Wishlist or Food search |
-| ⌘N | Open Add gear in the Gear area |
-| Escape | Leave search focus / close a Sheet; retain guarded meal edits |
-| ⌫ | Delete selected item, without confirmation |
-| ⌘Z / ⇧⌘Z | Undo / redo workspace command (native text undo inside inputs) |
-| ⌘Q | Quit |
+### Keyboard map
 
-The menu bar exposes these actions and View → Appearance → Light / Dark /
-System. Text inputs retain their native text editing shortcuts. Inventory
+Every command is one GPUI action, bound below and reachable from the menu bar; menu items
+disable themselves when the focused window cannot handle the action (for example Export GPX
+with no routed Trip open).
+
+| Shortcut | Action | Menu |
+| --- | --- | --- |
+| ⌘, | Settings | Strider |
+| ⌘H / ⌥⌘H | Hide Strider / Hide Others | Strider |
+| ⌘Q | Quit | Strider |
+| ⇧⌘N | New Window | File |
+| ⌘N | New Gear (in Gear), New Trip (in Trips and Basecamp) | File |
+| ⌘O | Import GPX… (a GPX, permit or Trip JSON into the open Trip) | File |
+| ⌘E | Export GPX… | File |
+| ⌘P | Print Trip Sheet… | File |
+| ⌘W | Close Window | File |
+| ⌘Z / ⇧⌘Z | Undo / Redo workspace command (native text undo inside inputs) | Edit |
+| ⌘X ⌘C ⌘V ⌘A | Cut, Copy, Paste, Select All | Edit |
+| ⌘F | Focus the current Gear/Wishlist or Food search | Edit |
+| ↑ / ↓, Return, ⌫ | Select previous/next item, edit it, delete it (Gear) | Edit |
+| ⌘K | Command palette | View |
+| ⌘1 ⌘2 ⌘3 ⌘4 ⌘5 | Gear, Food, Trips, Calendar, Basecamp | View |
+| ⌃⌘F | Enter Full Screen | View |
+| ⌘R | Sync Now | Sync |
+| ⌘M | Minimize | Window |
+| Escape | Close the palette, a menu or a Sheet; leave search focus; guarded meal edits are kept | |
+
+View → Appearance has Light / Dark / System. Sync also has Show Sync Status and Sign In… / Sign
+Out (only the one that applies is enabled). Window lists the open windows (macOS adds them);
+Help → Strider on the Web opens https://strider.thaiv.dev. ⌘N is bound per key context
+(`in-gear`, `in-trips`, `in-basecamp`), so the same chord does the right thing per area.
+
+### Command palette
+
+⌘K opens a Sheet listing every command that currently applies plus a "Go to" entry for every
+Trip, gear item and meal. Typing fuzzy-matches (case-insensitive subsequence; consecutive
+runs, word starts and prefixes score higher, longer labels cost a little). ↑/↓ choose,
+Return runs, Esc closes. At most 12 results show at once; keep typing to narrow them.
+
+### Multiple windows
+
+New Window (⇧⌘N) or a Trip row's right-click menu, "Open in New Window", opens another `AppView`
+over the **same** `Store` handle (`Rc<RefCell<Store>>`; every borrow is short and never held
+across a callback). Any command, undo/redo or sync pull in one window reloads every other
+window, and undo/redo stay one global history. Each window keeps its own area, selection and
+open Sheet. A window's title is its area, or the open Trip's name.
+
+The first window owns sign-in and background sync. Sync menu items and the Settings account
+card in other windows forward to it (and bring it forward); if it closes, the account and its
+sync thread pass to the oldest remaining window. Closing the last window quits the app.
+
+The window frame (position, size, maximized/full screen) and the area are saved after each
+change into the workspace's local, unsynced `sync_state` table (`window_frame`, `window_area`)
+and restored at the next launch; a frame that is off every connected display is ignored.
+Only the first window is restored; secondary windows are not reopened.
+
+### PDF trip sheet
+
+File → Print Trip Sheet… (⌘P) opens a save panel named `<gpx_filename stem>.pdf` (the same
+stem as Export GPX), renders the open Trip off the UI thread, writes the file and opens it with
+`open`. `crates/strider-print` builds the document with `pdf-writer`: Letter pages, text in the
+bundled Bricolage Grotesque and Instrument Sans (embedded, with a ToUnicode map, so text is real
+and selectable), colors from the light Topo tokens. Order: title, dates and nights, place,
+distance/gain/trailhead; the per-day Distance / Gain / Camp table with totals; Permit notes and
+the permit document reference; Gear (weight by class, then by category); Food per day;
+Campsites; then a full-page route map. The map is rasterized with `tiny-skia` from tiles
+already in the disk cache (`strider_map::read_cached`; the sheet never fetches), with parent
+tiles standing in for missing ones, the route drawn over them and the numbered campsites drawn
+as vector markers with real text. With no cached tiles the route is drawn over the `map` token
+color alone. Output is deterministic for a fixed input (no dates or random ids; compressed
+streams use a fixed zlib level).
+
+Differences from the web print page: the web page has no Gear, Food or Campsites sections,
+shows dates as "Jun 3, 2026 – Jun 6, 2026", prints an image permit on its own page, and prints
+from a browser; the desktop sheet adds those sections, uses the app's compact date range, and
+references an image permit by filename like a PDF one.
+
+Text inputs retain their native text editing shortcuts. Inventory
 selection/deletion is suspended while the Sheet is open. Weight accepts decimal
 oz, converts to integer grams on save, and allows blank for unknown weight.
 Quantity must be a positive integer. Invalid numeric input displays

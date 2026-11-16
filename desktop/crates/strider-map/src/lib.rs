@@ -435,6 +435,17 @@ impl TileCache {
         &self.root
     }
 }
+/// Bytes of a tile already on disk under a tile root, whatever its age. Never fetches.
+pub fn read_cached(root: &Path, source: Source, tile: Tile) -> Option<Vec<u8>> {
+    if !tile.valid() {
+        return None;
+    }
+    fs::read(tile_path(root, source, tile)).ok()
+}
+/// Whether a tile file exists under a tile root.
+pub fn is_cached(root: &Path, source: Source, tile: Tile) -> bool {
+    tile.valid() && tile_path(root, source, tile).is_file()
+}
 fn tile_path(root: &Path, source: Source, tile: Tile) -> PathBuf {
     root.join(source.name())
         .join(tile.z.to_string())

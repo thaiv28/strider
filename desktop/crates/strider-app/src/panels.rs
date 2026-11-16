@@ -264,7 +264,7 @@ impl AppView {
         }
         let input = PanelInput::from_trip(d);
         let data = compute(
-            &self.store,
+            &self.store.borrow(),
             &CacheOnly,
             &SystemClock,
             &input,

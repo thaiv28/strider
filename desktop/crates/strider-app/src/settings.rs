@@ -54,6 +54,7 @@ fn parse_color(s: &str) -> Option<String> {
 impl AppView {
     fn build_feeds(&self, w: &mut Window, cx: &mut Context<Self>) -> Vec<FeedEdit> {
         self.store
+            .borrow()
             .calendar_feeds()
             .unwrap_or_default()
             .into_iter()
@@ -66,9 +67,9 @@ impl AppView {
             .collect()
     }
     fn build_settings(&mut self, w: &mut Window, cx: &mut Context<Self>) -> SettingsState {
-        let e: EnergySettings = self.store.energy_settings().unwrap_or_default();
+        let e: EnergySettings = self.store.borrow().energy_settings().unwrap_or_default();
         let height = e.height_in.and_then(|h| h.to_string().parse::<f64>().ok());
-        let report = self.store.report_settings().unwrap_or_default();
+        let report = self.store.borrow().report_settings().unwrap_or_default();
         let energy = EnergyForm {
             bmr: input(e.bmr.to_string(), false, w, cx),
             cal: input(e.cal_per_mile.to_string(), false, w, cx),
@@ -706,7 +707,7 @@ mod tests {
             }
             g.settings.as_mut().expect("forms").energy.sex = "female".into();
             g.save_energy(cx);
-            let saved = g.store.energy_settings().expect("energy");
+            let saved = g.store.borrow().energy_settings().expect("energy");
             assert_eq!(
                 (saved.bmr, saved.cal_per_mile, saved.ft_per_mile),
                 (1800, 210, 600)
@@ -727,7 +728,10 @@ mod tests {
             let bmr = g.settings.as_ref().expect("forms").energy.bmr.clone();
             set(&bmr, "lots", w, cx);
             g.save_energy(cx);
-            assert_eq!(g.store.energy_settings().expect("energy").bmr, 1800);
+            assert_eq!(
+                g.store.borrow().energy_settings().expect("energy").bmr,
+                1800
+            );
             assert_eq!(
                 g.settings.as_ref().expect("forms").msg[ENERGY].as_deref(),
                 Some("Enter a number.")
@@ -740,7 +744,7 @@ mod tests {
             s.packing
                 .update(cx, |t, cx| t.set_value("- Map\n".to_owned(), w, cx));
             g.save_report(cx);
-            let report = g.store.report_settings().expect("report");
+            let report = g.store.borrow().report_settings().expect("report");
             assert_eq!(report.template.as_deref(), Some("# {{name}}\n"));
             assert_eq!(report.packing_default.as_deref(), Some("- Map\n"));
 
@@ -757,6 +761,7 @@ mod tests {
             }
             let labels = |g: &AppView| {
                 g.store
+                    .borrow()
                     .calendar_feeds()
                     .expect("feeds")
                     .into_iter()
@@ -773,7 +778,7 @@ mod tests {
             assert_eq!(labels(g), ["Work", "Home"], "a bad color saves nothing");
             set(&color, "#336699", w, cx);
             g.save_feed(0, cx);
-            let feeds = g.store.calendar_feeds().expect("feeds");
+            let feeds = g.store.borrow().calendar_feeds().expect("feeds");
             assert_eq!(
                 (feeds[0].label.as_str(), feeds[0].color.as_str()),
                 ("Office", "#336699")

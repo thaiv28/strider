@@ -63,12 +63,13 @@ fn trip_opened_offline_without_a_region_shows_the_map_message(cx: &mut TestAppCo
         )
         .expect("region");
         g.store
+            .borrow()
             .save_map_region(&super::map::record_for_tests(&region, "complete"))
             .expect("save");
         g.load_regions();
         assert!(g.has_offline_map());
         assert_eq!(g.map_message(&d), None, "a downloaded map needs no message");
-        g.store.delete_map_region(&trip).expect("delete");
+        g.store.borrow().delete_map_region(&trip).expect("delete");
         g.load_regions();
         assert!(g.map_message(&d).is_some());
         cx.notify();
@@ -122,7 +123,7 @@ fn region_download_reports_progress_completes_and_deletes(cx: &mut TestAppContex
     with_view(&view, &mut cx, |g, _, cx| {
         g.delete_region(&trip, cx);
         assert!(!g.has_offline_map());
-        assert!(g.store.map_region(&trip).expect("read").is_none());
+        assert!(g.store.borrow().map_region(&trip).expect("read").is_none());
         // The tiles stay cached but are no longer pinned, so clearing the cache frees them.
         assert!(strider_map::disk_usage(&root) > 0);
         g.clear_map_cache(cx);

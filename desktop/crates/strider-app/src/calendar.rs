@@ -86,7 +86,15 @@ impl AppView {
     /// Read the visible month from the feed cache and refresh stale feeds in the background.
     pub(super) fn load_calendar(&mut self, _cx: &mut Context<Self>) {
         let (y, m) = (self.cal.year, self.cal.month);
-        match load_month(&self.store, &CacheOnly, &SystemClock, y, m, Zone::LOCAL) {
+        let loaded = load_month(
+            &self.store.borrow(),
+            &CacheOnly,
+            &SystemClock,
+            y,
+            m,
+            Zone::LOCAL,
+        );
+        match loaded {
             Ok(month) => {
                 let wants = month.status.iter().any(|s| s.stale || s.error.is_some());
                 self.cal.data = Some(month);
@@ -450,9 +458,12 @@ mod tests {
                 },
                 cx,
             );
-            let feed = g.store.calendar_feeds().expect("feeds")[0].id.clone();
+            let feed = g.store.borrow().calendar_feeds().expect("feeds")[0]
+                .id
+                .clone();
             // The feed was fetched a moment ago; nothing here touches the network.
             g.store
+                .borrow()
                 .cache_put(
                     CacheKind::Calendar,
                     &feed,
