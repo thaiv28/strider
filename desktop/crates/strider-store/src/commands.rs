@@ -45,6 +45,136 @@ pub struct MealPatch {
 }
 #[derive(Debug, Clone)]
 pub enum Command {
+    CreateTrip {
+        name: String,
+        trail: Option<String>,
+        loadout: Option<String>,
+    },
+    UpdateTrip {
+        trip: String,
+        patch: Row,
+    },
+    DeleteTrip {
+        trip: String,
+    },
+    ImportTrip {
+        json: String,
+    },
+    SeedTripFromLoadout {
+        trip: String,
+        loadout: String,
+    },
+    AddTripGear {
+        trip: String,
+        gear: String,
+    },
+    RemoveTripGear {
+        trip: String,
+        id: String,
+    },
+    RestoreTripGear {
+        trip: String,
+        snapshot: Row,
+    },
+    SetTripGearClass {
+        trip: String,
+        id: String,
+        class: String,
+    },
+    SetTripGearQty {
+        trip: String,
+        id: String,
+        qty: f64,
+    },
+    SetTripGearPacked {
+        trip: String,
+        id: String,
+        packed: bool,
+    },
+    ClearTripGear {
+        trip: String,
+    },
+    MoveTripGear {
+        trip: String,
+        id: String,
+        category: String,
+        ordered_ids: Vec<String>,
+    },
+    SaveTripPackingList {
+        trip: String,
+        packing_list: String,
+    },
+    UpsertTripDay {
+        trip: String,
+        day: i32,
+        distance_mi: Option<Option<String>>,
+        elevation_gain_ft: Option<Option<i32>>,
+    },
+    AddTripDay {
+        trip: String,
+    },
+    DeleteTripDay {
+        trip: String,
+        id: String,
+    },
+    AddCampsite {
+        trip: String,
+        site: crate::trips::Site,
+    },
+    MoveCampsite {
+        trip: String,
+        id: String,
+        site: crate::trips::Site,
+    },
+    RemoveCampsite {
+        trip: String,
+        id: String,
+    },
+    ClearCampsites {
+        trip: String,
+    },
+    AttachGpx {
+        trip: String,
+        filename: String,
+        bytes: Vec<u8>,
+    },
+    ReverseGpx {
+        trip: String,
+    },
+    RemoveGpx {
+        trip: String,
+    },
+    RestoreGpx {
+        trip: String,
+        snapshot: Row,
+    },
+    AttachPermit {
+        trip: String,
+        filename: String,
+        mime_type: String,
+        bytes: Vec<u8>,
+    },
+    DeletePermit {
+        trip: String,
+    },
+    AddTripMeal {
+        trip: String,
+        day: i32,
+        entry: crate::trips::AddTripFood,
+    },
+    SetTripMealQty {
+        trip: String,
+        id: String,
+        qty: f64,
+    },
+    RemoveTripMeal {
+        trip: String,
+        id: String,
+    },
+    CopyTripMealToAll {
+        trip: String,
+        id: String,
+    },
     CreateGear {
         input: GearInput,
     },
@@ -175,6 +305,10 @@ pub(crate) struct Affected {
     pub gear: Vec<String>,
     pub ingredients: Vec<String>,
     pub meals: Vec<String>,
+    pub derive_days: BTreeSet<String>,
+    pub campsite_days: BTreeSet<String>,
+    pub food_trips: BTreeSet<String>,
+    pub trip_command: bool,
 }
 fn clean(v: Option<String>) -> Value {
     nullable(v.and_then(|v| {
@@ -362,7 +496,7 @@ fn set_member(
         _ => Ok(()),
     }
 }
-pub(crate) fn run(db: &Connection, cmd: Command) -> Result<Affected> {
+pub(crate) fn run(db: &Connection, cmd: Command, data_dir: &Path) -> Result<Affected> {
     let mut a = Affected::default();
     match cmd {
         Command::CreateGear { input } => {
@@ -788,6 +922,7 @@ pub(crate) fn run(db: &Connection, cmd: Command) -> Result<Affected> {
                 ids_where(db, "meal_ingredient", "meal_id", Some(&meal))?,
             )?;
         }
+        cmd => crate::trips::run(db, data_dir, cmd, &mut a)?,
     }
     Ok(a)
 }

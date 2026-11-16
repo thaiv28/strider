@@ -137,10 +137,33 @@ impl Store {
     pub fn set_cursor(&self, value: &str) -> Result<()> {
         self.set_state("cursor", value)
     }
+    /// Day edits made before the first campsite push need the server's generated IDs.
+    pub fn has_unresolved_day_edits(&self, batch: &OutboxBatch) -> Result<bool> {
+        for e in &batch.entries {
+            if e.table == "trip_day"
+                && self.connection.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM local_derived_day WHERE sync_id=? AND edited=1)",
+                    [&e.sync_id],
+                    |r| r.get::<_, bool>(0),
+                )?
+            {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+    /// A complete pull maps existing days. Unmatched edits are new explicit days.
+    pub fn finish_day_mapping(&self) -> Result<()> {
+        let tx = self.connection.unchecked_transaction()?;
+        tx.execute("DELETE FROM outbox WHERE tbl='trip_day' AND op='delete' AND sync_id IN (SELECT sync_id FROM local_derived_day WHERE edited=1)",[])?;
+        tx.execute("DELETE FROM local_derived_day WHERE edited=1", [])?;
+        tx.commit()?;
+        Ok(())
+    }
     pub fn pending_count(&self) -> Result<usize> {
         Ok(self
             .connection
-            .query_row("SELECT count(*) FROM outbox", [], |r| r.get::<_, i64>(0))?
+            .query_row("SELECT (SELECT count(*) FROM outbox)+(SELECT count(*) FROM permit_upload u JOIN trip_permit p ON p.trip_id=u.trip_id AND p.sha256=u.sha256)", [], |r| r.get::<_, i64>(0))?
             as usize)
     }
     /// Undo snapshots encompass the workspace. A pull invalidates all history,
@@ -327,6 +350,7 @@ impl Store {
         // Acknowledged rows exist remotely even before the next pull. This keeps
         // later queued edits from resending insert-only columns as an update.
         tx.execute("INSERT OR IGNORE INTO row_meta(tbl,sync_id,server_seq) SELECT tbl,sync_id,0 FROM outbox WHERE batch_id=? AND op='upsert'",[batch])?;
+        tx.execute("DELETE FROM permit_delete WHERE trip_id IN (SELECT trip_id FROM outbox WHERE batch_id=? AND tbl='trip_permit' AND op='delete')",[batch])?;
         tx.execute("DELETE FROM outbox WHERE batch_id=?", [batch])?;
         tx.execute("DELETE FROM sync_state WHERE key='inflight'", [])?;
         if !adopt.is_empty() {
@@ -426,6 +450,36 @@ impl Store {
         for r in ordered {
             let t = required(r, "table")?;
             let key = required(r, "sync_id")?;
+            // Binary PUT owns permit identities. Adopt metadata by its unique trip.
+            if t == "trip_permit"
+                && let Some(trip) = r.get("trip_id").and_then(Json::as_str)
+            {
+                tx.execute(
+                    "UPDATE trip_permit SET sync_id=? WHERE trip_id=? AND sync_id<>?",
+                    params![key, trip, key],
+                )?;
+            }
+            if t == "trip_day"
+                && let Some(trip) = r.get("trip_id").and_then(Json::as_str)
+            {
+                let day = r
+                    .get("day_number")
+                    .and_then(Json::as_i64)
+                    .ok_or_else(|| protocol("Missing day number"))?;
+                let local:Option<String>=tx.query_row("SELECT sync_id FROM local_derived_day WHERE trip_id=? AND day_number=? AND edited=1",params![trip,day],|r|r.get(0)).optional()?;
+                if let Some(local) = local {
+                    tx.execute(
+                        "UPDATE trip_day SET sync_id=? WHERE sync_id=?",
+                        params![key, local],
+                    )?;
+                    tx.execute(
+                        "UPDATE outbox SET sync_id=? WHERE tbl='trip_day' AND sync_id=?",
+                        params![key, local],
+                    )?;
+                    tx.execute("DELETE FROM local_derived_day WHERE sync_id=?", [local])?;
+                }
+                tx.execute("DELETE FROM trip_day WHERE trip_id=? AND sync_id IN (SELECT sync_id FROM local_derived_day WHERE edited=0)",[trip])?;
+            }
             let known = columns(&tx, t)?;
             let mut pending = BTreeSet::new();
             let entries = tx
@@ -434,7 +488,41 @@ impl Store {
                     Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
                 })?
                 .collect::<std::result::Result<Vec<_>, _>>()?;
-            let deleted = entries.iter().any(|(op, _)| op == "delete");
+            let deleting_permit = if t == "trip_permit" {
+                if let Some(trip) = r.get("trip_id").and_then(Json::as_str) {
+                    let deleting: bool = tx.query_row(
+                        "SELECT EXISTS(SELECT 1 FROM permit_delete WHERE trip_id=?)",
+                        [trip],
+                        |r| r.get(0),
+                    )?;
+                    if deleting {
+                        let queued:bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM outbox WHERE tbl='trip_permit' AND sync_id=? AND op='delete')",[key],|r|r.get(0))?;
+                        if !queued {
+                            tx.execute("INSERT INTO outbox(batch_id,tbl,sync_id,op,columns,created_at,trip_id) VALUES(?,'trip_permit',?,'delete','[]',strftime('%Y-%m-%dT%H:%M:%fZ','now'),?)",params![id(),key,trip])?;
+                        }
+                    }
+                    deleting
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+            let queued_permit = if t == "trip_permit" {
+                if let Some(trip) = r.get("trip_id").and_then(Json::as_str) {
+                    tx.query_row(
+                        "SELECT EXISTS(SELECT 1 FROM permit_upload WHERE trip_id=?)",
+                        [trip],
+                        |r| r.get::<_, bool>(0),
+                    )?
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+            let deleted =
+                deleting_permit || queued_permit || entries.iter().any(|(op, _)| op == "delete");
             for (_, cs) in entries {
                 pending.extend(serde_json::from_str::<Vec<String>>(&cs).map_err(protocol)?);
             }

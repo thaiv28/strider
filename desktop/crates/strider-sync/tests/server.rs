@@ -283,3 +283,62 @@ fn other_user_never_receives_private_rows() {
     b.sync_once().unwrap();
     assert!(b.store.row_values(&table, &id, &[]).unwrap().is_none());
 }
+
+#[test]
+#[ignore = "requires local server and two same-user device tokens"]
+fn permit_round_trip_two_devices() {
+    let ca = client("STRIDER_TEST_TOKEN_A");
+    let cb = client("STRIDER_TEST_TOKEN_B");
+    assert_eq!(
+        ca.request("GET", "/api/v1/me", None).unwrap()["email"],
+        cb.request("GET", "/api/v1/me", None).unwrap()["email"]
+    );
+    let mut cleanup = Cleanup {
+        client: ca.clone(),
+        rows: vec![],
+    };
+    let mut a = SyncEngine::new(Store::in_memory().unwrap(), ca);
+    let mut b = SyncEngine::new(Store::in_memory().unwrap(), cb);
+    a.store
+        .apply(Command::CreateTrip {
+            name: format!("STRIDER-DESKTOP-TEST-permit-{}", batch_id()),
+            trail: None,
+            loadout: None,
+        })
+        .unwrap();
+    let trip = ids(&a.store, "trip").remove(0);
+    cleanup.rows.push(("trip".into(), trip.clone()));
+    let bytes = b"%PDF-1.4\nStrider desktop permit fixture\n%%EOF\n".to_vec();
+    a.store
+        .apply(Command::AttachPermit {
+            trip: trip.clone(),
+            filename: "permit.pdf".into(),
+            mime_type: "application/pdf".into(),
+            bytes: bytes.clone(),
+        })
+        .unwrap();
+    settle(&mut a, &mut b);
+    let permit = b
+        .store
+        .permit_blobs()
+        .unwrap()
+        .into_iter()
+        .find(|p| p.trip_id == trip)
+        .unwrap();
+    assert_eq!(permit.state, "uploaded");
+    assert_eq!(permit.filename, "permit.pdf");
+    assert_eq!(b.store.blob_bytes(&permit.sha256).unwrap(), Some(bytes));
+    a.store
+        .apply(Command::DeletePermit { trip: trip.clone() })
+        .unwrap();
+    settle(&mut a, &mut b);
+    assert!(
+        !b.store
+            .permit_blobs()
+            .unwrap()
+            .iter()
+            .any(|p| p.trip_id == trip)
+    );
+    let _ = std::fs::remove_dir_all(a.store.data_dir());
+    let _ = std::fs::remove_dir_all(b.store.data_dir());
+}

@@ -8,12 +8,18 @@ use std::{
 use strider_core::units::Dec;
 use strider_core::{Cents, Grams};
 use uuid::Uuid;
+mod blobs;
 mod commands;
 mod fixture;
 mod propagation;
 mod queries;
 mod sync;
+mod trip_queries;
+mod trips;
+pub use blobs::*;
 pub use sync::*;
+pub use trip_queries::*;
+pub use trips::{AddTripFood, Site};
 pub mod reference;
 pub use commands::*;
 pub use fixture::*;
@@ -70,7 +76,11 @@ pub const TABLES: &[&str] = &[
     "trip_gpx",
     "trip_campsite",
 ];
-const MIGRATIONS: &[&str] = &[include_str!("schema.sql"), include_str!("sync.sql")];
+const MIGRATIONS: &[&str] = &[
+    include_str!("schema.sql"),
+    include_str!("sync.sql"),
+    include_str!("trips.sql"),
+];
 pub type Row = BTreeMap<String, Value>;
 type Snapshot = BTreeMap<String, BTreeMap<String, Row>>;
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -80,12 +90,15 @@ pub struct ChangeSet {
 struct Change {
     before: Snapshot,
     after: Snapshot,
+    direct: Snapshot,
+    trip_command: bool,
 }
 pub struct Store {
     connection: Connection,
     undo: Vec<Change>,
     redo: Vec<Change>,
     pull_generation: String,
+    data_dir: PathBuf,
 }
 pub fn default_path() -> Result<PathBuf> {
     Store::path_for_profile("dev")
@@ -115,7 +128,16 @@ impl Store {
         if let Some(p) = path.as_ref().parent().filter(|p| !p.as_os_str().is_empty()) {
             std::fs::create_dir_all(p)?;
         }
-        Self::from_connection(Connection::open(path)?)
+        {
+            let data_dir = path
+                .as_ref()
+                .parent()
+                .unwrap_or(Path::new("."))
+                .to_path_buf();
+            let mut store = Self::from_connection(Connection::open(path)?)?;
+            store.data_dir = data_dir;
+            Ok(store)
+        }
     }
     pub fn in_memory() -> Result<Self> {
         Self::from_connection(Connection::open_in_memory()?)
@@ -152,6 +174,7 @@ impl Store {
             undo: vec![],
             redo: vec![],
             pull_generation: String::new(),
+            data_dir: std::env::temp_dir().join(format!("strider-{}", id())),
         })
     }
     /// Connection access for diagnostics, import preparation, and integration tests.
@@ -164,14 +187,20 @@ impl Store {
             .connection
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
         let before = snapshot(&tx)?;
-        let affected = commands::run(&tx, command)?;
+        let affected = commands::run(&tx, command, &self.data_dir)?;
         let direct = snapshot(&tx)?;
+        let trip_command = affected.trip_command;
         propagation::run(&tx, affected)?;
         let after = snapshot(&tx)?;
         let changed = changes(&before, &after);
         append_outbox(&tx, &before, &direct)?;
         tx.commit()?;
-        self.undo.push(Change { before, after });
+        self.undo.push(Change {
+            before,
+            after,
+            direct,
+            trip_command,
+        });
         self.redo.clear();
         Ok(changed)
     }
@@ -197,6 +226,9 @@ impl Store {
             restore(
                 &self.connection,
                 if redo { &change.after } else { &change.before },
+                &change.before,
+                &change.direct,
+                change.trip_command,
             )?;
             Ok(true)
         })();
@@ -378,7 +410,17 @@ fn append_outbox(db: &Connection, a: &Snapshot, b: &Snapshot) -> Result<()> {
             if old.get(key) == new.get(key) {
                 continue;
             }
-            let (op, cols) = match new.get(key) {
+            if *table == "trip_permit" && (new.contains_key(key) || !db.query_row("SELECT EXISTS(SELECT 1 FROM row_meta WHERE tbl='trip_permit' AND sync_id=?)",[key],|r|r.get::<_,bool>(0))?) { continue; }
+            if *table == "trip_day"
+                && db.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM local_derived_day WHERE sync_id=? AND edited=0)",
+                    [key],
+                    |r| r.get::<_, bool>(0),
+                )?
+            {
+                continue;
+            }
+            let (op, mut cols) = match new.get(key) {
                 None => ("delete", vec![]),
                 Some(r) => (
                     "upsert",
@@ -391,6 +433,18 @@ fn append_outbox(db: &Connection, a: &Snapshot, b: &Snapshot) -> Result<()> {
                         .collect::<Vec<_>>(),
                 ),
             };
+            if *table == "trip_day"
+                && let Some(r) = new.get(key)
+            {
+                let local: bool = db.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM local_derived_day WHERE sync_id=? AND edited=1)",
+                    [key],
+                    |r| r.get(0),
+                )?;
+                if local {
+                    cols = r.keys().cloned().collect();
+                }
+            }
             let json = format!(
                 "[{}]",
                 cols.iter()
@@ -410,7 +464,13 @@ fn append_outbox(db: &Connection, a: &Snapshot, b: &Snapshot) -> Result<()> {
     }
     Ok(())
 }
-fn restore(db: &Connection, target: &Snapshot) -> Result<()> {
+fn restore(
+    db: &Connection,
+    target: &Snapshot,
+    original: &Snapshot,
+    direct: &Snapshot,
+    trip_command: bool,
+) -> Result<()> {
     let before = snapshot(db)?;
     let tx = db;
     tx.execute_batch("PRAGMA defer_foreign_keys=ON;")?;
@@ -441,7 +501,64 @@ fn restore(db: &Connection, target: &Snapshot) -> Result<()> {
             }
         }
     }
-    append_outbox(tx, &before, target)?;
+    // Restoring permit metadata schedules the retained file for binary transfer.
+    for (key, r) in &before["trip_permit"] {
+        if !target["trip_permit"].contains_key(key) && target["trip"].contains_key(s(r, "trip_id"))
+        {
+            tx.execute(
+                "INSERT OR IGNORE INTO permit_delete(trip_id) VALUES(?)",
+                [s(r, "trip_id")],
+            )?;
+        }
+    }
+    for (key, r) in &target["trip_permit"] {
+        if before["trip_permit"].get(key) != Some(r) {
+            tx.execute(
+                "DELETE FROM permit_delete WHERE trip_id=?",
+                [s(r, "trip_id")],
+            )?;
+            tx.execute("INSERT INTO permit_upload(trip_id,sha256) VALUES(?,?) ON CONFLICT(trip_id) DO UPDATE SET sha256=excluded.sha256",params![s(r,"trip_id"),s(r,"sha256")])?;
+        }
+    }
+    tx.execute(
+        "DELETE FROM permit_upload WHERE trip_id NOT IN (SELECT trip_id FROM trip_permit)",
+        [],
+    )?;
+    let mut wire_target = target.clone();
+    for table in ["trip", "trip_day"].into_iter().filter(|_| trip_command) {
+        let keys: BTreeSet<_> = before[table].keys().chain(target[table].keys()).collect();
+        for key in keys {
+            let old = original[table].get(key);
+            let new = direct[table].get(key);
+            if old == new {
+                if let Some(row) = before[table].get(key) {
+                    wire_target
+                        .get_mut(table)
+                        .expect("snapshot table")
+                        .insert(key.clone(), row.clone());
+                } else {
+                    wire_target
+                        .get_mut(table)
+                        .expect("snapshot table")
+                        .remove(key);
+                }
+            } else if let (Some(old), Some(new), Some(current), Some(restored)) =
+                (old, new, before[table].get(key), target[table].get(key))
+            {
+                let mut out = current.clone();
+                for (column, value) in restored {
+                    if old.get(column) != new.get(column) {
+                        out.insert(column.clone(), value.clone());
+                    }
+                }
+                wire_target
+                    .get_mut(table)
+                    .expect("snapshot table")
+                    .insert(key.clone(), out);
+            }
+        }
+    }
+    append_outbox(tx, &before, &wire_target)?;
     Ok(())
 }
 #[cfg(test)]

@@ -1,4 +1,4 @@
-use crate::{Client, Result, SyncError};
+use crate::{Client, Result, SyncError, Transport};
 use serde_json::{Value, json};
 use std::{
     collections::BTreeSet,
@@ -23,13 +23,57 @@ pub enum SyncEvent {
     UpgradeRequired,
     Error(String),
 }
-pub struct SyncEngine {
+pub struct SyncEngine<T: Transport = Client> {
     pub store: Store,
-    pub client: Client,
+    pub client: T,
 }
-impl SyncEngine {
-    pub fn new(store: Store, client: Client) -> Self {
+impl<T: Transport> SyncEngine<T> {
+    pub fn new(store: Store, client: T) -> Self {
         Self { store, client }
+    }
+    fn sync_blobs(&self) -> Result<BTreeSet<String>> {
+        let mut changed = BTreeSet::new();
+        for permit in self.store.permit_blobs()? {
+            if permit.state == "local_only" {
+                if self.store.server_seq("trip", &permit.trip_id)?.is_none() {
+                    continue;
+                }
+                let Some(bytes) = self.store.blob_bytes(&permit.sha256)? else {
+                    self.store.set_blob_state(&permit.sha256, "missing")?;
+                    continue;
+                };
+                let hash = self.client.upload_permit(
+                    &permit.trip_id,
+                    &permit.filename,
+                    &permit.mime_type,
+                    &bytes,
+                )?;
+                if hash != permit.sha256 {
+                    return Err(SyncError::Protocol("Permit hash mismatch".into()));
+                }
+                self.store
+                    .acknowledge_permit_upload(&permit.trip_id, &hash)?;
+                changed.insert("trip_permit".into());
+            } else if permit.state == "missing" && !permit.sha256.is_empty() {
+                match self.client.download_permit(&permit.trip_id) {
+                    Ok(bytes)
+                        if strider_store::blob_hash(&bytes) == permit.sha256
+                            && bytes.len() == permit.size_bytes =>
+                    {
+                        self.store.receive_blob(&permit.sha256, &bytes)?;
+                        changed.insert("trip_permit".into());
+                    }
+                    Ok(_) | Err(SyncError::Server(404)) => {
+                        self.store.set_blob_state(&permit.sha256, "missing")?;
+                    }
+                    Err(e) => {
+                        self.store.set_blob_state(&permit.sha256, "missing")?;
+                        return Err(e);
+                    }
+                }
+            }
+        }
+        Ok(changed)
     }
     pub fn operations(&self, batch: &OutboxBatch) -> Result<Value> {
         let snapshot = self
@@ -110,10 +154,7 @@ impl SyncEngine {
         let email = me["email"]
             .as_str()
             .ok_or_else(|| SyncError::Protocol("Missing account identity".into()))?;
-        let identity = format!(
-            "{}:{email}",
-            self.client.base_url.origin().ascii_serialization()
-        );
+        let identity = format!("{}:{email}", self.client.origin());
         if self
             .store
             .state("account_identity")?
@@ -126,6 +167,7 @@ impl SyncEngine {
         self.store.set_state("account_identity", &identity)?;
         self.store.set_state("account_email", email)?;
         let mut report = SyncReport::default();
+        let mut deferred_days = false;
         loop {
             // Persist exact payloads: retry safely after a lost response, including
             // when the UI edited the row again while the request was in flight.
@@ -137,6 +179,10 @@ impl SyncEngine {
                 let Some(batch) = batches.first() else {
                     break;
                 };
+                if self.store.has_unresolved_day_edits(batch)? {
+                    deferred_days = true;
+                    break;
+                }
                 let request = self.operations(batch)?;
                 self.store.set_state("inflight", &request.to_string())?;
                 request
@@ -196,6 +242,16 @@ impl SyncEngine {
         if self.store.state("pull_buffer")?.is_some() {
             return Err(SyncError::Protocol("Pulled rows reference unavailable parents; waiting for server visibility or a later page.".into()));
         }
+        self.store.finish_day_mapping()?;
+        if deferred_days {
+            let next = self.sync_once()?;
+            report.pushed += next.pushed;
+            report.pulled += next.pulled;
+            report.rejected += next.rejected;
+            report.tables.extend(next.tables);
+            return Ok(report);
+        }
+        report.tables.extend(self.sync_blobs()?);
         self.store.set_state(
             "last_sync",
             &std::time::SystemTime::now()

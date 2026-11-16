@@ -18,6 +18,15 @@ fn ingredient(r: &Row) -> Result<p::Ingredient> {
     })
 }
 pub(crate) fn run(db: &Connection, a: commands::Affected) -> Result<()> {
+    for trip in &a.campsite_days {
+        sync_campsite_days(db, trip)?;
+    }
+    for trip in &a.derive_days {
+        derive_days(db, trip)?;
+    }
+    for trip in &a.food_trips {
+        sync_food(db, trip)?;
+    }
     for key in a.gear {
         let r = row(db, "gear_item", &key)?;
         let item = p::GearItem {
@@ -145,4 +154,117 @@ pub(crate) fn run(db: &Connection, a: commands::Affected) -> Result<()> {
         )?;
     }
     Ok(())
+}
+pub(crate) fn derive_days(db: &Connection, trip: &str) -> Result<()> {
+    let days = crate::trips::children(db, "trip_day", trip)?;
+    let distances = days
+        .iter()
+        .filter_map(|r| crate::trips::numeric(r, "distance_mi"))
+        .collect::<Vec<_>>();
+    let gains = days
+        .iter()
+        .filter_map(|r| crate::trips::numeric(r, "elevation_gain_ft"))
+        .collect::<Vec<_>>();
+    let dist = if distances.is_empty() {
+        Value::Null
+    } else {
+        text(
+            strider_core::format::fixed(distances.iter().sum(), 2)
+                .parse::<f64>()
+                .unwrap_or(0.)
+                .to_string(),
+        )
+    };
+    write(
+        db,
+        "trip",
+        trip,
+        fields([
+            ("distance_mi", dist),
+            (
+                "elevation_gain_ft",
+                if gains.is_empty() {
+                    Value::Null
+                } else {
+                    Value::Integer(gains.iter().sum::<f64>() as i64)
+                },
+            ),
+            (
+                "nights",
+                if days.is_empty() {
+                    Value::Null
+                } else {
+                    Value::Integer(days.len() as i64 - 1)
+                },
+            ),
+        ]),
+        false,
+    )
+}
+pub(crate) fn sync_campsite_days(db: &Connection, trip: &str) -> Result<()> {
+    use strider_core::route::*;
+    let pts = crate::trips::points(db, trip)?
+        .into_iter()
+        .map(|p| RoutePt {
+            d: p.d,
+            e: p.e,
+            lat: p.lat,
+            lon: p.lon,
+        })
+        .collect::<Vec<_>>();
+    let mut camps = crate::trips::children(db, "trip_campsite", trip)?;
+    camps.sort_by(|a, b| {
+        crate::trips::numeric(a, "distance_mi")
+            .unwrap_or(0.)
+            .total_cmp(&crate::trips::numeric(b, "distance_mi").unwrap_or(0.))
+            .then_with(|| s(a, "sync_id").cmp(s(b, "sync_id")))
+    });
+    let camps = camps
+        .iter()
+        .map(|c| Campsite {
+            distance_mi: crate::trips::numeric(c, "distance_mi").unwrap_or(0.),
+            lat: crate::trips::numeric(c, "lat"),
+            lon: crate::trips::numeric(c, "lon"),
+        })
+        .collect::<Vec<_>>();
+    db.execute("DELETE FROM trip_day WHERE trip_id=?", [trip])?;
+    for seg in compute_day_segments(&pts, &camps) {
+        let key = id();
+        write(
+            db,
+            "trip_day",
+            &key,
+            fields([
+                ("trip_id", text(trip)),
+                ("day_number", Value::Integer(seg.day as i64)),
+                ("distance_mi", text(seg.distance_mi.to_string())),
+                ("elevation_gain_ft", Value::Integer(seg.elevation_gain_ft)),
+            ]),
+            true,
+        )?;
+        db.execute(
+            "INSERT INTO local_derived_day(sync_id,trip_id,day_number) VALUES(?,?,?)",
+            params![key, trip, seg.day as i64],
+        )?;
+    }
+    derive_days(db, trip)
+}
+pub(crate) fn sync_food(db: &Connection, trip: &str) -> Result<()> {
+    let t = row(db, "trip", trip)?;
+    let total = crate::trips::children(db, "trip_meal", trip)?
+        .iter()
+        .map(|r| n(r, "snapshot_weight_g"))
+        .sum::<i64>();
+    write(
+        db,
+        "trip",
+        trip,
+        fields([(
+            "food_g_per_day",
+            Value::Integer(strider_core::format::js_round(
+                total as f64 / (n(&t, "nights") + 1).max(1) as f64,
+            ) as i64),
+        )]),
+        false,
+    )
 }

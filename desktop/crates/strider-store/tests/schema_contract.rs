@@ -492,7 +492,7 @@ fn singleton_and_enum_checks_reject_invalid_rows() {
         "INSERT INTO meal(sync_id,name,meal_type) VALUES ('bad','Bad','brunch')",
         "INSERT INTO meal(sync_id,name,is_hot) VALUES ('bad','Bad',2)",
         "INSERT INTO loadout(sync_id,name,is_default) VALUES ('bad','Bad',2)",
-        "INSERT INTO blob_ref(sha256,state) VALUES ('bad','missing')",
+        "INSERT INTO blob_ref(sha256,state) VALUES ('bad','wanted')",
         "INSERT INTO outbox(batch_id,tbl,sync_id,op,columns,created_at) VALUES ('b','gear_item','x','insert','[]','2026-01-01T00:00:00Z')",
     ] {
         assert!(db.execute(sql, []).is_err(), "{sql}");

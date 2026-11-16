@@ -1,4 +1,4 @@
-# Strider Desktop — milestone 2b
+# Strider Desktop — milestone 3a (Trip backend)
 
 Native Rust/GPUI Gear and Food areas on a local SQLite workspace.
 Gear includes inventory, kits, loadouts, category management and wishlist projections.
@@ -37,8 +37,8 @@ wrapping the application view in its `Root`.
 
 | Crate | Responsibility |
 | --- | --- |
-| `strider-core` | Units, decimal arithmetic, formatting, food, fuel, energy, route, gear, trip and propagation rules; no runtime dependencies |
-| `strider-store` | Local workspace schema, deterministic fixture, Gear/Food queries and commands, outbox batches, undo/redo |
+| `strider-core` | Units, decimal arithmetic, formatting, food, fuel, energy, route, gear, trip, GPX and propagation rules; regex/serde for GPX |
+| `strider-store` | Local workspace schema, deterministic fixture, Gear/Food/Trip queries and commands, outbox batches, undo/redo |
 | `strider-sync` | Blocking HTTP, loopback PKCE sign-in, Keychain credentials, durable push/pull and background scheduling |
 | `strider-ui` | Generated Topo colors, embedded fonts, primitives, icons and contour drawing |
 | `strider-app` (`strider`) | Window/shell, Gear inventory/wishlist, Food pantry/meal editors, actions and drag/drop |
@@ -306,13 +306,13 @@ sequence. Such pages and their cursors are buffered atomically in SQLite until
 all referenced parents are available, including across restart. A remaining
 unresolvable dependency surfaces an error rather than dropping references.
 
-**Server limitation found by source inspection:** shared Trip rows can reference
-the owner's private Trail, Gear Items, Meals and Ingredients, but pull visibility
-omits that library. Those foreign keys cannot be materialized in the existing
-local schema. The client retains the affected pages and reports unavailable
-parents; shared trips with those references remain blocked until the server
-provides a representation compatible with its visibility boundary. Server code
-was not changed. Owner-only workspace convergence is the integration target.
+Shared Trip library references must arrive as null when the owner's library is
+not visible. Trip commands and queries work from snapshot columns in that case;
+library propagation naturally skips null references. A server returning non-null
+inaccessible parents still buffers the page and reports unavailable parents.
+Shared snapshots cannot reconstruct recipe lines, meal hot/water settings, or a
+trail name that the API does not expose: groceries fall back to snapshot names
+and weights, and unavailable meal details contribute no cook water (as on web).
 
 ### Real local server tests (maintainer)
 
@@ -327,9 +327,9 @@ Keep tokens out of shell history. From `desktop/`:
 cargo test --offline -p strider-sync --test server -- --ignored --test-threads=1
 ```
 
-The three ignored tests cover seeded 200-step Gear/Food interleavings and full
+The four ignored tests cover seeded 200-step Gear/Food interleavings and full
 row comparison across two devices and a fresh server pull; a replaced long-text
-conflict; and different-user isolation. A cleanup guard deletes uniquely named
+conflict; different-user isolation; and a two-device permit upload/download/delete round trip. A cleanup guard deletes uniquely named
 `STRIDER-DESKTOP-TEST-*` records even on assertion failure. Without the third token,
 run the two same-user tests individually with filters
 `seeded_two_device_convergence_200_steps` and `replaced_long_text_is_saved`.
@@ -339,3 +339,52 @@ adoption, revocation, pending columns, resurrection, atomicity and secondary
 connection undo invalidation. Real browser sign-in, Keychain prompts, visual
 layout and real-server convergence require maintainer verification; the GUI and
 network-dependent integration tests are not run in the constrained sandbox.
+
+
+## Milestone 3a: Trip commands, queries and permit bytes
+
+No Trips UI is added. `strider-store/src/trips.rs` implements the Trip mutations;
+`Command::CreateTrip` accepts optional local Trail and Loadout identities.
+`UpdateTrip` patches and restore snapshots use checked snake_case SQLite column
+names in `Row`; hidden fields and caller-supplied parent identities are refused.
+File commands accept bytes and filenames. `AddTripFood` accepts a local recipe,
+a pantry ingredient, or an already-resolved search hit (boxed `IngredientInput`).
+Every command uses the existing transaction, ChangeSet and undo/redo path.
+Trip day totals and campsite-generated days are computed after direct changes
+and excluded from the ordinary outbox. Trip-command undo excludes those derived
+changes too; existing library-command history retains its established behavior.
+Manual edits to generated days wait for a pull to map the server's day identities
+before their patches are pushed.
+
+`trips_list()` uses the local civil date; `trips_list_on(date)` allows deterministic
+upcoming/in-progress/past grouping, with completed Trips always past and undated
+Trips upcoming. Within groups, dates descend, null dates last, UUID ties stable.
+The current web logbook instead exposes status filters and a next-up card; the
+three time groups are the explicitly requested desktop query contract.
+`trip_detail(sync_id)` returns raw fields plus Trail, effective route stats,
+days/segments, campsites, GPX, grouped snapshot gear/weights, food, groceries,
+cook water, permit state and access. It hides private notes for collaborators.
+Queries never append outbox writes or undo entries.
+
+`strider-core::gpx` preserves the regex parser, hysteresis, 800-point downsampling
+rule, JavaScript rounding, waypoint grouping and GPX handoff formatting. All 69
+GPX fixture cases compare numbers exactly and export strings byte for byte.
+
+Permit metadata contains no bytes. Files are hash-verified and atomically renamed
+to `<data_dir>/blobs/<sha256>`, beside `workspace.db`; `blob_ref` tracks
+`local_only`, `uploaded`, or `missing`. Upload intent is per Trip because several
+Trips may attach the same content. The binary endpoint owns metadata creation;
+only deletions use row sync. Uploads follow parent push/pull, downloads verify
+both hash and size, and a pull adopts the server's permit identity. A deletion
+made before that identity is known is retained until it can be sent. Files are
+retained for undo; garbage collection is outside this milestone. In-memory test
+stores use isolated temporary blob directories. Pending counts include uploads.
+
+Excluded actions: create/revoke view links, create/revoke edit links, AI planning,
+and `routeMapUrl`, as requested. JSON Trip import is supported, including fenced
+JSON, inline tracks, campsite snapping and researched-gain fallback. It never
+fetches `route.gpxUrl`: supply inline geometry or attach GPX bytes. Search hits
+use supplied density instead of remote density lookup. Non-finite file-derived
+storage values are rejected. Existing UUID tie-breaking and lexical shopping
+ordering differences remain. Real-server convergence (four ignored tests) still
+requires maintainer verification; offline fakes exercise the transfer boundary.

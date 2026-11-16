@@ -119,3 +119,83 @@ impl Client {
         Ok(value)
     }
 }
+/// Injectable boundary for deterministic offline sync/permit tests.
+pub trait Transport {
+    fn origin(&self) -> String;
+    fn request(&self, method: &str, path: &str, body: Option<&Value>) -> Result<Value>;
+    fn upload_permit(&self, trip: &str, filename: &str, mime: &str, bytes: &[u8])
+    -> Result<String>;
+    fn download_permit(&self, trip: &str) -> Result<Vec<u8>>;
+}
+impl Transport for Client {
+    fn origin(&self) -> String {
+        self.base_url.origin().ascii_serialization()
+    }
+    fn request(&self, method: &str, path: &str, body: Option<&Value>) -> Result<Value> {
+        Client::request(self, method, path, body)
+    }
+    fn upload_permit(
+        &self,
+        trip: &str,
+        filename: &str,
+        mime: &str,
+        bytes: &[u8],
+    ) -> Result<String> {
+        let mut response = self.permit_request("PUT", trip, Some((filename, mime, bytes)))?;
+        let value: Value = response
+            .body_mut()
+            .read_json()
+            .map_err(|_| SyncError::Protocol("Invalid permit response".into()))?;
+        value["sha256"]
+            .as_str()
+            .map(str::to_owned)
+            .ok_or_else(|| SyncError::Protocol("Missing permit hash".into()))
+    }
+    fn download_permit(&self, trip: &str) -> Result<Vec<u8>> {
+        let mut response = self.permit_request("GET", trip, None)?;
+        response
+            .body_mut()
+            .with_config()
+            .limit(strider_store::PERMIT_MAX_BYTES as u64)
+            .read_to_vec()
+            .map_err(|_| SyncError::Protocol("Invalid permit body".into()))
+    }
+}
+impl Client {
+    fn permit_request(
+        &self,
+        method: &str,
+        trip: &str,
+        file: Option<(&str, &str, &[u8])>,
+    ) -> Result<ureq::http::Response<ureq::Body>> {
+        let url = self
+            .base_url
+            .join(&format!("/api/v1/trips/{trip}/permit"))
+            .map_err(|_| SyncError::Protocol("Invalid permit path".into()))?;
+        let mut request = ureq::http::Request::builder()
+            .method(method)
+            .uri(url.as_str())
+            .header("X-Strider-App-Version", &self.app_version);
+        if let Some(token) = &self.token {
+            request = request.header("Authorization", format!("Bearer {token}"));
+        }
+        let bytes = if let Some((name, mime, bytes)) = file {
+            request = request
+                .header("Content-Type", mime)
+                .header("X-Filename", name);
+            bytes.to_vec()
+        } else {
+            vec![]
+        };
+        let request = request
+            .body(bytes)
+            .map_err(|_| SyncError::Protocol("Invalid permit request".into()))?;
+        let response = self.agent.run(request).map_err(|_| SyncError::Offline)?;
+        match response.status().as_u16() {
+            200..=299 => Ok(response),
+            401 => Err(SyncError::Unauthorized),
+            426 => Err(SyncError::UpgradeRequired),
+            s => Err(SyncError::Server(s)),
+        }
+    }
+}
