@@ -56,7 +56,7 @@ implementation. No web stylesheet is changed.
 
 Click a row to select it; double-click or use its more button to edit. Expand a
 kit with its chevron. Search by item or category name; More exposes Current /
-Retired / All, bulk loadout membership, Manage loadouts and Manage categories.
+Retired / All, bulk loadout membership and Manage loadouts.
 Wishlist items never enter the inventory. Drag a grip to insert before another
 row; drop on a category header to append to it. Dragging is disabled while searching.
 Select a loadout above BaseBar to check membership and mark members packed/worn.
@@ -272,9 +272,9 @@ runs the same exporter without that socket. The exporter never queries PostgreSQ
 - Native GPUI dropdown menus, text controls, focus outlines and centered Sheets
   approximate the web primitives; no CSS, tokens, colors, fonts or radii were added.
   Gear retains its virtualized card slices. Text keyboard shortcuts remain native.
-- **Desktop-only category management needs Thai's approval before product adoption.**
-  This spike exposes existing store category commands in More → Manage categories.
-  Category/loadout names use inline fields rather than browser prompts, and their
+- **Category management is hidden.** The category sheet exists in code but has no entry
+  point, by Thai's decision (2026-11-16), until the web has category management.
+  Loadout names use inline fields rather than browser prompts, and their
   ordering uses ↑/↓. Meal lines also offer ↑/↓ ordering.
 - BaseBar implements the requested category bar with hover/focus item popovers;
   the web's optional pie chart and category-detail modal are not ported. At half

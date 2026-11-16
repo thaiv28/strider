@@ -183,29 +183,17 @@ impl AppView {
                     );
                 }
             }
-            row = row
-                .child(
-                    strider_ui::button(
-                        "manage-loadouts",
-                        "Manage loadouts",
-                        ButtonVariant::Ghost,
-                        t,
-                    )
-                    .on_click(
-                        cx.listener(|this, _, window, cx| this.open_manager(false, window, cx)),
-                    ),
+            row = row.child(
+                strider_ui::button(
+                    "manage-loadouts",
+                    "Manage loadouts",
+                    ButtonVariant::Ghost,
+                    t,
                 )
-                .child(
-                    strider_ui::button(
-                        "manage-categories",
-                        "Manage categories",
-                        ButtonVariant::Ghost,
-                        t,
-                    )
-                    .on_click(
-                        cx.listener(|this, _, window, cx| this.open_manager(true, window, cx)),
-                    ),
-                );
+                .on_click(cx.listener(|this, _, window, cx| this.open_manager(false, window, cx))),
+            );
+            // "Manage categories" (open_manager(true, ..)) stays hidden until the web has
+            // category management; Thai decided on 2026-11-16 not to ship it desktop-only.
             left = left.child(row);
         }
         let view = cx.entity();
