@@ -19,6 +19,7 @@
     "import": "tsx scripts/import-sheets.ts",
     "test:mobile": "playwright test tests/mobile.spec.ts",
     "test:workflow": "playwright test tests/workflows.spec.ts --project=workflow",
+    "test:api": "playwright test --project=api",
     "test:e2e": "playwright test",
     "verify": "tsx scripts/verify.ts",
     "check:design": "node scripts/check-design.mjs"

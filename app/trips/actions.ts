@@ -5,12 +5,13 @@ import { eq, and, asc, max, sql } from "drizzle-orm";
 import { db, schema } from "@/src/db/index";
 import { getCurrentUserId } from "@/lib/gear";
 import { parseGpx } from "@/lib/gpx";
-import { computeDaySegments } from "@/lib/trip";
+import { renumberDays, deriveTripFromDays, syncDaysFromCampsites } from "@/lib/trip-derived";
 import { computeMealTotals, upsertIngredientFromHit } from "@/lib/food-server";
 import { composeTopoMap, type MapCampsite } from "@/lib/topo-map";
 import { kcalForGrams } from "@/lib/food";
 import type { FoodHit } from "@/lib/food-search";
-import { randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
+import { changeTripShareLink } from "@/lib/trip-sharing";
 import {
   requireOwnedGearItem,
   requireOwnedIngredient,
@@ -30,54 +31,25 @@ function bump(tripId: number) {
 }
 
 export async function createTripShareLink(tripId: number): Promise<string> {
-  const userId = await getCurrentUserId();
-  const [existing] = await db
-    .select({ token: schema.trip.shareToken })
-    .from(schema.trip)
-    .where(and(eq(schema.trip.id, tripId), eq(schema.trip.userId, userId)));
-  if (!existing) throw new Error("Trip not found");
-  if (existing.token) return existing.token;
-
-  const token = randomBytes(24).toString("base64url");
-  await db
-    .update(schema.trip)
-    .set({ shareToken: token, updatedAt: new Date() })
-    .where(and(eq(schema.trip.id, tripId), eq(schema.trip.userId, userId)));
-  revalidatePath(`/trips/${tripId}`);
-  return token;
+  return (await changeTripShareLink(await getCurrentUserId(), tripId, "view", "create"))!;
 }
 
 export async function revokeTripShareLink(tripId: number) {
   const userId = await getCurrentUserId();
   await requireOwnedTrip(tripId, userId);
-  await db.transaction(async (tx) => {
-    await tx.update(schema.trip).set({ shareToken: null, updatedAt: new Date() }).where(eq(schema.trip.id, tripId));
-    await tx.delete(schema.tripShareVisit).where(and(eq(schema.tripShareVisit.tripId, tripId), eq(schema.tripShareVisit.permission, "view")));
-  });
-  revalidatePath(`/trips/${tripId}`);
-  revalidatePath("/trips");
+  await changeTripShareLink(userId, tripId, "view", "revoke");
 }
 
 export async function createTripEditLink(tripId: number): Promise<string> {
   const userId = await getCurrentUserId();
   await requireOwnedTrip(tripId, userId);
-  const [row] = await db.select({ token: schema.trip.editToken }).from(schema.trip).where(eq(schema.trip.id, tripId));
-  if (row.token) return row.token;
-  const token = randomBytes(24).toString("base64url");
-  await db.update(schema.trip).set({ editToken: token, updatedAt: new Date() }).where(eq(schema.trip.id, tripId));
-  revalidatePath(`/trips/${tripId}`);
-  return token;
+  return (await changeTripShareLink(userId, tripId, "edit", "create"))!;
 }
 
 export async function revokeTripEditLink(tripId: number) {
   const userId = await getCurrentUserId();
   await requireOwnedTrip(tripId, userId);
-  await db.transaction(async (tx) => {
-    await tx.update(schema.trip).set({ editToken: null, updatedAt: new Date() }).where(eq(schema.trip.id, tripId));
-    await tx.delete(schema.tripShareVisit).where(and(eq(schema.tripShareVisit.tripId, tripId), eq(schema.tripShareVisit.permission, "edit")));
-  });
-  revalidatePath(`/trips/${tripId}`);
-  revalidatePath("/trips");
+  await changeTripShareLink(userId, tripId, "edit", "revoke");
 }
 
 export async function createTrip(name: string, loadoutId?: number): Promise<number> {
@@ -435,59 +407,10 @@ export async function deleteTripDay(tripId: number, id: number) {
   bump(tripId);
 }
 
-async function renumberDays(tripId: number) {
-  const rows = await db
-    .select({ id: schema.tripDay.id })
-    .from(schema.tripDay)
-    .where(eq(schema.tripDay.tripId, tripId))
-    .orderBy(asc(schema.tripDay.dayNumber), asc(schema.tripDay.id));
-  for (let i = 0; i < rows.length; i++) {
-    await db.update(schema.tripDay).set({ dayNumber: i + 1 }).where(eq(schema.tripDay.id, rows[i].id));
-  }
-}
 
-async function deriveTripFromDays(tripId: number) {
-  const rows = await db
-    .select({ distanceMi: schema.tripDay.distanceMi, elevationGainFt: schema.tripDay.elevationGainFt })
-    .from(schema.tripDay)
-    .where(eq(schema.tripDay.tripId, tripId));
-  const anyDist = rows.some((r) => r.distanceMi != null);
-  const anyGain = rows.some((r) => r.elevationGainFt != null);
-  const distSum = rows.reduce((s, r) => s + (r.distanceMi != null ? Number(r.distanceMi) : 0), 0);
-  const gainSum = rows.reduce((s, r) => s + (r.elevationGainFt ?? 0), 0);
-  await db
-    .update(schema.trip)
-    .set({
-      distanceMi: anyDist ? String(+distSum.toFixed(2)) : null,
-      elevationGainFt: anyGain ? gainSum : null,
-      nights: rows.length ? rows.length - 1 : null,
-    })
-    .where(eq(schema.trip.id, tripId));
-}
 
 // Regenerate the day rows from campsite positions (each campsite ends a day,
 // plus a final leg to the endpoint). Called whenever campsites change.
-async function syncDaysFromCampsites(tripId: number) {
-  const [gpx] = await db
-    .select({ points: schema.tripGpx.points })
-    .from(schema.tripGpx)
-    .where(eq(schema.tripGpx.tripId, tripId));
-  const camps = await db
-    .select()
-    .from(schema.tripCampsite)
-    .where(eq(schema.tripCampsite.tripId, tripId))
-    .orderBy(asc(schema.tripCampsite.distanceMi));
-  const segs = computeDaySegments(
-    gpx?.points ?? [],
-    camps.map((c) => ({ distanceMi: Number(c.distanceMi), lat: c.lat != null ? Number(c.lat) : null, lon: c.lon != null ? Number(c.lon) : null })),
-  );
-  await db.delete(schema.tripDay).where(eq(schema.tripDay.tripId, tripId));
-  if (segs.length)
-    await db.insert(schema.tripDay).values(
-      segs.map((s) => ({ tripId, dayNumber: s.day, distanceMi: String(s.distanceMi), elevationGainFt: s.elevationGainFt })),
-    );
-  await deriveTripFromDays(tripId);
-}
 
 type Site = { distanceMi: number; lat: number | null; lon: number | null; eleFt: number | null };
 const siteVals = (tripId: number, c: Site) => ({
@@ -714,7 +637,7 @@ export async function uploadPermit(tripId: number, form: FormData): Promise<{ ok
   if (file.size > PERMIT_MAX_BYTES) return { ok: false, error: "File exceeds 15 MB." };
 
   const data = Buffer.from(await file.arrayBuffer());
-  const row = { tripId, filename: file.name, mimeType: file.type, sizeBytes: file.size, data, uploadedAt: new Date() };
+  const row = { tripId, filename: file.name, mimeType: file.type, sizeBytes: file.size, data, sha256: createHash("sha256").update(data).digest("hex"), uploadedAt: new Date() };
   await db
     .insert(schema.tripPermit)
     .values(row)

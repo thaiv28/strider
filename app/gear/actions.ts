@@ -5,6 +5,7 @@ import { eq, and, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/src/db/index";
 import { getCurrentUserId, OTHER_CATEGORY_ID } from "@/lib/gear";
 import { ozToG } from "@/lib/util";
+import { recomputeKitWeight } from "@/lib/gear-kit";
 import { propagateGearItem } from "@/lib/trip-propagation";
 import {
   requireOwnedCategory,
@@ -45,11 +46,9 @@ function parseForm(fd: FormData) {
   const qty = Number(fd.get("quantity"));
   const isKit = fd.get("isKit") === "on" || fd.get("isKit") === "true";
   const components = isKit ? parseComponents(fd) : [];
-  // A kit's per-unit weight is the sum of its components; the manual field is ignored.
-  const kitWeightG = components.reduce((s, c) => s + c.weightG * c.quantity, 0);
   return {
     name: String(fd.get("name") ?? "").trim(),
-    weightG: isKit ? kitWeightG : ozNum != null && Number.isFinite(ozNum) ? ozToG(ozNum) : null,
+    weightG: isKit ? 0 : ozNum != null && Number.isFinite(ozNum) ? ozToG(ozNum) : null,
     priceCents: priceNum != null && Number.isFinite(priceNum) ? Math.max(0, Math.round(priceNum * 100)) : null,
     quantity: Number.isFinite(qty) && qty >= 1 ? Math.round(qty) : 1,
     defaultWeightClass: (String(fd.get("defaultWeightClass") ?? "base") as WClass),
@@ -68,6 +67,7 @@ async function writeComponents(tx: Tx, gearItemId: number, isKit: boolean, compo
   await tx.delete(schema.gearComponent).where(eq(schema.gearComponent.gearItemId, gearItemId));
   if (isKit && components.length)
     await tx.insert(schema.gearComponent).values(components.map((c) => ({ gearItemId, ...c })));
+  if (isKit) await recomputeKitWeight(tx, gearItemId);
 }
 
 export async function createGear(fd: FormData) {

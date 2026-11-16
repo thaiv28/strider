@@ -12,7 +12,7 @@ export default {
   callbacks: {
     authorized({ auth, request }) {
       const path = request.nextUrl.pathname;
-      if (PUBLIC_PATHS.has(path) || path.startsWith("/share/") || path.startsWith("/api/auth/")) {
+      if (PUBLIC_PATHS.has(path) || path.startsWith("/share/") || path.startsWith("/api/auth/") || path.startsWith("/api/v1/")) {
         return true;
       }
       return Boolean(auth?.user);

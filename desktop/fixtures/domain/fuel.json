@@ -1,0 +1,534 @@
+[
+  {
+    "fn": "fuelPlan",
+    "args": [
+      0
+    ],
+    "out": {
+      "cookWaterMl": 0,
+      "liters": 0,
+      "neededGasG": 0,
+      "gasProvidedG": 0,
+      "packedWeightG": 0,
+      "label": "none"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      1
+    ],
+    "out": {
+      "cookWaterMl": 1,
+      "liters": 0.001,
+      "neededGasG": 1,
+      "gasProvidedG": 110,
+      "packedWeightG": 200,
+      "label": "one 110 g canister"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      500
+    ],
+    "out": {
+      "cookWaterMl": 500,
+      "liters": 0.5,
+      "neededGasG": 6,
+      "gasProvidedG": 110,
+      "packedWeightG": 200,
+      "label": "one 110 g canister"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      9166
+    ],
+    "out": {
+      "cookWaterMl": 9166,
+      "liters": 9.166,
+      "neededGasG": 110,
+      "gasProvidedG": 110,
+      "packedWeightG": 200,
+      "label": "one 110 g canister"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      9167
+    ],
+    "out": {
+      "cookWaterMl": 9167,
+      "liters": 9.167,
+      "neededGasG": 111,
+      "gasProvidedG": 230,
+      "packedWeightG": 375,
+      "label": "one 230 g canister"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      19167
+    ],
+    "out": {
+      "cookWaterMl": 19167,
+      "liters": 19.167,
+      "neededGasG": 231,
+      "gasProvidedG": 450,
+      "packedWeightG": 655,
+      "label": "one 450 g canister"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      37500
+    ],
+    "out": {
+      "cookWaterMl": 37500,
+      "liters": 37.5,
+      "neededGasG": 450,
+      "gasProvidedG": 450,
+      "packedWeightG": 655,
+      "label": "one 450 g canister"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      100000
+    ],
+    "out": {
+      "cookWaterMl": 100000,
+      "liters": 100,
+      "neededGasG": 1200,
+      "gasProvidedG": 1350,
+      "packedWeightG": 1965,
+      "label": "3 × 450 g canisters"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      147447
+    ],
+    "out": {
+      "cookWaterMl": 147447,
+      "liters": 147.447,
+      "neededGasG": 1770,
+      "gasProvidedG": 1800,
+      "packedWeightG": 2620,
+      "label": "4 × 450 g canisters"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      4648
+    ],
+    "out": {
+      "cookWaterMl": 4648,
+      "liters": 4.648,
+      "neededGasG": 56,
+      "gasProvidedG": 110,
+      "packedWeightG": 200,
+      "label": "one 110 g canister"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      82803
+    ],
+    "out": {
+      "cookWaterMl": 82803,
+      "liters": 82.803,
+      "neededGasG": 994,
+      "gasProvidedG": 1350,
+      "packedWeightG": 1965,
+      "label": "3 × 450 g canisters"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      24765
+    ],
+    "out": {
+      "cookWaterMl": 24765,
+      "liters": 24.765,
+      "neededGasG": 298,
+      "gasProvidedG": 450,
+      "packedWeightG": 655,
+      "label": "one 450 g canister"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      25622
+    ],
+    "out": {
+      "cookWaterMl": 25622,
+      "liters": 25.622,
+      "neededGasG": 308,
+      "gasProvidedG": 450,
+      "packedWeightG": 655,
+      "label": "one 450 g canister"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      62866
+    ],
+    "out": {
+      "cookWaterMl": 62866,
+      "liters": 62.866,
+      "neededGasG": 755,
+      "gasProvidedG": 900,
+      "packedWeightG": 1310,
+      "label": "2 × 450 g canisters"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      26857
+    ],
+    "out": {
+      "cookWaterMl": 26857,
+      "liters": 26.857,
+      "neededGasG": 323,
+      "gasProvidedG": 450,
+      "packedWeightG": 655,
+      "label": "one 450 g canister"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      132785
+    ],
+    "out": {
+      "cookWaterMl": 132785,
+      "liters": 132.785,
+      "neededGasG": 1594,
+      "gasProvidedG": 1800,
+      "packedWeightG": 2620,
+      "label": "4 × 450 g canisters"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      137786
+    ],
+    "out": {
+      "cookWaterMl": 137786,
+      "liters": 137.786,
+      "neededGasG": 1654,
+      "gasProvidedG": 1800,
+      "packedWeightG": 2620,
+      "label": "4 × 450 g canisters"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      65258
+    ],
+    "out": {
+      "cookWaterMl": 65258,
+      "liters": 65.258,
+      "neededGasG": 784,
+      "gasProvidedG": 900,
+      "packedWeightG": 1310,
+      "label": "2 × 450 g canisters"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      103891
+    ],
+    "out": {
+      "cookWaterMl": 103891,
+      "liters": 103.891,
+      "neededGasG": 1247,
+      "gasProvidedG": 1350,
+      "packedWeightG": 1965,
+      "label": "3 × 450 g canisters"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      5993
+    ],
+    "out": {
+      "cookWaterMl": 5993,
+      "liters": 5.993,
+      "neededGasG": 72,
+      "gasProvidedG": 110,
+      "packedWeightG": 200,
+      "label": "one 110 g canister"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      73446
+    ],
+    "out": {
+      "cookWaterMl": 73446,
+      "liters": 73.446,
+      "neededGasG": 882,
+      "gasProvidedG": 900,
+      "packedWeightG": 1310,
+      "label": "2 × 450 g canisters"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      139605
+    ],
+    "out": {
+      "cookWaterMl": 139605,
+      "liters": 139.605,
+      "neededGasG": 1676,
+      "gasProvidedG": 1800,
+      "packedWeightG": 2620,
+      "label": "4 × 450 g canisters"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      44224
+    ],
+    "out": {
+      "cookWaterMl": 44224,
+      "liters": 44.224,
+      "neededGasG": 531,
+      "gasProvidedG": 900,
+      "packedWeightG": 1310,
+      "label": "2 × 450 g canisters"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      34639
+    ],
+    "out": {
+      "cookWaterMl": 34639,
+      "liters": 34.639,
+      "neededGasG": 416,
+      "gasProvidedG": 450,
+      "packedWeightG": 655,
+      "label": "one 450 g canister"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      64508
+    ],
+    "out": {
+      "cookWaterMl": 64508,
+      "liters": 64.508,
+      "neededGasG": 775,
+      "gasProvidedG": 900,
+      "packedWeightG": 1310,
+      "label": "2 × 450 g canisters"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      35341
+    ],
+    "out": {
+      "cookWaterMl": 35341,
+      "liters": 35.341,
+      "neededGasG": 425,
+      "gasProvidedG": 450,
+      "packedWeightG": 655,
+      "label": "one 450 g canister"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      124984
+    ],
+    "out": {
+      "cookWaterMl": 124984,
+      "liters": 124.984,
+      "neededGasG": 1500,
+      "gasProvidedG": 1800,
+      "packedWeightG": 2620,
+      "label": "4 × 450 g canisters"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      16797
+    ],
+    "out": {
+      "cookWaterMl": 16797,
+      "liters": 16.797,
+      "neededGasG": 202,
+      "gasProvidedG": 230,
+      "packedWeightG": 375,
+      "label": "one 230 g canister"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      85734
+    ],
+    "out": {
+      "cookWaterMl": 85734,
+      "liters": 85.734,
+      "neededGasG": 1029,
+      "gasProvidedG": 1350,
+      "packedWeightG": 1965,
+      "label": "3 × 450 g canisters"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      43443
+    ],
+    "out": {
+      "cookWaterMl": 43443,
+      "liters": 43.443,
+      "neededGasG": 522,
+      "gasProvidedG": 900,
+      "packedWeightG": 1310,
+      "label": "2 × 450 g canisters"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      111545
+    ],
+    "out": {
+      "cookWaterMl": 111545,
+      "liters": 111.545,
+      "neededGasG": 1339,
+      "gasProvidedG": 1350,
+      "packedWeightG": 1965,
+      "label": "3 × 450 g canisters"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      73648
+    ],
+    "out": {
+      "cookWaterMl": 73648,
+      "liters": 73.648,
+      "neededGasG": 884,
+      "gasProvidedG": 900,
+      "packedWeightG": 1310,
+      "label": "2 × 450 g canisters"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      48689
+    ],
+    "out": {
+      "cookWaterMl": 48689,
+      "liters": 48.689,
+      "neededGasG": 585,
+      "gasProvidedG": 900,
+      "packedWeightG": 1310,
+      "label": "2 × 450 g canisters"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      6909
+    ],
+    "out": {
+      "cookWaterMl": 6909,
+      "liters": 6.909,
+      "neededGasG": 83,
+      "gasProvidedG": 110,
+      "packedWeightG": 200,
+      "label": "one 110 g canister"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      1463
+    ],
+    "out": {
+      "cookWaterMl": 1463,
+      "liters": 1.463,
+      "neededGasG": 18,
+      "gasProvidedG": 110,
+      "packedWeightG": 200,
+      "label": "one 110 g canister"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      22133
+    ],
+    "out": {
+      "cookWaterMl": 22133,
+      "liters": 22.133,
+      "neededGasG": 266,
+      "gasProvidedG": 450,
+      "packedWeightG": 655,
+      "label": "one 450 g canister"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      116550
+    ],
+    "out": {
+      "cookWaterMl": 116550,
+      "liters": 116.55,
+      "neededGasG": 1399,
+      "gasProvidedG": 1800,
+      "packedWeightG": 2620,
+      "label": "4 × 450 g canisters"
+    }
+  },
+  {
+    "fn": "fuelPlan",
+    "args": [
+      127266
+    ],
+    "out": {
+      "cookWaterMl": 127266,
+      "liters": 127.266,
+      "neededGasG": 1528,
+      "gasProvidedG": 1800,
+      "packedWeightG": 2620,
+      "label": "4 × 450 g canisters"
+    }
+  }
+]

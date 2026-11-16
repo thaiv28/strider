@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db, schema } from "@/src/db/index";
 import { getCurrentUserId } from "@/lib/gear";
 import { requireOwnedCalendarFeed } from "@/lib/authorization";
@@ -72,4 +72,16 @@ export async function deleteCalendarFeed(id: number) {
   await requireOwnedCalendarFeed(id);
   await db.delete(schema.calendarFeed).where(eq(schema.calendarFeed.id, id));
   await bumpCalendar();
+}
+
+export async function listDevices() {
+  const userId = await getCurrentUserId();
+  return db.select({ id: schema.deviceSession.id, deviceName: schema.deviceSession.deviceName, createdAt: schema.deviceSession.createdAt, lastUsedAt: schema.deviceSession.lastUsedAt })
+    .from(schema.deviceSession).where(and(eq(schema.deviceSession.userId, userId), isNull(schema.deviceSession.revokedAt))).orderBy(schema.deviceSession.createdAt);
+}
+
+export async function revokeDevice(id: number) {
+  const userId = await getCurrentUserId();
+  await db.update(schema.deviceSession).set({ revokedAt: new Date() }).where(and(eq(schema.deviceSession.id, id), eq(schema.deviceSession.userId, userId)));
+  revalidatePath("/settings");
 }

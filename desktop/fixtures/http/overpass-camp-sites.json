@@ -1,0 +1,6 @@
+{"version":0.6,"generator":"Overpass API 0.7.62","osm3s":{"copyright":"The data included in this document is from www.openstreetmap.org."},"elements":[
+{"type":"node","id":101,"lat":39.0412,"lon":-105.2231,"tags":{"tourism":"camp_site","name":"Elk Meadow","fee":"no"}},
+{"type":"node","id":102,"lat":39.0987,"lon":-105.1544,"tags":{"tourism":"wilderness_hut","name":"Ridge Hut"}},
+{"type":"way","id":103,"nodes":[1,2,3],"tags":{"tourism":"camp_site","name":"Outline only"}},
+{"type":"node","id":104,"lat":39.1502,"lon":-105.2002,"tags":{"leisure":"firepit"}}
+]}

@@ -114,15 +114,24 @@ developer's local GitHub CLI session—is the durable publication path.
 
 ## Recommended next work
 
-1. Add an automated, isolated backup restore drill and explicit retention policy.
-2. Add safe application rollback around container replacement and document the
+The desktop sync API (`/api/v1`), device sign-in at `/desktop/authorize`, the
+Settings Devices section and migrations 0019 (sync columns, triggers, device
+tables) and 0020 (drops the legacy `trip.companions` column) ship with the Strider
+Desktop app in `desktop/` (a Rust workspace, excluded from the Docker image).
+Desktop updates are hosted at `https://strider-releases.thaiv.dev` by the
+`ThaivStriderReleases` stack in `project-platform-infrastructure`.
+
+1. Get an Apple Developer ID so desktop builds can be signed and notarized for
+   trip partners (see `docs/adr/0006-desktop-distribution-and-updates.md`).
+2. Add an automated, isolated backup restore drill and explicit retention policy.
+3. Add safe application rollback around container replacement and document the
    migration compatibility window it requires.
-3. Expand workflow coverage to representative gear, food, and calendar writes.
-4. Add observability beyond the database health check (structured logs, disk and
+4. Expand workflow coverage to representative gear, food, and calendar writes.
+5. Add observability beyond the database health check (structured logs, disk and
    backup freshness alarms, and external dependency visibility).
-5. Add optional incremental Google Calendar authorization and one-way Trip event
+6. Add optional incremental Google Calendar authorization and one-way Trip event
    synchronization after the Google OAuth consent screen is verified.
-6. Add rate limits, upload quotas, and account deletion before broader promotion.
+7. Add rate limits, upload quotas, and account deletion before broader promotion.
 
 ## Handoff rule
 

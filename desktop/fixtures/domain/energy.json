@@ -1,0 +1,242 @@
+[
+  {
+    "fn": "mifflinBmr",
+    "args": [
+      null,
+      null,
+      70,
+      30
+    ],
+    "out": null
+  },
+  {
+    "fn": "mifflinBmr",
+    "args": [
+      null,
+      180,
+      null,
+      30
+    ],
+    "out": null
+  },
+  {
+    "fn": "mifflinBmr",
+    "args": [
+      null,
+      180,
+      70,
+      null
+    ],
+    "out": null
+  },
+  {
+    "fn": "mifflinBmr",
+    "args": [
+      null,
+      0,
+      70,
+      30
+    ],
+    "out": null
+  },
+  {
+    "fn": "mifflinBmr",
+    "args": [
+      null,
+      180,
+      70,
+      30
+    ],
+    "out": null
+  },
+  {
+    "fn": "mifflinBmr",
+    "args": [
+      null,
+      130,
+      64,
+      45
+    ],
+    "out": null
+  },
+  {
+    "fn": "mifflinBmr",
+    "args": [
+      null,
+      220,
+      76,
+      22
+    ],
+    "out": null
+  },
+  {
+    "fn": "mifflinBmr",
+    "args": [
+      null,
+      155.5,
+      67.5,
+      62
+    ],
+    "out": null
+  },
+  {
+    "fn": "mifflinBmr",
+    "args": [
+      "male",
+      null,
+      70,
+      30
+    ],
+    "out": null
+  },
+  {
+    "fn": "mifflinBmr",
+    "args": [
+      "male",
+      180,
+      null,
+      30
+    ],
+    "out": null
+  },
+  {
+    "fn": "mifflinBmr",
+    "args": [
+      "male",
+      180,
+      70,
+      null
+    ],
+    "out": null
+  },
+  {
+    "fn": "mifflinBmr",
+    "args": [
+      "male",
+      0,
+      70,
+      30
+    ],
+    "out": null
+  },
+  {
+    "fn": "mifflinBmr",
+    "args": [
+      "male",
+      180,
+      70,
+      30
+    ],
+    "out": 1783
+  },
+  {
+    "fn": "mifflinBmr",
+    "args": [
+      "male",
+      130,
+      64,
+      45
+    ],
+    "out": 1386
+  },
+  {
+    "fn": "mifflinBmr",
+    "args": [
+      "male",
+      220,
+      76,
+      22
+    ],
+    "out": 2099
+  },
+  {
+    "fn": "mifflinBmr",
+    "args": [
+      "male",
+      155.5,
+      67.5,
+      62
+    ],
+    "out": 1472
+  },
+  {
+    "fn": "mifflinBmr",
+    "args": [
+      "female",
+      null,
+      70,
+      30
+    ],
+    "out": null
+  },
+  {
+    "fn": "mifflinBmr",
+    "args": [
+      "female",
+      180,
+      null,
+      30
+    ],
+    "out": null
+  },
+  {
+    "fn": "mifflinBmr",
+    "args": [
+      "female",
+      180,
+      70,
+      null
+    ],
+    "out": null
+  },
+  {
+    "fn": "mifflinBmr",
+    "args": [
+      "female",
+      0,
+      70,
+      30
+    ],
+    "out": null
+  },
+  {
+    "fn": "mifflinBmr",
+    "args": [
+      "female",
+      180,
+      70,
+      30
+    ],
+    "out": 1617
+  },
+  {
+    "fn": "mifflinBmr",
+    "args": [
+      "female",
+      130,
+      64,
+      45
+    ],
+    "out": 1220
+  },
+  {
+    "fn": "mifflinBmr",
+    "args": [
+      "female",
+      220,
+      76,
+      22
+    ],
+    "out": 1933
+  },
+  {
+    "fn": "mifflinBmr",
+    "args": [
+      "female",
+      155.5,
+      67.5,
+      62
+    ],
+    "out": 1306
+  }
+]

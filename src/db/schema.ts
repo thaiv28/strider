@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   pgTable,
   pgEnum,
@@ -11,8 +12,30 @@ import {
   jsonb,
   customType,
   uniqueIndex,
+  index,
+  uuid,
+  bigint,
+  bigserial,
+  primaryKey,
+  pgSequence,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
+
+export const syncSeq = pgSequence("sync_seq");
+
+function syncColumns() {
+  return {
+    syncId: uuid("sync_id").notNull().defaultRandom(),
+    serverSeq: bigint("server_seq", { mode: "bigint" }).notNull().default(sql`0`),
+  };
+}
+
+function syncIndexes(name: string, t: { syncId: AnyPgColumn; serverSeq: AnyPgColumn }) {
+  return {
+    syncIdUnique: uniqueIndex(`${name}_sync_id_uniq`).on(t.syncId),
+    serverSeqIndex: index(`${name}_server_seq_idx`).on(t.serverSeq),
+  };
+}
 
 const bytea = customType<{ data: Buffer; default: false }>({
   dataType() {
@@ -44,6 +67,7 @@ export const users = pgTable("users", {
 
 // Tunable constants for the calorie-burn model (Calories sheet).
 export const energyParams = pgTable("energy_params", {
+  ...syncColumns(),
   id: serial("id").primaryKey(),
   userId: integer("user_id")
     .notNull()
@@ -57,11 +81,12 @@ export const energyParams = pgTable("energy_params", {
   weightLb: numeric("weight_lb"),
   heightIn: numeric("height_in"),
   ageYears: integer("age_years"),
-});
+}, (t) => syncIndexes("energy_params", t));
 
 // Slot/grouping tree: parent groups (Essentials, Worn, Consumables...) hold
 // slots (Shelter, Rain jacket, Fuel...).
 export const gearCategory = pgTable("gear_category", {
+  ...syncColumns(),
   id: serial("id").primaryKey(),
   userId: integer("user_id")
     .notNull()
@@ -70,9 +95,10 @@ export const gearCategory = pgTable("gear_category", {
   parentId: integer("parent_id").references((): AnyPgColumn => gearCategory.id),
   weightClass: weightClass("weight_class"),
   sortOrder: integer("sort_order").notNull().default(0),
-});
+}, (t) => syncIndexes("gear_category", t));
 
 export const gearItem = pgTable("gear_item", {
+  ...syncColumns(),
   id: serial("id").primaryKey(),
   userId: integer("user_id")
     .notNull()
@@ -92,11 +118,12 @@ export const gearItem = pgTable("gear_item", {
   retiredAt: date("retired_at"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => syncIndexes("gear_item", t));
 
 // Contents of a composite kit (First Aid, Repair Kit). Parent gear_item.weight_g
 // is the sum of its components.
 export const gearComponent = pgTable("gear_component", {
+  ...syncColumns(),
   id: serial("id").primaryKey(),
   gearItemId: integer("gear_item_id")
     .notNull()
@@ -105,13 +132,14 @@ export const gearComponent = pgTable("gear_component", {
   weightG: integer("weight_g").notNull(),
   quantity: integer("quantity").notNull().default(1),
   notes: text("notes"),
-});
+}, (t) => syncIndexes("gear_component", t));
 
 // Which current gear a wishlist item would replace (many-to-many). Drives the
 // projected base-weight bar: buying the wishlist item retires the linked items.
 export const wishlistReplacement = pgTable(
   "wishlist_replacement",
   {
+    ...syncColumns(),
     id: serial("id").primaryKey(),
     wishlistItemId: integer("wishlist_item_id")
       .notNull()
@@ -121,6 +149,7 @@ export const wishlistReplacement = pgTable(
       .references(() => gearItem.id, { onDelete: "cascade" }),
   },
   (t) => ({
+    ...syncIndexes("wishlist_replacement", t),
     wishlistReplacementUniq: uniqueIndex("wishlist_replacement_uniq").on(
       t.wishlistItemId,
       t.replacesItemId,
@@ -134,6 +163,7 @@ export const wishlistReplacement = pgTable(
 export const wishlistLoadout = pgTable(
   "wishlist_loadout",
   {
+    ...syncColumns(),
     id: serial("id").primaryKey(),
     wishlistItemId: integer("wishlist_item_id")
       .notNull()
@@ -144,12 +174,14 @@ export const wishlistLoadout = pgTable(
     included: boolean("included").notNull(),
   },
   (t) => ({
+    ...syncIndexes("wishlist_loadout", t),
     wishlistLoadoutUniq: uniqueIndex("wishlist_loadout_uniq").on(t.wishlistItemId, t.loadoutId),
   }),
 );
 
 // A reusable kit — a named subset of gear. Trips copy a loadout as a template.
 export const loadout = pgTable("loadout", {
+  ...syncColumns(),
   id: serial("id").primaryKey(),
   userId: integer("user_id")
     .notNull()
@@ -159,12 +191,13 @@ export const loadout = pgTable("loadout", {
   sortOrder: integer("sort_order").notNull().default(0),
   notes: text("notes"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => syncIndexes("loadout", t));
 
 // Membership of a gear item in a loadout, with a per-loadout worn/packed choice.
 export const loadoutItem = pgTable(
   "loadout_item",
   {
+    ...syncColumns(),
     id: serial("id").primaryKey(),
     loadoutId: integer("loadout_id")
       .notNull()
@@ -175,12 +208,14 @@ export const loadoutItem = pgTable(
     weightClass: packClass("weight_class").notNull().default("base"),
   },
   (t) => ({
+    ...syncIndexes("loadout_item", t),
     loadoutItemUniq: uniqueIndex("loadout_item_uniq").on(t.loadoutId, t.gearItemId),
   }),
 );
 
 // Reusable route/destination catalog (a trail can be hiked more than once).
 export const trail = pgTable("trail", {
+  ...syncColumns(),
   id: serial("id").primaryKey(),
   userId: integer("user_id")
     .notNull()
@@ -191,9 +226,10 @@ export const trail = pgTable("trail", {
   typicalDistanceMi: numeric("typical_distance_mi"),
   typicalElevationFt: integer("typical_elevation_ft"),
   notes: text("notes"),
-});
+}, (t) => syncIndexes("trail", t));
 
 export const trip = pgTable("trip", {
+  ...syncColumns(),
   id: serial("id").primaryKey(),
   userId: integer("user_id")
     .notNull()
@@ -236,24 +272,26 @@ export const trip = pgTable("trip", {
   packingList: text("packing_list"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => syncIndexes("trip", t));
 
 // A visit remembers a link in the visitor's trip list. Revoking a link removes
 // its visits, including edit grants, without affecting the other permission.
 export const tripShareVisit = pgTable(
   "trip_share_visit",
   {
+    serverSeq: bigint("server_seq", { mode: "bigint" }).notNull().default(sql`0`),
     tripId: integer("trip_id").notNull().references(() => trip.id, { onDelete: "cascade" }),
     userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     permission: text("permission").$type<"view" | "edit">().notNull(),
     visitedAt: timestamp("visited_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (t) => ({ tripShareVisitUniq: uniqueIndex("trip_share_visit_uniq").on(t.tripId, t.userId, t.permission) }),
+  (t) => ({ serverSeqIndex: index("trip_share_visit_server_seq_idx").on(t.serverSeq), tripShareVisitUniq: uniqueIndex("trip_share_visit_uniq").on(t.tripId, t.userId, t.permission) }),
 );
 
 // Per-user, singleton: the pre-trip report template and the master packing list
 // each trip's list is seeded from. Null columns fall back to code defaults (lib/report).
 export const reportSettings = pgTable("report_settings", {
+  ...syncColumns(),
   id: serial("id").primaryKey(),
   userId: integer("user_id")
     .notNull()
@@ -261,11 +299,12 @@ export const reportSettings = pgTable("report_settings", {
     .unique(),
   template: text("template"),
   packingDefault: text("packing_default"),
-});
+}, (t) => syncIndexes("report_settings", t));
 
 // Read-only Google Calendar (or any) secret iCal feeds, shown on the planning
 // calendar. url is a bearer-token .ics address; treat as a secret.
 export const calendarFeed = pgTable("calendar_feed", {
+  ...syncColumns(),
   id: serial("id").primaryKey(),
   userId: integer("user_id")
     .notNull()
@@ -274,11 +313,13 @@ export const calendarFeed = pgTable("calendar_feed", {
   color: text("color").notNull().default("#1f7a70"),
   url: text("url").notNull(),
   sortOrder: integer("sort_order").notNull().default(0),
-});
+}, (t) => syncIndexes("calendar_feed", t));
 
 // One uploaded permit per trip (PDF or image), bytes stored inline so it travels
 // with DB backups. Replaced on re-upload; tripId is the PK.
 export const tripPermit = pgTable("trip_permit", {
+  ...syncColumns(),
+  sha256: text("sha256"),
   tripId: integer("trip_id")
     .primaryKey()
     .references(() => trip.id, { onDelete: "cascade" }),
@@ -287,9 +328,10 @@ export const tripPermit = pgTable("trip_permit", {
   sizeBytes: integer("size_bytes").notNull(),
   data: bytea("data").notNull(),
   uploadedAt: timestamp("uploaded_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => syncIndexes("trip_permit", t));
 
 export const tripDay = pgTable("trip_day", {
+  ...syncColumns(),
   id: serial("id").primaryKey(),
   tripId: integer("trip_id")
     .notNull()
@@ -297,13 +339,14 @@ export const tripDay = pgTable("trip_day", {
   dayNumber: integer("day_number").notNull(),
   distanceMi: numeric("distance_mi"),
   elevationGainFt: integer("elevation_gain_ft"),
-});
+}, (t) => syncIndexes("trip_day", t));
 
 // Per-trip gear selection. Name/weight copies are kept current by
 // lib/trip-propagation.ts; category and other allocation choices stay per-trip.
 export const tripGear = pgTable(
   "trip_gear",
   {
+    ...syncColumns(),
     id: serial("id").primaryKey(),
     tripId: integer("trip_id")
       .notNull()
@@ -318,6 +361,7 @@ export const tripGear = pgTable(
     sortOrder: integer("sort_order").notNull().default(0),
   },
   (t) => ({
+    ...syncIndexes("trip_gear", t),
     tripItemUniq: uniqueIndex("trip_gear_trip_item_uniq").on(t.tripId, t.gearItemId),
   }),
 );
@@ -325,6 +369,7 @@ export const tripGear = pgTable(
 // Reusable food component with per-100g nutrition. density_g_ml (when known,
 // from USDA reference data, a product label, or a user measurement) enables weight<->volume conversion.
 export const ingredient = pgTable("ingredient", {
+  ...syncColumns(),
   id: serial("id").primaryKey(),
   userId: integer("user_id")
     .notNull()
@@ -339,11 +384,12 @@ export const ingredient = pgTable("ingredient", {
   source: text("source"), // 'usda' | 'off' | 'manual'
   sourceId: text("source_id"), // FDC id or Open Food Facts barcode
   notes: text("notes"),
-});
+}, (t) => syncIndexes("ingredient", t));
 
 // A recipe yielding base_servings servings. Ingredient amounts are stored for
 // the whole recipe at base_servings; per-serving = amount_g / base_servings.
 export const meal = pgTable("meal", {
+  ...syncColumns(),
   id: serial("id").primaryKey(),
   userId: integer("user_id")
     .notNull()
@@ -355,11 +401,12 @@ export const meal = pgTable("meal", {
   waterMl: integer("water_ml"), // boiling water to cook; null on a hot meal → default rate
   notes: text("notes"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => syncIndexes("meal", t));
 
 // An ingredient line in a meal. Name, nutrition and density copies are kept
 // current by lib/trip-propagation.ts; amounts belong to the recipe.
 export const mealIngredient = pgTable("meal_ingredient", {
+  ...syncColumns(),
   id: serial("id").primaryKey(),
   mealId: integer("meal_id")
     .notNull()
@@ -372,12 +419,13 @@ export const mealIngredient = pgTable("meal_ingredient", {
   enteredUnit: text("entered_unit"), // g, oz, or a VOLUME_ML key
   amountG: integer("amount_g").notNull(), // grams for the whole recipe at base_servings
   sortOrder: integer("sort_order").notNull().default(0),
-});
+}, (t) => syncIndexes("meal_ingredient", t));
 
 // A meal or standalone ingredient placed on a trip day. Exactly one of
 // meal_id / ingredient_id is set. Name/totals copies are kept current by
 // lib/trip-propagation.ts; servings and standalone ingredient grams stay per-trip.
 export const tripMeal = pgTable("trip_meal", {
+  ...syncColumns(),
   id: serial("id").primaryKey(),
   tripId: integer("trip_id")
     .notNull()
@@ -391,9 +439,10 @@ export const tripMeal = pgTable("trip_meal", {
   snapshotKcal: integer("snapshot_kcal").notNull(), // total for this entry
   snapshotWeightG: integer("snapshot_weight_g").notNull(), // total for this entry
   sortOrder: integer("sort_order").notNull().default(0),
-});
+}, (t) => syncIndexes("trip_meal", t));
 
 export const tripConsumable = pgTable("trip_consumable", {
+  ...syncColumns(),
   id: serial("id").primaryKey(),
   tripId: integer("trip_id")
     .notNull()
@@ -402,10 +451,11 @@ export const tripConsumable = pgTable("trip_consumable", {
   label: text("label"),
   grams: integer("grams").notNull(),
   dayNumber: integer("day_number"),
-});
+}, (t) => syncIndexes("trip_consumable", t));
 
 // Uploaded GPX for a trip: raw XML plus derived route data for map + profile.
 export const tripGpx = pgTable("trip_gpx", {
+  ...syncColumns(),
   id: serial("id").primaryKey(),
   tripId: integer("trip_id")
     .notNull()
@@ -423,10 +473,11 @@ export const tripGpx = pgTable("trip_gpx", {
   // Unified route points shared by the map + elevation profile + campsite placement.
   points: jsonb("points").$type<{ d: number; lat: number; lon: number; e: number }[]>(),
   uploadedAt: timestamp("uploaded_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => syncIndexes("trip_gpx", t));
 
 // A night's campsite along the route, placed on the elevation profile.
 export const tripCampsite = pgTable("trip_campsite", {
+  ...syncColumns(),
   id: serial("id").primaryKey(),
   tripId: integer("trip_id")
     .notNull()
@@ -435,7 +486,7 @@ export const tripCampsite = pgTable("trip_campsite", {
   lat: numeric("lat"),
   lon: numeric("lon"),
   eleFt: integer("ele_ft"),
-});
+}, (t) => syncIndexes("trip_campsite", t));
 
 export const file = pgTable("file", {
   id: serial("id").primaryKey(),
@@ -448,3 +499,43 @@ export const file = pgTable("file", {
   storageUrl: text("storage_url").notNull(),
   uploadedAt: timestamp("uploaded_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+// Device bearer tokens and short-lived authorization codes are stored only as hashes.
+export const deviceSession = pgTable("device_session", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  deviceName: text("device_name").notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+});
+
+export const deviceAuthCode = pgTable("device_auth_code", {
+  codeHash: text("code_hash").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  codeChallenge: text("code_challenge").notNull(),
+  deviceName: text("device_name").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+});
+
+export const syncBatch = pgTable("sync_batch", {
+  batchId: uuid("batch_id").notNull(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  result: jsonb("result").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({ pk: primaryKey({ columns: [t.userId, t.batchId] }) }));
+
+export const syncTombstone = pgTable("sync_tombstone", {
+  id: bigserial("id", { mode: "bigint" }).primaryKey(),
+  tbl: text("tbl").notNull(),
+  syncId: uuid("sync_id").notNull(),
+  ownerUserId: integer("owner_user_id").notNull(),
+  tripId: integer("trip_id"),
+  serverSeq: bigint("server_seq", { mode: "bigint" }).notNull(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  ownerSeqIndex: index("sync_tombstone_owner_seq_idx").on(t.ownerUserId, t.serverSeq),
+  tripSeqIndex: index("sync_tombstone_trip_seq_idx").on(t.tripId, t.serverSeq),
+}));

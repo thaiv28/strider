@@ -1,0 +1,12 @@
+[package]
+name = "strider-ui"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+gpui.workspace = true
+gpui-component.workspace = true
+strider-map = { path = "../strider-map" }
+strider-core = { path = "../strider-core" }
