@@ -8,6 +8,8 @@ import { DEFAULT_TEMPLATE, DEFAULT_PACKING } from "@/lib/report";
 import { AppearanceSetting } from "@/components/appearance-setting";
 import { PageHeader, PageBody } from "@/components/page-header";
 import { Button } from "@/components/ui";
+import { Devices } from "@/components/settings/devices";
+import { listDevices } from "./actions";
 import { logout } from "@/app/login/actions";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +19,7 @@ const num = (s: string | null) => (s == null ? null : Number(s));
 
 export default async function SettingsPage() {
   const userId = await getCurrentUserId();
+  const devices = await listDevices();
   const [ep] = await db.select().from(schema.energyParams).where(eq(schema.energyParams.userId, userId));
   const [rs] = await db.select().from(schema.reportSettings).where(eq(schema.reportSettings.userId, userId));
   const feeds = await db.select().from(schema.calendarFeed).where(eq(schema.calendarFeed.userId, userId)).orderBy(schema.calendarFeed.sortOrder);
@@ -27,6 +30,7 @@ export default async function SettingsPage() {
       <PageBody className="grid items-start gap-4 desk:grid-cols-2">
         <div className="min-w-0 space-y-3">
           <AppearanceSetting />
+          <Devices devices={devices} />
           <EnergyModel
             params={{
               bmr: ep?.bmr ?? 1735,

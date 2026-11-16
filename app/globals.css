@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* Never scan the Rust desktop app: desktop/target holds gigabytes of build output, and
+   scanning it exhausted memory during next build (2026-11-16). */
+@source not "../desktop";
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
 
 @theme inline {

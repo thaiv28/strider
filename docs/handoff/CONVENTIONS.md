@@ -21,8 +21,8 @@ changes correct.
   re-exported from `lib/gear.ts` for server code.
 
 ## Mutations
-- All writes are server actions in `app/<area>/actions.ts` (`"use server"`), and
-  must `revalidatePath()` every route they affect (`/gear`, `/`, `/trips/[id]`…).
+- Web writes are server actions in `app/<area>/actions.ts` (`"use server"`);
+  device writes use authenticated `/api/v1/` handlers. Both must `revalidatePath()` every route they affect (`/gear`, `/`, `/trips/[id]`…).
 - Multi-row writes use `db.transaction`. The tx type is
   `Parameters<Parameters<typeof db.transaction>[0]>[0]`.
 - Client UI updates optimistically (local state) inside a `useTransition`, then
@@ -38,6 +38,16 @@ changes correct.
   preserve compatible application behavior during rollout, and document the
   irreversible part. Do not assume reverting application code reverses a
   migration.
+- Every new synced table needs `sync_id` (UUID, default random, unique index),
+  `server_seq` (bigint, default zero, btree index), both shared sync triggers,
+  an entry in `lib/sync/registry.ts`, and explicit push authorization, column
+  allowlists, validation, and derived-data rules. Backfill existing sequence
+  values in the migration before attaching triggers. `trip_share_visit` uses
+  only `server_seq` because it represents access grants rather than synced rows.
+- Sync trigger SQL is appended to the generated migration with statement
+  breakpoints; keep the generated schema snapshot consistent. The shared
+  advisory transaction lock globally serializes synced writes until commit;
+  keep these transactions short and never allocate sync sequences outside it.
 - Blobs use a `customType<{data: Buffer}>` mapping to `bytea` (see `trip_permit`).
 
 ## Domain rules
@@ -118,6 +128,14 @@ stays light.
   health checks. `/share/trips/[token]` and its permit handler are deliberately
   public bearer-link routes: validate the token on every request, keep them
   read-only, and never include `trip_report` private notes.
+- `/api/v1/` deliberately bypasses browser-session middleware. Every handler
+  except `POST /api/v1/auth/token` must authenticate an unrevoked device bearer
+  token, enforce row ownership or an active trip grant, require a supported
+  `X-Strider-App-Version`, and return `Cache-Control: no-store`. Never treat a
+  browser session as device authentication. Store only SHA-256 token/code hashes;
+  device authorization codes are single-use, expire after 60 seconds, and require
+  PKCE S256. Never include permit bytes or other owners' private Trip Report
+  notes/link tokens in row pull responses.
 - Google sign-in requests identity scopes only. Future Google API permissions
   must use a separate incremental-consent flow.
 - Authentication tests use the hidden Auth.js `e2e` provider and dedicated

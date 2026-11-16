@@ -39,6 +39,9 @@ truth, and keep operational behavior in version-controlled workflows/scripts.
   redirects to sign-in, records the visitor, then opens the trip editor.
   Link revocation removes matching visits. Private report notes, sharing,
   and deletion remain owner-only.
+- The desktop API on branch `desktop-spike` bypasses the browser-session gate
+  under `/api/v1/` and authenticates device tokens in every handler except token
+  exchange. It requires a supported app version and sets `Cache-Control: no-store`.
 - `/api/health` verifies that the app can query PostgreSQL; it does not verify
   every third-party map, food, weather, or calendar dependency.
 
@@ -69,7 +72,9 @@ See `docs/handoff/OPERATIONS.md` and `docs/adr/0001-single-instance-aws-runtime.
 | `/gear` | **Gear Library** — inventory, loadouts, kits, and the Wishlist tab |
 | `/food` | meals, ingredients/pantry, nutrition |
 | `/calendar` | planning calendar over iCal feeds |
-| `/settings` | report template, master packing list, energy/BMR params |
+| `/settings` | report template, master packing list, energy/BMR params, desktop device sessions |
+| `/desktop/authorize` | browser-session consent for desktop loopback sign-in with PKCE S256 |
+| `/api/v1/*` | device-token API: token exchange/revocation, profile, row sync, permit bytes, sharing, food search, geocode |
 
 ## Data model (highlights — full detail in `src/db/schema.ts`)
 
@@ -94,9 +99,28 @@ See `docs/handoff/OPERATIONS.md` and `docs/adr/0001-single-instance-aws-runtime.
 - `calendar_feed` (secret iCal URLs), `report_settings` (singleton template +
   packing default), `energy_params` (BMR + calorie-burn tunables).
 
+### Desktop sync additions (branch `desktop-spike`, pending deployment)
+
+The 22 synced domain tables have stable UUID `sync_id` values with unique indexes
+and indexed bigint `server_seq` values. `trip_share_visit` has an indexed sequence
+for grant changes. `sync_seq` supplies global ordering; shared PostgreSQL triggers
+cover both web and device writes. `sync_tombstone` records visible deletions and
+visit revocations. Missing parents suppress redundant cascade tombstones.
+`trip_permit.sha256` identifies permit content without sending bytes in row sync.
+
+`device_session` stores revocable device token hashes and usage metadata;
+`device_auth_code` stores single-use, expiring PKCE authorization code hashes.
+`sync_batch` stores each user's batch UUID and result for atomic retry handling.
+A transaction-scoped advisory lock serializes all synced writes globally until
+commit. This ensures cursor safety but limits write throughput across users.
+Server rules remain authoritative for derived values and active share grants.
+See `docs/adr/0005-desktop-device-sessions-and-sync-api.md`.
+
 ## `lib/` map
 
 `gear.ts` (gear view/loadouts/wishlist — **server-only, imports pg**),
+`sync/` (server-only device authentication, table registry, row authorization,
+cursor pull, and transactional push),
 `categories.ts` (client-safe palette + the `Other` sentinel), `energy.ts`
 (calorie model), `food*.ts` / `pantry.ts` (nutrition + USDA/Open Food Facts
 search), `trip.ts`, `gpx.ts` (parse GPX → points/profile), `usgs-map.ts` +
