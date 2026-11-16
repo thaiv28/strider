@@ -38,7 +38,8 @@ pass the Team ID check.
 - An Apple Developer account, a Developer ID Application certificate and a
   `notarytool` keychain profile do not exist yet. Until then builds are ad-hoc
   signed and need right-click > Open on other Macs.
-- An update host (public HTTPS, stable URL) is undecided. The manifest URL is
-  baked into builds, so choose it before the first partner build.
+- Updates are hosted on AWS at `https://strider-releases.thaiv.dev` by the
+  isolated `ThaivStriderReleases` stack in `project-platform-infrastructure`
+  (private S3 behind CloudFront). The stack is not deployed yet.
 - Generate the update key pair and store the private seed outside the repo.
 - Notarization and a real end-to-end update have not been exercised.

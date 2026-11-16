@@ -16,6 +16,10 @@ type Result<T> = std::result::Result<T, String>;
 const BUNDLE_ID: &str = "dev.thaiv.strider";
 const MINIMUM_OS: &str = "13.0";
 const ICON_SVG: &str = "../app/icon.svg";
+/// Where releases are hosted (the `ThaivStriderReleases` stack in project-platform-infrastructure).
+const DEFAULT_UPDATE_URL: &str = "https://strider-releases.thaiv.dev/manifest.json";
+const RELEASES_STACK: &str = "ThaivStriderReleases";
+const RELEASES_REGION: &str = "us-west-2";
 
 fn main() -> ExitCode {
     let mut args = std::env::args().skip(1);
@@ -27,9 +31,11 @@ fn main() -> ExitCode {
         "notarize" => notarize(),
         "release" => release(),
         "keygen" => keygen(),
-        _ => {
-            Err("usage: cargo xtask bundle [--release] | sign | notarize | release | keygen".into())
-        }
+        "publish" => publish(),
+        _ => Err(
+            "usage: cargo xtask bundle [--release] | sign | notarize | release | publish | keygen"
+                .into(),
+        ),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -262,7 +268,7 @@ fn bundle(release: bool) -> Result<PathBuf> {
     let version = app_version()?;
     let plist = info_plist(
         &version,
-        &env_var("STRIDER_UPDATE_URL").unwrap_or_default(),
+        &update_url(),
         &env_var("STRIDER_UPDATE_PUBKEY").unwrap_or_default(),
     );
     let plist_path = app.join("Contents/Info.plist");
@@ -407,13 +413,104 @@ fn zip_url(zip_name: &str) -> String {
     if let Some(url) = env_var("STRIDER_RELEASE_URL") {
         return url;
     }
-    match env_var("STRIDER_UPDATE_URL") {
-        Some(url) => match url.rsplit_once('/') {
-            Some((base, _)) => format!("{base}/{zip_name}"),
-            None => zip_name.to_owned(),
-        },
+    match update_url().rsplit_once('/') {
+        Some((base, _)) => format!("{base}/{zip_name}"),
         None => zip_name.to_owned(),
     }
+}
+
+/// The manifest URL baked into builds: `STRIDER_UPDATE_URL`, else the AWS releases host.
+/// Updates stay off in a build without `STRIDER_UPDATE_PUBKEY`, whatever the URL.
+fn update_url() -> String {
+    env_var("STRIDER_UPDATE_URL").unwrap_or_else(|| DEFAULT_UPDATE_URL.to_owned())
+}
+
+fn aws_output(stack_output: &str) -> Result<String> {
+    let out = Command::new("aws")
+        .args([
+            "cloudformation",
+            "describe-stacks",
+            "--region",
+            RELEASES_REGION,
+            "--stack-name",
+            RELEASES_STACK,
+        ])
+        .args([
+            "--query",
+            &format!("Stacks[0].Outputs[?OutputKey=='{stack_output}'].OutputValue"),
+            "--output",
+            "text",
+        ])
+        .output()
+        .map_err(|e| format!("aws: {e} (install the AWS CLI and sign in, e.g. `aws sso login`)"))?;
+    let value = String::from_utf8_lossy(&out.stdout).trim().to_owned();
+    if !out.status.success() || value.is_empty() || value == "None" {
+        return Err(format!(
+            "could not read {stack_output} from the {RELEASES_STACK} stack: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ));
+    }
+    Ok(value)
+}
+
+/// Uploads the artifacts `release` wrote: the zip first (immutable), then the manifest
+/// (no-cache), then invalidates `/manifest.json`, so clients never see a manifest whose zip
+/// is missing. Uses the caller's AWS session.
+fn publish() -> Result<()> {
+    let version = app_version()?;
+    let out = target().join("release-artifacts");
+    let name = format!("Strider-{version}.zip");
+    let (zip, manifest) = (out.join(&name), out.join("manifest.json"));
+    for path in [&zip, &manifest] {
+        if !path.exists() {
+            return Err(format!(
+                "{} is missing; run `cargo xtask release` with STRIDER_UPDATE_SIGNING_KEY set",
+                path.display()
+            ));
+        }
+    }
+    let manifest_text = fs::read_to_string(&manifest).map_err(|e| e.to_string())?;
+    let parsed: serde_json::Value =
+        serde_json::from_str(&manifest_text).map_err(|e| e.to_string())?;
+    if parsed["version"] != version.as_str() {
+        return Err(format!(
+            "manifest.json is for {}, not {version}",
+            parsed["version"]
+        ));
+    }
+    let bucket = aws_output("DeploymentBucket")?;
+    let distribution = aws_output("CloudFrontDistributionId")?;
+    let zip_target = format!("s3://{bucket}/current/{name}");
+    run(Command::new("aws")
+        .args(["s3", "cp"])
+        .arg(&zip)
+        .arg(&zip_target)
+        .args([
+            "--content-type",
+            "application/zip",
+            "--cache-control",
+            "public, max-age=31536000, immutable",
+        ]))?;
+    run(Command::new("aws")
+        .args(["s3", "cp"])
+        .arg(&manifest)
+        .arg(format!("s3://{bucket}/current/manifest.json"))
+        .args([
+            "--content-type",
+            "application/json",
+            "--cache-control",
+            "no-cache",
+        ]))?;
+    run(Command::new("aws").args([
+        "cloudfront",
+        "create-invalidation",
+        "--distribution-id",
+        &distribution,
+        "--paths",
+        "/manifest.json",
+    ]))?;
+    println!("Published Strider {version} to {}", update_url());
+    Ok(())
 }
 
 fn manifest(

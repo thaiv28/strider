@@ -581,7 +581,7 @@ installs a strictly newer semver.
 
 | Variable | Used by | Meaning |
 | --- | --- | --- |
-| `STRIDER_UPDATE_URL` | `bundle`, `release` | HTTPS URL of `manifest.json`, baked into the build (`StriderUpdateURL`). Empty means updates are off. |
+| `STRIDER_UPDATE_URL` | `bundle`, `release`, `publish` | HTTPS URL of `manifest.json`, baked into the build (`StriderUpdateURL`). Default: `https://strider-releases.thaiv.dev/manifest.json`. Updates stay off in builds without `STRIDER_UPDATE_PUBKEY`. |
 | `STRIDER_UPDATE_PUBKEY` | `bundle`, `release` | Base64 ed25519 public key, baked in (`StriderUpdatePublicKey`). |
 | `STRIDER_SIGN_IDENTITY` | `sign` | Developer ID Application identity name. Unset: ad-hoc signing (`--sign -`, no timestamp) and a one-line notice. |
 | `STRIDER_NOTARY_PROFILE` | `notarize`, `release` | A `notarytool` keychain profile (`xcrun notarytool store-credentials <name>`). Unset: notarization is skipped and the missing variable is printed. |
@@ -603,18 +603,22 @@ the key baked into them.
 ### Cut a release
 
 ```sh
-export STRIDER_UPDATE_URL=https://<host>/strider/manifest.json
 export STRIDER_UPDATE_PUBKEY=...        # from keygen
 export STRIDER_UPDATE_SIGNING_KEY=...   # from keygen
 export STRIDER_SIGN_IDENTITY="Developer ID Application: <Name> (<TEAMID>)"
 export STRIDER_NOTARY_PROFILE=<profile>
 cargo xtask release
+aws sso login                           # any session that can read the stack and write its bucket
+cargo xtask publish
 ```
 
-Upload both files from `target/release-artifacts/` to the same public HTTPS directory:
-`manifest.json` at exactly `STRIDER_UPDATE_URL` and `Strider-<version>.zip` at the manifest's
-`url`. Upload the zip first, the manifest last. The manifest URL is fixed in every build, so
-choose the host once. The manifest is
+Releases are hosted on AWS by the `ThaivStriderReleases` stack in
+`thaiv28/project-platform-infrastructure` (deployed only by its **Deploy Strider Releases
+Infrastructure** workflow): a private S3 bucket behind CloudFront at
+`https://strider-releases.thaiv.dev`. `publish` reads the bucket and distribution from the stack's
+outputs, uploads `Strider-<version>.zip` (immutable) before `manifest.json` (no-cache) under
+`current/`, then invalidates `/manifest.json`. The manifest URL is fixed in every build. The
+manifest is
 `{ version, url, sha256, size, signature, notes, minimum_os }`; `signature` is ed25519 over
 `"<version>\n<sha256>"`.
 
